@@ -5,8 +5,19 @@ const List = require('../models/list'); // Import the List model
 // Get all lists for a goal
 router.get('/:goalId', async (req, res) => {
   try {
-    console.log("list get");
+    console.log("list get for goal");
     const lists = await List.find({ goalId: req.params.goalId });
+    res.status(200).json(lists);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all lists
+router.get('/', async (req, res) => {
+  try {
+    console.log("get lists");
+    const lists = await List.find();
     res.status(200).json(lists);
   } catch (err) {
     res.status(500).json({ error: err.message });

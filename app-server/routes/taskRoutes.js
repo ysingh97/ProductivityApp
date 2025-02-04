@@ -28,11 +28,11 @@ router.get('/', async(req, res) => {
 router.post('/', async (req, res) => {
   try {
     console.log("task post request", req);
-    const {title, description, completed} = req.body;
+    const {title, description, listId} = req.body;
     const newTask = new Task({
       title,
       description,
-      completed,
+      listId,
     });
     const savedTask = await newTask.save();
     res.status(201).json(savedTask);
