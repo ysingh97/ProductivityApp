@@ -6,11 +6,11 @@ const ListForm = ({ onSubmit }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault(); // Prevent page reload
-    const taskData = {
+    const listData = {
         title,
         description,
     };
-    onSubmit(taskData); // Pass form data to parent
+    onSubmit(listData); // Pass form data to parent
     setTitle(""); // Clear the form fields
     setDescription("");
   };

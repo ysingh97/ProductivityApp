@@ -1,6 +1,8 @@
 import ListForm from '../features/listForm';
 import React, { useState } from "react";
 import { Link } from 'react-router-dom';
+import axios from 'axios';
+import { createList } from '../services/listService';
 
 const CreateListPage = () => {
     const [lists, setLists] = useState([]);
@@ -11,20 +13,23 @@ const CreateListPage = () => {
     
         try {
           // POST request to the backend
-          const response = await fetch("http://localhost:5000/api/lists", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(listData),
-          });
+          const response = await createList(listData);
+          const createdList = response.data;
+
+          // const response = await fetch("http://localhost:5000/api/lists", {
+          //   method: "POST",
+          //   headers: {
+          //     "Content-Type": "application/json",
+          //   },
+          //   body: JSON.stringify(listData),
+          // });
     
-          if (!response.ok) {
-            throw new Error("Failed to add list");
-          }
+          // if (!response.ok) {
+          //   throw new Error("Failed to add list");
+          // }
     
-          const newList = await response.json();
-          setLists((prevLists) => [...prevLists, newList]); // Update list of lists
+          // const newList = await response.json();
+          setLists((prevLists) => [...prevLists, createdList]); // Update list of lists
         } catch (err) {
           setError(err.message);
         }
