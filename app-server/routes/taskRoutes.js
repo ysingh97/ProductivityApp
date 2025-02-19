@@ -5,7 +5,7 @@ const Task = require('../models/task'); // Import the Task model
 // Get all tasks for a list
 router.get('/:listId', async (req, res) => {
   try {
-    console.log("task get");
+    //console.log("task get");
     const tasks = await Task.find({ listId: req.params.listId });
     res.status(200).json(tasks);
   } catch (err) {
@@ -16,7 +16,7 @@ router.get('/:listId', async (req, res) => {
 // Get all tasks
 router.get('/', async(req, res) => {
   try {
-    console.log("get all tasks");
+    //console.log("get all tasks");
     const tasks = await Task.find();
     res.status(200).json(tasks);
   } catch (err) {
@@ -27,12 +27,12 @@ router.get('/', async(req, res) => {
 // Create a new task
 router.post('/', async (req, res) => {
   try {
-    console.log("task post request", req);
-    const {title, description, completed} = req.body;
-    const newTask = new Task({
+    //console.log("task post request", req);
+    const {title, description, listId} = req.body;
+    const newTask = new Task({  
       title,
       description,
-      completed,
+      listId,
     });
     const savedTask = await newTask.save();
     res.status(201).json(savedTask);
@@ -40,5 +40,21 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Delete a task
+router.delete('/:id', async (req, res) => {
+  try {
+    //console.log("delete task request: ", req, ". params: ", req.params);
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    await task.deleteOne();
+    res.json({ message: "Task deleted successfully" });
+  } catch {
+
+  }
+})
 
 module.exports = router;

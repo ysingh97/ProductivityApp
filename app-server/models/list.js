@@ -6,15 +6,21 @@ const listSchema = new mongoose.Schema({
     type: String,
     required: true, // The list's name is mandatory
   },
+  description: {
+    type: String
+  },
   goalId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Goal', // References the Goal model
-    required: true, // Each list must belong to a specific goal
+    required: false, // Each list must belong to a specific goal
   },
   createdAt: {
     type: Date,
     default: Date.now, // Automatically set to the current date
   },
+  tasks: {
+    type: [{type: mongoose.Schema.Types.ObjectId, ref: 'Task'}]
+  }
 });
 
 // Create the List model
