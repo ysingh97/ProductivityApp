@@ -13,7 +13,13 @@ const ListView = ({ tasks, handleTaskDelete }) => {
     
     if (!tasks | tasks.length === 0) {
         console.log("listview: no tasks");
-        return <p>No tasks found</p>;
+        return (
+            <div>
+                <p>No tasks found</p>
+                <Link to="/">Back to Taskboard</Link>
+            </div>
+            
+        );
     }
 
     return (
