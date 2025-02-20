@@ -1,6 +1,7 @@
 import TaskForm from '../features/taskForm';
 import React, { useState } from "react";
 import { Link } from 'react-router-dom';
+import { createTask } from '../services/taskService';
 
 const EnterTaskPage = () => {
     const [tasks, setTasks] = useState([]);
@@ -11,19 +12,21 @@ const EnterTaskPage = () => {
     
         try {
           // POST request to the backend
-          const response = await fetch("http://localhost:5000/api/tasks", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(taskData),
-          });
+          
+          const response = await createTask(taskData);
+          // const response = await fetch("http://localhost:5000/api/tasks", {
+          //   method: "POST",
+          //   headers: {
+          //     "Content-Type": "application/json",
+          //   },
+          //   body: JSON.stringify(taskData),
+          // });
     
-          if (!response.ok) {
-            throw new Error("Failed to add task");
-          }
+          // if (!response.ok) {
+          //   throw new Error("Failed to add task");
+          // }
     
-          const newTask = await response.json();
+          const newTask = await response.data;
           setTasks((prevTasks) => [...prevTasks, newTask]); // Update task list
         } catch (err) {
           setError(err.message);

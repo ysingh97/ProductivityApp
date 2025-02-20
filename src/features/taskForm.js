@@ -24,7 +24,8 @@ const TaskForm = ({ onSubmit }) => {
   useEffect(() => {
       const loadLists = async () => {
         try {
-          const listData = await fetchLists();
+          const response = await fetchLists();
+          const listData = response.data;
           setLists(listData);
         } catch (err) {
           setError('Failed to load tasks');
