@@ -4,29 +4,29 @@ import { fetchLists } from '../services/listService';
 import { Link } from 'react-router-dom';
 
 const TaskBoard = () => {
-  const [tasks, setTasks] = useState([]); // State to store tasks
+  const [tasks, setTasks] = useState([]);
   const [lists, setLists] = useState([])
-  const [loading, setLoading] = useState(true); // State to track loading status
-  const [error, setError] = useState(null); // State to track errors
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const loadTasks = async () => {
       try {
         console.log("Begin load tasks");
-        const taskData = await fetchTasks(); // Fetch tasks using the service
-        setTasks(taskData); // Set the fetched tasks into state
-        const listData = await fetchLists();
-        setLists(listData);
+        const taskResponse = await fetchTasks();
+        setTasks(taskResponse.data);
+        const listResponse = await fetchLists();
+        setLists(listResponse.data);
       } catch (err) {
         setError('Failed to load tasks');
         console.error(err.message);
       } finally {
-        setLoading(false); // Mark loading as finished
+        setLoading(false);
       }
     };
 
-    loadTasks(); // Call the function on component mount
-  }, []); // Empty dependency array ensures it runs once on mount
+    loadTasks();
+  }, []);
 
   if (loading) return <p>Loading tasks...</p>;
   if (error) return <p>{error}</p>;

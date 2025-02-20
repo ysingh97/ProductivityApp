@@ -15,20 +15,7 @@ const CreateListPage = () => {
           // POST request to the backend
           const response = await createList(listData);
           const createdList = response.data;
-
-          // const response = await fetch("http://localhost:5000/api/lists", {
-          //   method: "POST",
-          //   headers: {
-          //     "Content-Type": "application/json",
-          //   },
-          //   body: JSON.stringify(listData),
-          // });
-    
-          // if (!response.ok) {
-          //   throw new Error("Failed to add list");
-          // }
-    
-          // const newList = await response.json();
+          console.log("handleListSubmit - created list: ", createdList);
           setLists((prevLists) => [...prevLists, createdList]); // Update list of lists
         } catch (err) {
           setError(err.message);

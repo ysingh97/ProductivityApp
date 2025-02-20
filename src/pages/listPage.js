@@ -19,20 +19,18 @@ const ListPage = () => {
         console.log("List useEffect");
         const loadTasks = async () => {
           try {
-            //console.log("Begin load tasks from listPage");
-            let taskData = await fetchTasks(); // Fetch tasks using the service
-            //console.log("task data: ", taskData);
+            let response = await fetchTasks();
+            let taskData = response.data;
             var filteredTaskData = taskData.filter(task => task.listId && task.listId.toString() === listId);
-            //console.log("filtered task data: ", filteredTaskData);
-            setTasks(filteredTaskData); // Set the fetched tasks into state
+            setTasks(filteredTaskData);
           } catch (err) {
             console.error(err.message);
           }
         };
     
-         loadTasks(); // Call the function on component mount
-      }, []); // Empty dependency array ensures it runs once on mount
-    //console.log(`list ${listId.toString()} view tasks: `, tasks);
+         loadTasks();
+      }, []);
+
     return (
         <div>
           <button onClick={() => setForceRerender(prev => !prev)}>Force Re-Render</button>
