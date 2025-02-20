@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchTasks, deleteTask } from '../services/taskService';
 import ListView from '../features/listView';
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 const ListPage = () => {
     const [tasks, setTasks] = useState([]); // State to store tasks
@@ -35,6 +35,7 @@ const ListPage = () => {
         <div>
           <button onClick={() => setForceRerender(prev => !prev)}>Force Re-Render</button>
           <ListView tasks={tasks} handleTaskDelete={handleTaskDelete} />
+          <Link to="/enterTaskPage" state={{listId: listId, isListFixed: true}}>Create Task</Link>
         </div>
         
     )

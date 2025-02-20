@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { fetchLists } from '../services/listService';
 import Select from 'react-select';
+import { useLocation } from "react-router-dom";
 
 const TaskForm = ({ onSubmit }) => {
+  const [lists, setLists] = useState([]);
+
+  const location = useLocation();
+  const listId = location.state?.listId || null;
+  const isListFixed = location.state?.isListFixed || false;
+  
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedList, setSelectedList] = useState(null);
-  const [lists, setLists] = useState([]);
-  const [error, setError] = useState(null); // State to track errors
+  const [error, setError] = useState(null);
 
+  console.log("Task Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
+  
   const handleSubmit = (e) => {
     e.preventDefault(); // Prevent page reload
     const taskData = {
@@ -16,8 +24,8 @@ const TaskForm = ({ onSubmit }) => {
         description,
         listId: selectedList.value
     };
-    onSubmit(taskData); // Pass form data to parent
-    setTitle(""); // Clear the form fields
+    onSubmit(taskData);
+    setTitle("");
     setDescription("");
   };
 
@@ -32,22 +40,38 @@ const TaskForm = ({ onSubmit }) => {
           console.error(err.message);
         } 
       };
-      loadLists(); // Call the function on component mount
-    }, []); // Empty dependency array ensures it runs once on mount
+      loadLists();
+    }, []);
 
-//   var options = [
-//     { value: 'chocolate', label: 'Chocolate' },
-//     { value: 'strawberry', label: 'Strawberry' },
-//     { value: 'vanilla', label: 'Vanilla' }
-//   ]
+  useEffect(() => {
+    var defaultSelectedList = null;
+    if (listId && isListFixed) {
+      var list = lists.find(list => list._id === listId);
+      console.log("list with listId: ", list);
+      defaultSelectedList = list ? { value: listId, label: list.title } : null;
+      setSelectedList(defaultSelectedList);
+    }
+    console.log("defaultselectedlist: ", defaultSelectedList);
+  }, [lists, listId, isListFixed]);
 
   var options = lists.map(list => ({
     value: list._id,
     label: list.title
   }));
 
-  console.log(lists);
-  console.log(options);
+  console.log("taskform - options: ", options);
+  console.log("taskform - selectedList: ", selectedList);
+
+  
+  // console.log("taskform - defaultselectedlist: ", defaultSelectedList);
+  // useEffect(() => {
+    
+  //   if (defaultSelectedList && selectedList !== defaultSelectedList) {
+  //     setSelectedList(defaultSelectedList);
+  //   }
+  // }, []);
+
+  
 
   return (
     <div>
@@ -73,8 +97,9 @@ const TaskForm = ({ onSubmit }) => {
         <div>
             <label htmlFor="list">List:</label>
             <Select options={options}
-                    value = {selectedList}
-                    onChange = {(option) => setSelectedList(option)} />
+                    value={selectedList}
+                    onChange={(option) => setSelectedList(option)}
+                    isDisabled={isListFixed}/>
         </div>
         <button type="submit">Add Task</button>
       </form>
