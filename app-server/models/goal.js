@@ -14,6 +14,43 @@ const goalSchema = new mongoose.Schema({
     type: Date,
     default: Date.now, // Automatically set to the current date
   },
+  targetCompletionDate: {
+    type: Date
+  },
+  isComplete: {
+    type: Boolean,
+    default: false
+  },
+  estimatedHours: {
+    type: Number,
+    default: 0
+  },
+  timeLeft: {
+    type: Number,
+    default: 0
+  },
+  timeSpent: {
+    type: Number,
+    default: 0
+  },
+  parentGoal: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Goal'
+  },
+  subGoals: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Goal'
+    }
+  ],
+  subTasks: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Task'
+    }
+  ]
+  
+
 });
 
 // Create the Goal model

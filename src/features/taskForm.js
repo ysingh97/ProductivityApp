@@ -13,6 +13,7 @@ const TaskForm = ({ onSubmit }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedList, setSelectedList] = useState(null);
+  const [selectedParentGoal, setSelectedParentGoal] = useState(null);
   const [error, setError] = useState(null);
 
   console.log("Task Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
@@ -22,7 +23,7 @@ const TaskForm = ({ onSubmit }) => {
     const taskData = {
         title,
         description,
-        listId: selectedList.value
+        listId: selectedList?.value
     };
     onSubmit(taskData);
     setTitle("");
@@ -30,11 +31,11 @@ const TaskForm = ({ onSubmit }) => {
   };
 
   useEffect(() => {
+      console.log("taskForm useEffect");
       const loadLists = async () => {
         try {
-          const response = await fetchLists();
-          const listData = response.data;
-          setLists(listData);
+          var listResponse = await fetchLists();
+          setLists(listResponse);
         } catch (err) {
           setError('Failed to load tasks');
           console.error(err.message);
@@ -54,12 +55,12 @@ const TaskForm = ({ onSubmit }) => {
     console.log("defaultselectedlist: ", defaultSelectedList);
   }, [lists, listId, isListFixed]);
 
-  var options = lists.map(list => ({
+  var selectedListOptions = lists.map(list => ({
     value: list._id,
     label: list.title
   }));
 
-  console.log("taskform - options: ", options);
+  console.log("taskform - options: ", selectedListOptions);
   console.log("taskform - selectedList: ", selectedList);
 
   
@@ -96,11 +97,18 @@ const TaskForm = ({ onSubmit }) => {
         </div>
         <div>
             <label htmlFor="list">List:</label>
-            <Select options={options}
+            <Select options={selectedListOptions}
                     value={selectedList}
                     onChange={(option) => setSelectedList(option)}
                     isDisabled={isListFixed}/>
         </div>
+        {/* <div>
+            <label htmlFor="list">Parent Goal:</label>
+            <Select options={options}
+                    value={selectedParentGoal}
+                    onChange={(option) => setSelectedParentGoal(option)}
+                    isDisabled={isListFixed}/>
+        </div> */}
         <button type="submit">Add Task</button>
       </form>
     </div>

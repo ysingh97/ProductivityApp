@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Link } from 'react-router-dom';
 import { createTask } from '../services/taskService';
 
-const EnterTaskPage = () => {
+const CreateTaskPage = () => {
     const [tasks, setTasks] = useState([]);
     const [error, setError] = useState(null);
 
@@ -14,18 +14,6 @@ const EnterTaskPage = () => {
           // POST request to the backend
           
           const response = await createTask(taskData);
-          // const response = await fetch("http://localhost:5000/api/tasks", {
-          //   method: "POST",
-          //   headers: {
-          //     "Content-Type": "application/json",
-          //   },
-          //   body: JSON.stringify(taskData),
-          // });
-    
-          // if (!response.ok) {
-          //   throw new Error("Failed to add task");
-          // }
-    
           const newTask = await response.data;
           setTasks((prevTasks) => [...prevTasks, newTask]); // Update task list
         } catch (err) {
@@ -43,4 +31,4 @@ const EnterTaskPage = () => {
     );
 };
 
-export default EnterTaskPage;
+export default CreateTaskPage;
