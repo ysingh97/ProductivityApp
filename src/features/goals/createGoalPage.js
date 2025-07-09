@@ -1,19 +1,19 @@
-import TaskForm from '../features/taskForm';
+import GoalForm from './goalForm';
 import React, { useState } from "react";
 import { Link } from 'react-router-dom';
-import { createTask } from '../services/taskService';
+import { createGoal } from './goalService';
 
-const CreateTaskPage = () => {
+const CreateGoalPage = () => {
     const [tasks, setTasks] = useState([]);
     const [error, setError] = useState(null);
 
-    const handleTaskSubmit = async (taskData) => {
+    const handleGoalSubmit = async (taskData) => {
         setError(null); // Clear any previous errors
     
         try {
           // POST request to the backend
           
-          const response = await createTask(taskData);
+          const response = await createGoal(taskData);
           const newTask = await response.data;
           setTasks((prevTasks) => [...prevTasks, newTask]); // Update task list
         } catch (err) {
@@ -24,11 +24,11 @@ const CreateTaskPage = () => {
 
     return (
         <div>
-        <h1>Enter Task</h1>
-        <TaskForm onSubmit={handleTaskSubmit}/>
+        <h1>Create Goal</h1>
+        <GoalForm onSubmit={handleGoalSubmit}/>
         <Link to="/">Back to Taskboard</Link>
         </div>
     );
 };
 
-export default CreateTaskPage;
+export default CreateGoalPage;

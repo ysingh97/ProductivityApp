@@ -33,7 +33,7 @@ const goalSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  parentGoal: {
+  parentGoalId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Goal'
   },

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { fetchLists } from '../services/listService';
+import { fetchLists } from '../lists/listService';
+import { fetchGoals } from '../goals/goalService';
 import Select from 'react-select';
 import { useLocation } from "react-router-dom";
 
 const TaskForm = ({ onSubmit }) => {
   const [lists, setLists] = useState([]);
+  const [parentGoals, setParentGoals] = useState([]);
 
   const location = useLocation();
   const listId = location.state?.listId || null;
   const isListFixed = location.state?.isListFixed || false;
+  const parentGoal = location.state?.parentGoal || null;
+  const isParentGoalFixed = location.state?.isParentGoalFixed || false;
   
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -16,14 +20,16 @@ const TaskForm = ({ onSubmit }) => {
   const [selectedParentGoal, setSelectedParentGoal] = useState(null);
   const [error, setError] = useState(null);
 
-  console.log("Task Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
+  //console.log("Task Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
   
   const handleSubmit = (e) => {
     e.preventDefault(); // Prevent page reload
+    console.log(`handle submit: title: ${title} - description: ${description} - list: ${selectedList?.value} - parentGoal: ${selectedParentGoal?.value}`)
     const taskData = {
         title,
         description,
-        listId: selectedList?.value
+        listId: selectedList?.value,
+        parentGoalId: selectedParentGoal?.value
     };
     onSubmit(taskData);
     setTitle("");
@@ -31,11 +37,15 @@ const TaskForm = ({ onSubmit }) => {
   };
 
   useEffect(() => {
-      console.log("taskForm useEffect");
+      //console.log("taskForm useEffect");
       const loadLists = async () => {
         try {
-          var listResponse = await fetchLists();
+          const [listResponse, goalResponse] = await Promise.all([
+              fetchLists(),
+              fetchGoals()
+          ]);
           setLists(listResponse);
+          setParentGoals(goalResponse);
         } catch (err) {
           setError('Failed to load tasks');
           console.error(err.message);
@@ -48,20 +58,34 @@ const TaskForm = ({ onSubmit }) => {
     var defaultSelectedList = null;
     if (listId && isListFixed) {
       var list = lists.find(list => list._id === listId);
-      console.log("list with listId: ", list);
+      //console.log("list with listId: ", list);
       defaultSelectedList = list ? { value: listId, label: list.title } : null;
       setSelectedList(defaultSelectedList);
     }
-    console.log("defaultselectedlist: ", defaultSelectedList);
+    //console.log("defaultselectedlist: ", defaultSelectedList);
   }, [lists, listId, isListFixed]);
+
+  useEffect(() => {
+      // If goal page is entered from another goal, provide parent goal as default parent goal
+      var defaultParentGoal = (parentGoal && isParentGoalFixed) ? { value: parentGoal._id, label: parentGoal.title } : null;
+      setSelectedParentGoal(defaultParentGoal);
+      console.log("default parent goal: ", defaultParentGoal);
+    }, [parentGoal, isParentGoalFixed]);
 
   var selectedListOptions = lists.map(list => ({
     value: list._id,
     label: list.title
   }));
 
-  console.log("taskform - options: ", selectedListOptions);
-  console.log("taskform - selectedList: ", selectedList);
+  var selectedParentGoalOptions = parentGoals.map(parentGoal => ({
+    value: parentGoal._id,
+    label: parentGoal.title
+  }));
+
+
+
+  //console.log("taskform - options: ", selectedListOptions);
+  //console.log("taskform - selectedList: ", selectedList);
 
   
   // console.log("taskform - defaultselectedlist: ", defaultSelectedList);
@@ -72,7 +96,7 @@ const TaskForm = ({ onSubmit }) => {
   //   }
   // }, []);
 
-  
+  console.log("parentgoal optionss: ", selectedParentGoalOptions);
 
   return (
     <div>
@@ -102,13 +126,13 @@ const TaskForm = ({ onSubmit }) => {
                     onChange={(option) => setSelectedList(option)}
                     isDisabled={isListFixed}/>
         </div>
-        {/* <div>
+        <div>
             <label htmlFor="list">Parent Goal:</label>
-            <Select options={options}
+            <Select options={selectedParentGoalOptions}
                     value={selectedParentGoal}
                     onChange={(option) => setSelectedParentGoal(option)}
-                    isDisabled={isListFixed}/>
-        </div> */}
+                    isDisabled={isParentGoalFixed}/>
+        </div>
         <button type="submit">Add Task</button>
       </form>
     </div>

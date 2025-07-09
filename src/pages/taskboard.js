@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { fetchTasks } from '../services/taskService';
-import { fetchLists } from '../services/listService';
-import { fetchGoals } from '../services/goalService';
+import { fetchTasks } from '../features/tasks/taskService';
+import { fetchLists } from '../features/lists/listService';
+import { fetchGoals } from '../features/goals/goalService';
 import { Link } from 'react-router-dom';
 
 const TaskBoard = () => {

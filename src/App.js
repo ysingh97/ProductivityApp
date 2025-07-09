@@ -1,10 +1,10 @@
 import './App.css';
 import TaskBoard from './pages/taskboard';
-import CreateTaskPage from './pages/createTaskPage';
-import CreateListPage from './pages/createListPage';
-import CreateGoalPage from './pages/createGoalPage';
-import ListPage from './pages/listPage';
-import GoalPage from './pages/goalPage';
+import CreateTaskPage from './features/tasks/createTaskPage';
+import CreateListPage from './features/lists/createListPage';
+import CreateGoalPage from './features/goals/createGoalPage';
+import ListPage from './features/lists/listPage';
+import GoalPage from './features/goals/goalPage';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 function App() {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fetchGoals } from '../services/goalService'
+import { fetchGoals } from './goalService'
 import Select from 'react-select';
 import { useLocation } from "react-router-dom";
 
@@ -9,7 +9,7 @@ const GoalForm = ({ onSubmit }) => {
   const location = useLocation();
   const parentGoal = location.state?.parentGoal || null;
   const isParentGoalFixed = location.state?.isParentGoalFixed || false;
-  console.log("isParentGoalFixed: ", isParentGoalFixed);
+  //console.log("isParentGoalFixed: ", isParentGoalFixed);
   
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -24,7 +24,7 @@ const GoalForm = ({ onSubmit }) => {
     const goalData = {
         title,
         description,
-        parentGoal: selectedParentGoal?.value
+        parentGoalId: selectedParentGoal?.value
         // listId: selectedList.value
     };
     onSubmit(goalData);
@@ -33,7 +33,7 @@ const GoalForm = ({ onSubmit }) => {
   };
 
   useEffect(() => {
-      console.log("goalForm useEffect");   
+      //console.log("goalForm useEffect");   
       const loadData = async () => {
         try {
           const [goalResponse] = await Promise.all([
@@ -55,14 +55,14 @@ const GoalForm = ({ onSubmit }) => {
     // If goal page is entered from another goal, provide parent goal as default parent goal
     var defaultParentGoal = (parentGoal && isParentGoalFixed) ? { value: parentGoal._id, label: parentGoal.title } : null;
     setSelectedParentGoal(defaultParentGoal);
-    console.log("default parent goal: ", defaultParentGoal);
+    //console.log("default parent goal: ", defaultParentGoal);
   }, [parentGoal, isParentGoalFixed]);
 
   var selectedParentGoalOptions = parentGoals.map(parentGoal => ({
     value: parentGoal._id,
     label: parentGoal.title
   }));
-  console.log("Parent goals: ", parentGoals);
+  //console.log("Parent goals: ", parentGoals);
 
   if (isParentGoalFixed && !selectedParentGoal) {
     return <p>Loading parent goal...</p>;

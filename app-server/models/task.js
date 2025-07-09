@@ -29,7 +29,7 @@ const taskSchema = new mongoose.Schema({
   listId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'List', // References the List model
-    required: false, // Each task must belong to a specific list
+    required: false,
   },
   createdAt: {
     type: Date,
@@ -38,9 +38,10 @@ const taskSchema = new mongoose.Schema({
   scheduledTime: {
     type: Date
   },
-  parentGoal: {
+  parentGoalId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Goal'
+    ref: 'Goal',
+    required: false
   },
   category: {
     type: mongoose.Schema.Types.ObjectId,

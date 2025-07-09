@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { fetchGoalById } from '../services/goalService';
+import { fetchGoalById } from './goalService';
 import { Link } from "react-router-dom";
 
 const GoalView = ({ goal }) => {
     const [parentGoal, setParentGoal] = useState(null);
-    console.log("rendering goalview goal: ", goal);
+    //console.log("rendering goalview goal: ", goal);
 
     useEffect(() => {
-        console.log("goal view useeffect: goal", goal);
+        //console.log("goal view useeffect: goal", goal);
         if (goal && goal.parentGoal) {
             const loadData = async() => {
                 try {
@@ -26,7 +26,7 @@ const GoalView = ({ goal }) => {
     }
 
     return (
-        <div>
+        <div>   
             <p>Goal test</p>
             <p>Goal: {goal.title}</p>
             <p>Description: {goal.description}</p>
@@ -35,6 +35,10 @@ const GoalView = ({ goal }) => {
                 to="/createGoalPage"
                 state={{ parentGoal: goal, isParentGoalFixed: true }}
             >Create Sub-Goal</Link>
+            <Link
+                to="/createTaskPage"
+                state={{ parentGoal: goal, isParentGoalFixed: true }}
+            >Create Sub-Task</Link>
             <Link to="/">Back to Taskboard</Link>
         </div>
     )

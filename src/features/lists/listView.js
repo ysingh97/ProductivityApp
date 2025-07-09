@@ -4,15 +4,15 @@ import { Link, useParams } from "react-router-dom";
 const ListView = ({ tasks, handleTaskDelete }) => {
 
     const listId = useParams().listId;
-    console.log("ListView: list: ", listId, ". tasks: ", tasks);
+    //console.log("ListView: list: ", listId, ". tasks: ", tasks);
 
     const onDeletePressed = (e, taskId, taskTitle) => {
-        console.log("delete pressed, taskId: ", taskId, ". taskTitle: ", taskTitle);
+        //console.log("delete pressed, taskId: ", taskId, ". taskTitle: ", taskTitle);
         handleTaskDelete(taskId);
     }
     
     if (!tasks | tasks.length === 0) {
-        console.log("listview: no tasks");
+        //console.log("listview: no tasks");
         return (
             <div>
                 <p>No tasks found</p>

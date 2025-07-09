@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchTasks, deleteTask } from '../services/taskService';
-import ListView from '../features/listView';
+import { fetchTasks, deleteTask } from '../tasks/taskService';
+import ListView from './listView';
 import { Link, useParams } from "react-router-dom";
 
 const ListPage = () => {
@@ -8,7 +8,7 @@ const ListPage = () => {
     const [forceRerender, setForceRerender] = useState(true);
 
     const listId = useParams().listId;
-    console.log("ListPage: ", listId);
+    //console.log("ListPage: ", listId);
 
     const handleTaskDelete = async (taskId) => {
       const response = await deleteTask(taskId);
@@ -16,7 +16,7 @@ const ListPage = () => {
     }
 
     useEffect(() => {
-        console.log("List useEffect");
+        //console.log("List useEffect");
         const loadTasks = async () => {
           try {
             let response = await fetchTasks();
