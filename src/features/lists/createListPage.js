@@ -1,8 +1,8 @@
-import ListForm from '../features/listForm';
+import ListForm from './listForm';
 import React, { useState } from "react";
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { createList } from '../services/listService';
+import { createList } from './listService';
 
 const CreateListPage = () => {
     const [lists, setLists] = useState([]);

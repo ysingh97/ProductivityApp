@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchTasks, deleteTask } from '../services/taskService';
-import ListView from '../features/listView';
+import { fetchTasks, deleteTask } from '../tasks/taskService';
+import ListView from './listView';
 import { Link, useParams } from "react-router-dom";
 
 const ListPage = () => {
@@ -8,20 +8,20 @@ const ListPage = () => {
     const [forceRerender, setForceRerender] = useState(true);
 
     const listId = useParams().listId;
-    console.log("ListPage: ", listId);
+    //console.log("ListPage: ", listId);
 
     const handleTaskDelete = async (taskId) => {
       const response = await deleteTask(taskId);
+      //TODO handle response and set tasks accordingly
       setTasks((prevTasks) => prevTasks.filter(task => task._id !== taskId));
     }
 
     useEffect(() => {
-        console.log("List useEffect");
+        //console.log("List useEffect");
         const loadTasks = async () => {
           try {
-            let response = await fetchTasks();
-            let taskData = response.data;
-            var filteredTaskData = taskData.filter(task => task.listId && task.listId.toString() === listId);
+            let tasks = await fetchTasks();
+            var filteredTaskData = tasks.filter(task => task.listId && task.listId.toString() === listId);
             setTasks(filteredTaskData);
           } catch (err) {
             console.error(err.message);
@@ -35,7 +35,7 @@ const ListPage = () => {
         <div>
           <button onClick={() => setForceRerender(prev => !prev)}>Force Re-Render</button>
           <ListView tasks={tasks} handleTaskDelete={handleTaskDelete} />
-          <Link to="/enterTaskPage" state={{listId: listId, isListFixed: true}}>Create Task</Link>
+          <Link to="/createTaskPage" state={{listId: listId, isListFixed: true}}>Create Task</Link>
         </div>
         
     )

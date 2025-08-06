@@ -10,19 +10,43 @@ const taskSchema = new mongoose.Schema({
     type: String,
     default: '', // Optional description for the task
   },
-  completed: {
+  isComplete: {
     type: Boolean,
     default: false, // Tracks whether the task is completed
+  },
+  estimatedHours: {
+    type: Number,
+    default: 0
+  },
+  timeLeft: {
+    type: Number,
+    default: 0
+  },
+  timeSpent: {
+    type: Number,
+    default: 0
   },
   listId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'List', // References the List model
-    required: false, // Each task must belong to a specific list
+    required: false,
   },
   createdAt: {
     type: Date,
     default: Date.now, // Automatically set to the current date
   },
+  scheduledTime: {
+    type: Date
+  },
+  parentGoalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Goal',
+    required: false
+  },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category'
+  }
 });
 
 // Create the Task model
