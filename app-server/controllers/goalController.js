@@ -1,4 +1,3 @@
-const { default: GoalForm } = require('../../src/features/goals/goalForm');
 const Goal = require('../models/goal'); // Import the Goal model
 
 // Get all goals
@@ -50,8 +49,16 @@ const updateGoal = async (req, res) => {
 
 const deleteGoal = async (req, res) => {
     try {
-        await Goal.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Goal deleted' });
+        const deletedTask = await Goal.findByIdAndDelete(req.params.id);
+
+        if (!deletedTask) {
+            return res.status(404).json({ message: "Task not found" });
+        }
+        
+        res.json({
+            message: 'Goal deleted',
+            deletedTask
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -62,5 +69,5 @@ module.exports = {
     getGoalById,
     createGoal,
     updateGoal,
-    deleteGoal
+    deleteGoal,
 };

@@ -43,27 +43,50 @@ const createTask = async (req, res) => {
 const deleteTask = async (req, res) => {
     try {
       //console.log("delete task request: ", req, ". params: ", req.params);
-      const task = await Task.findById(req.params.id);
-      if (!task) {
+      const deletedTask = await Task.findByIdAndDelete(req.params.id);
+      if (!deletedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
   
-      await task.deleteOne();
-      res.json({ message: "Task deleted successfully" });
-    } catch {
-  
+      res.json({
+        message: "Task deleted successfully",
+        deletedTask
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
+}
+
+const getTaskById = async (req, res) => {
+  try {
+    // console.log("getTaskById before findBYid");
+    const task = await Task.findById(req.params.id);
+    console.log("getTaskById from controller - fetched task: ", {task});
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.status(200).json(task);
+  }
+  catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
 // Get all tasks for a list
 const getTasksByListId = async (req, res) => {
-    try {
-        //console.log("task get");
-        const tasks = await Task.find({ listId: req.params.listId });
-        res.status(200).json(tasks);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  try {
+    const listId = req.params.listId;
+    const tasks = await Task.find({ listId });
+
+    if (!tasks || tasks.length === 0) {
+      return res.status(404).json({ message: "No tasks found for this list" });
     }
+
+    res.status(200).json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
 
@@ -71,5 +94,6 @@ module.exports = {
     getTasks,
     createTask,
     deleteTask,
-    getTasksByListId
+    getTasksByListId,
+    getTaskById
 };

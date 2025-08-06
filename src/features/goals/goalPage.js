@@ -10,16 +10,14 @@ const GoalPage = () => {
   //console.log("GoalPage is rendering", goalId);
 
   useEffect(() => {
-    //console.log("useEffect is running", goalId);
     const loadGoal = async () => {
-    try {
-        const goalData = await fetchGoalById(goalId)
-        setGoal(goalData);
-    } catch (err) {
-        console.error(err.message);
-    }
-   };
-
+      try {
+          const goalData = await fetchGoalById(goalId)
+          setGoal(goalData);
+      } catch (err) {
+          console.error(err.message);
+      }
+    };
     loadGoal();
   }, [goalId]);
   //console.log("goalPage goal: ", goal);

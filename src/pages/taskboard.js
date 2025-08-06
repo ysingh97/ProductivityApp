@@ -16,7 +16,7 @@ const TaskBoard = () => {
       try {
         console.log("Begin load tasks");
         const taskResponse = await fetchTasks();
-        setTasks(taskResponse.data);
+        setTasks(taskResponse);
         const listResponse = await fetchLists();
         setLists(listResponse);
         const goalResponse = await fetchGoals();
@@ -42,8 +42,7 @@ const TaskBoard = () => {
         <ul>
           {tasks.map(task => (
             <li key={task._id}>
-              <h3>{task.title}</h3>
-              <p>{task.description}</p>
+              <Link to={`/tasks/${task._id}`}>{task.title}</Link>
             </li>
           ))}
         </ul>
@@ -57,7 +56,7 @@ const TaskBoard = () => {
         <ul>
           {goals.map(goal => (
             <li key={goal._id}>
-              <Link to={`/goal/${goal._id}`}>{goal.title}</Link>
+              <Link to={`/goals/${goal._id}`}>{goal.title}</Link>
             </li>
           ))}
         </ul>

@@ -3,11 +3,11 @@ const router = express.Router();
 const {
   getLists,
   createList,
-  getListByGoalId
+  getListsByGoalId
 } = require('../controllers/listController'); // Import the List model
 
 router.get('/', getLists);
 router.post('/', createList);
-router.get('/:goalId', getListByGoalId);
+router.get('/:goalId', getListsByGoalId);
 
 module.exports = router;

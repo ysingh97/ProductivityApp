@@ -12,6 +12,7 @@ const ListPage = () => {
 
     const handleTaskDelete = async (taskId) => {
       const response = await deleteTask(taskId);
+      //TODO handle response and set tasks accordingly
       setTasks((prevTasks) => prevTasks.filter(task => task._id !== taskId));
     }
 
@@ -19,9 +20,8 @@ const ListPage = () => {
         //console.log("List useEffect");
         const loadTasks = async () => {
           try {
-            let response = await fetchTasks();
-            let taskData = response.data;
-            var filteredTaskData = taskData.filter(task => task.listId && task.listId.toString() === listId);
+            let tasks = await fetchTasks();
+            var filteredTaskData = tasks.filter(task => task.listId && task.listId.toString() === listId);
             setTasks(filteredTaskData);
           } catch (err) {
             console.error(err.message);

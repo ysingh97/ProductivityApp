@@ -17,7 +17,6 @@ export const deleteGoal = async (goalId) => {
 }
 
 export const fetchGoalById = async (goalId) => {
-  const goals = await fetchGoals();
-  console.log("fetchgoalsbyid goals: ", goals);
-  return goals.find(goal => goal._id === goalId);
+  const response = await axios.get(`http://localhost:5000/api/goals/${goalId}`);
+  return response.data;
 }

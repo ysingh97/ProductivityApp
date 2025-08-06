@@ -13,8 +13,7 @@ const CreateTaskPage = () => {
         try {
           // POST request to the backend
           
-          const response = await createTask(taskData);
-          const newTask = await response.data;
+          const newTask = await createTask(taskData);
           setTasks((prevTasks) => [...prevTasks, newTask]); // Update task list
         } catch (err) {
           setError(err.message);
