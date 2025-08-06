@@ -18,6 +18,7 @@ const TaskForm = ({ onSubmit }) => {
   const [description, setDescription] = useState("");
   const [selectedList, setSelectedList] = useState(null);
   const [selectedParentGoal, setSelectedParentGoal] = useState(null);
+  const [estimatedCompletionTime, setEstimatedCompletionTime] = useState(0);
   const [error, setError] = useState(null);
 
   //console.log("Task Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
@@ -29,11 +30,13 @@ const TaskForm = ({ onSubmit }) => {
         title,
         description,
         listId: selectedList?.value,
-        parentGoalId: selectedParentGoal?.value
+        parentGoalId: selectedParentGoal?.value,
+        estimatedCompletionTime
     };
     onSubmit(taskData);
     setTitle("");
     setDescription("");
+    setEstimatedCompletionTime(0);
   };
 
   useEffect(() => {
@@ -120,18 +123,28 @@ const TaskForm = ({ onSubmit }) => {
           />
         </div>
         <div>
-            <label htmlFor="list">List:</label>
-            <Select options={selectedListOptions}
-                    value={selectedList}
-                    onChange={(option) => setSelectedList(option)}
-                    isDisabled={isListFixed}/>
+          <label htmlFor="list">List:</label>
+          <Select options={selectedListOptions}
+                  value={selectedList}
+                  onChange={(option) => setSelectedList(option)}
+                  isDisabled={isListFixed}/>
         </div>
         <div>
-            <label htmlFor="list">Parent Goal:</label>
-            <Select options={selectedParentGoalOptions}
-                    value={selectedParentGoal}
-                    onChange={(option) => setSelectedParentGoal(option)}
-                    isDisabled={isParentGoalFixed}/>
+          <label htmlFor="list">Parent Goal:</label>
+          <Select options={selectedParentGoalOptions}
+                  value={selectedParentGoal}
+                  onChange={(option) => setSelectedParentGoal(option)}
+                  isDisabled={isParentGoalFixed}/>
+        </div>
+        <div>
+          <label htmlFor="estimatedCompletionTime">Estimated Completion Time:</label>
+          <input
+            id="estimatedCompletionTime"
+            type="number"
+            step="0.01"
+            value={estimatedCompletionTime}
+            onChange={(e) => setEstimatedCompletionTime(e.target.value)}
+          />
         </div>
         <button type="submit">Add Task</button>
       </form>

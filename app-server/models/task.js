@@ -14,7 +14,7 @@ const taskSchema = new mongoose.Schema({
     type: Boolean,
     default: false, // Tracks whether the task is completed
   },
-  estimatedHours: {
+  estimatedCompletionTime: {
     type: Number,
     default: 0
   },
