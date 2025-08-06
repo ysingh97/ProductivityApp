@@ -9,7 +9,6 @@ import TaskPage from './features/tasks/taskPage';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
 
 const theme = createTheme({

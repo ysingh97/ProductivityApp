@@ -14,13 +14,14 @@ const getTasks = async(req, res) => {
 const createTask = async (req, res) => {
     try {
       console.log("task post request", req.body);
-      const {title, description, listId, parentGoalId} = req.body;
+      const {title, description, listId, parentGoalId, estimatedCompletionTime} = req.body;
       console.log("task post: ", parentGoalId);
       const newTask = new Task({  
         title,
         description,
         listId,
-        parentGoalId
+        parentGoalId,
+        estimatedCompletionTime
       });
       const savedTask = await newTask.save();
       res.status(201).json(savedTask);
