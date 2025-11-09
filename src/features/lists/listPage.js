@@ -35,7 +35,7 @@ const ListPage = () => {
         <div>
           <button onClick={() => setForceRerender(prev => !prev)}>Force Re-Render</button>
           <ListView tasks={tasks} handleTaskDelete={handleTaskDelete} />
-          <Link to="/createTaskPage" state={{listId: listId, isListFixed: true}}>Create Task</Link>
+          <Link to="/task/new" state={{listId: listId, isListFixed: true}}>Create Task</Link>
         </div>
         
     )

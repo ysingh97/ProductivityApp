@@ -63,7 +63,7 @@ const TaskBoard = () => {
         
       </div>
       <div>
-        <Link to="/createTaskPage">Create Task</Link>
+        <Link to="/task/new">Create Task</Link>
         <Link to="/createListPage">Create List</Link>
         <Link to="/createGoalPage">Create Goal</Link>
       </div>

@@ -17,6 +17,6 @@ export const deleteGoal = async (goalId) => {
 }
 
 export const fetchGoalById = async (goalId) => {
-  const response = await axios.get(`${process.env.REACT_APP_API_URL}/goals/goals/${goalId}`);
+  const response = await axios.get(`${process.env.REACT_APP_API_URL}/goals/${goalId}`);
   return response.data;
 }

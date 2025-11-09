@@ -6,6 +6,7 @@ import CreateGoalPage from './features/goals/createGoalPage';
 import ListPage from './features/lists/listPage';
 import GoalPage from './features/goals/goalPage';
 import TaskPage from './features/tasks/taskPage';
+// import EditTaskPage from './features/tasks/editTaskPage';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -27,7 +28,8 @@ function App() {
         <div className="App">
           <Routes>
             <Route path="/" element={<TaskBoard />}/>
-            <Route path="/createTaskPage" element={<CreateTaskPage />}/>
+            <Route path="/task/new" element={<CreateTaskPage />}/>
+            <Route path ="/task/:taskId/edit" element={<CreateTaskPage />}/>
             <Route path="/createListPage" element={<CreateListPage/>}/>
             <Route path="/createGoalPage" element={<CreateGoalPage/>}/>
             <Route path="/lists/:listId" element={<ListPage/>}/>

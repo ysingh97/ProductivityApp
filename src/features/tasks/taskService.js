@@ -8,10 +8,11 @@ export const fetchTasks = async () => {
 
 export const createTask = async (taskData) => {
   const response = await axios.post(`${process.env.REACT_APP_API_UR}/tasks`, taskData);
-  return response.data;  
+  return response.data;
 }
 
 export const updateTask = async (taskId, updates) => {
+  console.log("task service, updateTask, taskId, updates: ", taskId, updates);
   try {
     const res = await axios.put(`${process.env.REACT_APP_API_URL}/tasks/${taskId}`, updates);
     return res.data; // updated task object
