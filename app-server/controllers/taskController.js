@@ -41,6 +41,27 @@ const createTask = async (req, res) => {
     }
 }
 
+const updateTask = async (req, res) => {
+  console.log("task controller, update task, req.body: ", req.body);
+  try {
+    const { id } = req.params; // task id from URL
+    const updates = req.body;  // fields to update
+
+    const updatedTask = await Task.findByIdAndUpdate(id, updates, {
+      new: true,        // return the updated document
+      runValidators: true // make sure updates respect schema validation
+    });
+
+    if (!updatedTask) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.status(200).json(updatedTask);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 const deleteTask = async (req, res) => {
     try {
       //console.log("delete task request: ", req, ". params: ", req.params);
@@ -94,6 +115,7 @@ const getTasksByListId = async (req, res) => {
 module.exports = {
     getTasks,
     createTask,
+    updateTask,
     deleteTask,
     getTasksByListId,
     getTaskById

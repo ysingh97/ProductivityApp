@@ -4,106 +4,113 @@ import { fetchGoals } from '../goals/goalService';
 import Select from 'react-select';
 import { useLocation } from "react-router-dom";
 
-const TaskForm = ({ onSubmit }) => {
+const TaskForm = ({ task, onSubmit }) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
 
-  const location = useLocation();
-  const listId = location.state?.listId || null;
-  const isListFixed = location.state?.isListFixed || false;
-  const parentGoal = location.state?.parentGoal || null;
-  const isParentGoalFixed = location.state?.isParentGoalFixed || false;
-  
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(task?.title || "");
+  const [description, setDescription] = useState(task?.description || "");
+  const [estimatedCompletionTime, setEstimatedCompletionTime] = useState(
+    task?.estimatedCompletionTime || 0
+  );
+
   const [selectedList, setSelectedList] = useState(null);
   const [selectedParentGoal, setSelectedParentGoal] = useState(null);
-  const [estimatedCompletionTime, setEstimatedCompletionTime] = useState(0);
+
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  //console.log("Task Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
-  
+  // Fetch lists and goals
+  useEffect(() => {
+    const loadListsAndGoals = async () => {
+      setLoading(true);
+      try {
+        const [listResponse, goalResponse] = await Promise.all([
+          fetchLists(),
+          fetchGoals(),
+        ]);
+        setLists(listResponse);
+        setParentGoals(goalResponse);
+      } catch (err) {
+        setError("Failed to load tasks");
+        console.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadListsAndGoals();
+  }, []);
+
+  // set form fields when task prop changes (e.g., when editing a different task)
+  useEffect(() => {
+    setTitle(task?.title || "");
+    setDescription(task?.description || "");
+    setEstimatedCompletionTime(task?.estimatedCompletionTime || 0);
+    setSelectedList(null);
+    setSelectedParentGoal(null);
+  }, [task]);
+
+  // Once lists/parentGoals are loaded, set initial selected values
+  useEffect(() => {
+    if (!loading) {
+      const listOptions = lists.map((list) => ({
+        value: list._id,
+        label: list.title,
+      }));
+      const parentGoalOptions = parentGoals.map((pg) => ({
+        value: pg._id,
+        label: pg.title,
+      }));
+
+      if (task?.listId) {
+        const match = listOptions.find((o) => o.value === task.listId);
+        setSelectedList(match || null);
+      }
+
+      if (task?.parentGoalId) {
+        const match = parentGoalOptions.find(
+          (o) => o.value === task.parentGoalId
+        );
+        setSelectedParentGoal(match || null);
+      }
+    }
+  }, [loading, lists, parentGoals, task]);
+
   const handleSubmit = (e) => {
-    e.preventDefault(); // Prevent page reload
-    console.log(`handle submit: title: ${title} - description: ${description} - list: ${selectedList?.value} - parentGoal: ${selectedParentGoal?.value}`)
+    e.preventDefault();
     const taskData = {
-        title,
-        description,
-        listId: selectedList?.value,
-        parentGoalId: selectedParentGoal?.value,
-        estimatedCompletionTime
+      title,
+      description,
+      listId: selectedList?.value,
+      parentGoalId: selectedParentGoal?.value,
+      estimatedCompletionTime,
     };
     onSubmit(taskData);
+
+    // clear form after submit if you're in "create" mode
     setTitle("");
     setDescription("");
     setEstimatedCompletionTime(0);
+    setSelectedList(null);
+    setSelectedParentGoal(null);
   };
 
-  useEffect(() => {
-      //console.log("taskForm useEffect");
-      const loadLists = async () => {
-        try {
-          const [listResponse, goalResponse] = await Promise.all([
-              fetchLists(),
-              fetchGoals()
-          ]);
-          setLists(listResponse);
-          setParentGoals(goalResponse);
-        } catch (err) {
-          setError('Failed to load tasks');
-          console.error(err.message);
-        } 
-      };
-      loadLists();
-    }, []);
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>{error}</p>;
 
-  useEffect(() => {
-    var defaultSelectedList = null;
-    if (listId && isListFixed) {
-      var list = lists.find(list => list._id === listId);
-      //console.log("list with listId: ", list);
-      defaultSelectedList = list ? { value: listId, label: list.title } : null;
-      setSelectedList(defaultSelectedList);
-    }
-    //console.log("defaultselectedlist: ", defaultSelectedList);
-  }, [lists, listId, isListFixed]);
-
-  useEffect(() => {
-      // If goal page is entered from another goal, provide parent goal as default parent goal
-      var defaultParentGoal = (parentGoal && isParentGoalFixed) ? { value: parentGoal._id, label: parentGoal.title } : null;
-      setSelectedParentGoal(defaultParentGoal);
-      console.log("default parent goal: ", defaultParentGoal);
-    }, [parentGoal, isParentGoalFixed]);
-
-  var selectedListOptions = lists.map(list => ({
+  const listOptions = lists.map((list) => ({
     value: list._id,
-    label: list.title
+    label: list.title,
   }));
-
-  var selectedParentGoalOptions = parentGoals.map(parentGoal => ({
-    value: parentGoal._id,
-    label: parentGoal.title
+  const parentGoalOptions = parentGoals.map((pg) => ({
+    value: pg._id,
+    label: pg.title,
   }));
-
-
-
-  //console.log("taskform - options: ", selectedListOptions);
-  //console.log("taskform - selectedList: ", selectedList);
-
-  
-  // console.log("taskform - defaultselectedlist: ", defaultSelectedList);
-  // useEffect(() => {
-    
-  //   if (defaultSelectedList && selectedList !== defaultSelectedList) {
-  //     setSelectedList(defaultSelectedList);
-  //   }
-  // }, []);
-
-  console.log("parentgoal optionss: ", selectedParentGoalOptions);
 
   return (
     <div>
-      <h2>Add a New Task</h2>
+      <h2>{task ? "Update Task" : "Create Task"}</h2>
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="title">Title:</label>
@@ -114,6 +121,7 @@ const TaskForm = ({ onSubmit }) => {
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
+
         <div>
           <label htmlFor="description">Description:</label>
           <textarea
@@ -122,22 +130,29 @@ const TaskForm = ({ onSubmit }) => {
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+
         <div>
           <label htmlFor="list">List:</label>
-          <Select options={selectedListOptions}
-                  value={selectedList}
-                  onChange={(option) => setSelectedList(option)}
-                  isDisabled={isListFixed}/>
+          <Select
+            options={listOptions}
+            value={selectedList}
+            onChange={setSelectedList}
+          />
         </div>
+
         <div>
-          <label htmlFor="list">Parent Goal:</label>
-          <Select options={selectedParentGoalOptions}
-                  value={selectedParentGoal}
-                  onChange={(option) => setSelectedParentGoal(option)}
-                  isDisabled={isParentGoalFixed}/>
+          <label htmlFor="parentGoal">Parent Goal:</label>
+          <Select
+            options={parentGoalOptions}
+            value={selectedParentGoal}
+            onChange={setSelectedParentGoal}
+          />
         </div>
+
         <div>
-          <label htmlFor="estimatedCompletionTime">Estimated Completion Time:</label>
+          <label htmlFor="estimatedCompletionTime">
+            Estimated Completion Time:
+          </label>
           <input
             id="estimatedCompletionTime"
             type="number"
@@ -146,7 +161,8 @@ const TaskForm = ({ onSubmit }) => {
             onChange={(e) => setEstimatedCompletionTime(e.target.value)}
           />
         </div>
-        <button type="submit">Add Task</button>
+
+        <button type="submit">Submit</button>
       </form>
     </div>
   );
