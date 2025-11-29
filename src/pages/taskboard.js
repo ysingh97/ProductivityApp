@@ -1,74 +1,125 @@
-import React, { useState, useEffect } from 'react';
-import { fetchTasks } from '../features/tasks/taskService';
-import { fetchLists } from '../features/lists/listService';
-import { fetchGoals } from '../features/goals/goalService';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { fetchTasks } from "../features/tasks/taskService";
+import { fetchLists } from "../features/lists/listService";
+import { fetchGoals } from "../features/goals/goalService";
+import { Link } from "react-router-dom";
+
+import {
+  Container,
+  Box,
+  Typography,
+  Card,
+  CardActionArea
+} from "@mui/material";
+
+const scrollRowSx = {
+  display: "flex",
+  gap: 2,
+  overflowX: "auto",
+  pb: 2,
+  borderBottom: "1px solid #ccc",
+  minHeight: 160
+};
+
+const cardSx = {
+  minWidth: 200,
+  minHeight: 120,
+  p: 2,
+  flexShrink: 0,
+  textAlign: "center",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 3
+};
 
 const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
-  const [lists, setLists] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const loadTasks = async () => {
+    const loadData = async () => {
       try {
-        console.log("Begin load tasks");
-        const taskResponse = await fetchTasks();
-        setTasks(taskResponse);
-        const listResponse = await fetchLists();
-        setLists(listResponse);
-        const goalResponse = await fetchGoals();
-        setGoals(goalResponse);
-      } catch (err) {
-        setError('Failed to load tasks');
-        console.error(err.message);
+        const [taskRes, listRes, goalRes] = await Promise.all([
+          fetchTasks(),
+          fetchLists(),
+          fetchGoals()
+        ]);
+
+        setTasks(taskRes);
+        setLists(listRes);
+        setGoals(goalRes);
       } finally {
         setLoading(false);
       }
     };
 
-    loadTasks();
+    loadData();
   }, []);
 
-  if (loading) return <p>Loading tasks...</p>;
-  if (error) return <p>{error}</p>;
+  if (loading) return <p>Loading...</p>;
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '20px' }}>
-        <h1>Task Board</h1>
-        <ul>
-          {tasks.map(task => (
-            <li key={task._id}>
-              <Link to={`/tasks/${task._id}`}>{task.title}</Link>
-            </li>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" fontWeight={700} mb={4}>
+        Task Board
+      </Typography>
+
+      {/* Tasks */}
+      <Box mb={6}>
+        <Typography variant="h5" mb={2}>
+          Tasks
+        </Typography>
+
+        <Box sx={scrollRowSx}>
+          {tasks.map((task) => (
+            <Card key={task._id} sx={{ ...cardSx, background: "#f9f9f9" }}>
+              <CardActionArea
+                component={Link}
+                to={`/tasks/${task._id}`}
+                sx={{ height: "100%" }}
+              >
+                <Typography color="text.primary" fontWeight={500}>
+                  {task.title}
+                </Typography>
+              </CardActionArea>
+            </Card>
           ))}
-        </ul>
-        <ul>
-          {lists.map(list => (
-            <li key={list._id}>
-              <Link to={`/lists/${list._id}`}>{list.title}</Link>
-            </li>
+        </Box>
+      </Box>
+
+      {/* Goals */}
+      <Box mb={6}>
+        <Typography variant="h5" mb={2}>
+          Goals
+        </Typography>
+
+        <Box sx={scrollRowSx}>
+          {goals.map((goal) => (
+            <Card key={goal._id} sx={{ ...cardSx, background: "#eef5ff" }}>
+              <CardActionArea
+                component={Link}
+                to={`/goals/${goal._id}`}
+                sx={{ height: "100%" }}
+              >
+                <Typography color="text.primary" fontWeight={500}>
+                  {goal.title}
+                </Typography>
+              </CardActionArea>
+            </Card>
           ))}
-        </ul>
-        <ul>
-          {goals.map(goal => (
-            <li key={goal._id}>
-              <Link to={`/goals/${goal._id}`}>{goal.title}</Link>
-            </li>
-          ))}
-        </ul>
-        
-      </div>
-      <div>
+        </Box>
+      </Box>
+
+      {/* Actions */}
+      <Box sx={{ display: "flex", gap: 2 }}>
         <Link to="/task/new">Create Task</Link>
         <Link to="/createListPage">Create List</Link>
         <Link to="/createGoalPage">Create Goal</Link>
-      </div>
-    </div>
-    
+      </Box>
+    </Container>
   );
 };
 

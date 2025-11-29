@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { fetchTaskById } from './taskService';
 import TaskView from './taskView';
 import { useParams } from 'react-router-dom';
+import HomeButton from '../../components/DateTimePicker/HomeButton';
 
 const TaskPage = () => {
     const [task, setTask] = useState(null);
@@ -34,6 +35,7 @@ const TaskPage = () => {
     return (
         <div>
             <TaskView task={task}/>
+            <HomeButton />
         </div>
     )
 };
