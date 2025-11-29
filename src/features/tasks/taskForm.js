@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { fetchLists } from '../lists/listService';
 import { fetchGoals } from '../goals/goalService';
 import Select from 'react-select';
+import DateTimePicker from '../../components/DateTimePicker';
 import { useLocation } from "react-router-dom";
 
 const TaskForm = ({ task, onSubmit }) => {
@@ -13,6 +14,10 @@ const TaskForm = ({ task, onSubmit }) => {
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState(
     task?.estimatedCompletionTime || 0
   );
+  const [targetCompletionDate, setTargetCompletionDate] = useState(
+    task?.targetCompletionDate ? new Date(task.targetCompletionDate) : null
+  );
+
 
   const [selectedList, setSelectedList] = useState(null);
   const [selectedParentGoal, setSelectedParentGoal] = useState(null);
@@ -49,6 +54,7 @@ const TaskForm = ({ task, onSubmit }) => {
     setEstimatedCompletionTime(task?.estimatedCompletionTime || 0);
     setSelectedList(null);
     setSelectedParentGoal(null);
+    setTargetCompletionDate(task?.targetCompletionDate ? new Date(task.targetCompletionDate) : null);
   }, [task]);
 
   // Once lists/parentGoals are loaded, set initial selected values
@@ -161,7 +167,13 @@ const TaskForm = ({ task, onSubmit }) => {
             onChange={(e) => setEstimatedCompletionTime(e.target.value)}
           />
         </div>
-
+        <div>
+          <label htmlFor="targetCompletionDate">Target Completion Date:</label>
+          <DateTimePicker
+            value={targetCompletionDate}
+            onChange={(newValue) => setTargetCompletionDate(newValue?.toDate ? newValue.toDate() : newValue)}
+          />
+        </div>
         <button type="submit">Submit</button>
       </form>
     </div>

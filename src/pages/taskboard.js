@@ -1,74 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { fetchTasks } from '../features/tasks/taskService';
-import { fetchLists } from '../features/lists/listService';
-import { fetchGoals } from '../features/goals/goalService';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { fetchTasks } from "../features/tasks/taskService";
+import { fetchLists } from "../features/lists/listService";
+import { fetchGoals } from "../features/goals/goalService";
+import { Link } from "react-router-dom";
+
+import {
+  Container,
+  Box,
+  Typography,
+  Card,
+  CardActionArea,
+  Button,
+  Divider
+} from "@mui/material";
+
+const scrollRowSx = {
+  display: "flex",
+  gap: 2,
+  overflowX: "auto",
+  overflowY: "hidden",
+  pb: 2,
+  borderBottom: "1px solid #e0e0e0",
+  minHeight: 150
+};
+
+const cardBaseSx = {
+  minWidth: 220,
+  minHeight: 130,
+  p: 2,
+  flexShrink: 0,
+  borderRadius: 3,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "0.2s",
+  boxShadow: 1,
+  "&:hover": {
+    transform: "translateY(-4px)",
+    boxShadow: 4
+  }
+};
 
 const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
-  const [lists, setLists] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const loadTasks = async () => {
+    const loadData = async () => {
       try {
-        console.log("Begin load tasks");
-        const taskResponse = await fetchTasks();
-        setTasks(taskResponse);
-        const listResponse = await fetchLists();
-        setLists(listResponse);
-        const goalResponse = await fetchGoals();
-        setGoals(goalResponse);
-      } catch (err) {
-        setError('Failed to load tasks');
-        console.error(err.message);
+        const [taskRes, listRes, goalRes] = await Promise.all([
+          fetchTasks(),
+          fetchLists(),
+          fetchGoals()
+        ]);
+
+        setTasks(taskRes);
+        setLists(listRes);
+        setGoals(goalRes);
       } finally {
         setLoading(false);
       }
     };
 
-    loadTasks();
+    loadData();
   }, []);
 
-  if (loading) return <p>Loading tasks...</p>;
-  if (error) return <p>{error}</p>;
+  if (loading) return <p>Loading...</p>;
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '20px' }}>
-        <h1>Task Board</h1>
-        <ul>
-          {tasks.map(task => (
-            <li key={task._id}>
-              <Link to={`/tasks/${task._id}`}>{task.title}</Link>
-            </li>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      {/* Dashboard Header */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3
+        }}
+      >
+        <Typography variant="h4" fontWeight={700}>
+          Task Board
+        </Typography>
+
+        {/* Header Action Buttons */}
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Button variant="contained" component={Link} to="/task/new">
+            New Task
+          </Button>
+          <Button variant="contained" component={Link} to="/createGoalPage">
+            New Goal
+          </Button>
+          <Button variant="outlined" component={Link} to="/createListPage">
+            New List
+          </Button>
+        </Box>
+      </Box>
+
+      <Divider sx={{ mb: 4 }} />
+
+      {/* TASKS SECTION */}
+      <Box mb={5}>
+        <Typography variant="h6" mb={1} fontWeight={600}>
+          Tasks ({tasks.length})
+        </Typography>
+
+        <Box sx={scrollRowSx}>
+          {tasks.map((task) => (
+            <Card
+              key={task._id}
+              sx={{
+                ...cardBaseSx,
+                background: "#fafafa"
+              }}
+            >
+              <CardActionArea
+                component={Link}
+                to={`/tasks/${task._id}`}
+                sx={{ height: "100%" }}
+              >
+                <Typography color="text.primary" fontWeight={500}>
+                  {task.title}
+                </Typography>
+              </CardActionArea>
+            </Card>
           ))}
-        </ul>
-        <ul>
-          {lists.map(list => (
-            <li key={list._id}>
-              <Link to={`/lists/${list._id}`}>{list.title}</Link>
-            </li>
+        </Box>
+      </Box>
+
+      {/* GOALS SECTION */}
+      <Box mb={5}>
+        <Typography variant="h6" mb={1} fontWeight={600}>
+          Goals ({goals.length})
+        </Typography>
+
+        <Box sx={scrollRowSx}>
+          {goals.map((goal) => (
+            <Card
+              key={goal._id}
+              sx={{
+                ...cardBaseSx,
+                background: "#eef5ff"
+              }}
+            >
+              <CardActionArea
+                component={Link}
+                to={`/goals/${goal._id}`}
+                sx={{ height: "100%" }}
+              >
+                <Typography color="text.primary" fontWeight={500}>
+                  {goal.title}
+                </Typography>
+              </CardActionArea>
+            </Card>
           ))}
-        </ul>
-        <ul>
-          {goals.map(goal => (
-            <li key={goal._id}>
-              <Link to={`/goals/${goal._id}`}>{goal.title}</Link>
-            </li>
-          ))}
-        </ul>
-        
-      </div>
-      <div>
-        <Link to="/task/new">Create Task</Link>
-        <Link to="/createListPage">Create List</Link>
-        <Link to="/createGoalPage">Create Goal</Link>
-      </div>
-    </div>
-    
+        </Box>
+      </Box>
+    </Container>
   );
 };
 
