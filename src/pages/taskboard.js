@@ -9,28 +9,36 @@ import {
   Box,
   Typography,
   Card,
-  CardActionArea
+  CardActionArea,
+  Button,
+  Divider
 } from "@mui/material";
 
 const scrollRowSx = {
   display: "flex",
   gap: 2,
   overflowX: "auto",
+  overflowY: "hidden",
   pb: 2,
-  borderBottom: "1px solid #ccc",
-  minHeight: 160
+  borderBottom: "1px solid #e0e0e0",
+  minHeight: 150
 };
 
-const cardSx = {
-  minWidth: 200,
-  minHeight: 120,
+const cardBaseSx = {
+  minWidth: 220,
+  minHeight: 130,
   p: 2,
   flexShrink: 0,
-  textAlign: "center",
+  borderRadius: 3,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 3
+  transition: "0.2s",
+  boxShadow: 1,
+  "&:hover": {
+    transform: "translateY(-4px)",
+    boxShadow: 4
+  }
 };
 
 const TaskBoard = () => {
@@ -62,20 +70,51 @@ const TaskBoard = () => {
   if (loading) return <p>Loading...</p>;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" fontWeight={700} mb={4}>
-        Task Board
-      </Typography>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      {/* Dashboard Header */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3
+        }}
+      >
+        <Typography variant="h4" fontWeight={700}>
+          Task Board
+        </Typography>
 
-      {/* Tasks */}
-      <Box mb={6}>
-        <Typography variant="h5" mb={2}>
-          Tasks
+        {/* Header Action Buttons */}
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Button variant="contained" component={Link} to="/task/new">
+            New Task
+          </Button>
+          <Button variant="contained" component={Link} to="/createGoalPage">
+            New Goal
+          </Button>
+          <Button variant="outlined" component={Link} to="/createListPage">
+            New List
+          </Button>
+        </Box>
+      </Box>
+
+      <Divider sx={{ mb: 4 }} />
+
+      {/* TASKS SECTION */}
+      <Box mb={5}>
+        <Typography variant="h6" mb={1} fontWeight={600}>
+          Tasks ({tasks.length})
         </Typography>
 
         <Box sx={scrollRowSx}>
           {tasks.map((task) => (
-            <Card key={task._id} sx={{ ...cardSx, background: "#f9f9f9" }}>
+            <Card
+              key={task._id}
+              sx={{
+                ...cardBaseSx,
+                background: "#fafafa"
+              }}
+            >
               <CardActionArea
                 component={Link}
                 to={`/tasks/${task._id}`}
@@ -90,15 +129,21 @@ const TaskBoard = () => {
         </Box>
       </Box>
 
-      {/* Goals */}
-      <Box mb={6}>
-        <Typography variant="h5" mb={2}>
-          Goals
+      {/* GOALS SECTION */}
+      <Box mb={5}>
+        <Typography variant="h6" mb={1} fontWeight={600}>
+          Goals ({goals.length})
         </Typography>
 
         <Box sx={scrollRowSx}>
           {goals.map((goal) => (
-            <Card key={goal._id} sx={{ ...cardSx, background: "#eef5ff" }}>
+            <Card
+              key={goal._id}
+              sx={{
+                ...cardBaseSx,
+                background: "#eef5ff"
+              }}
+            >
               <CardActionArea
                 component={Link}
                 to={`/goals/${goal._id}`}
@@ -111,13 +156,6 @@ const TaskBoard = () => {
             </Card>
           ))}
         </Box>
-      </Box>
-
-      {/* Actions */}
-      <Box sx={{ display: "flex", gap: 2 }}>
-        <Link to="/task/new">Create Task</Link>
-        <Link to="/createListPage">Create List</Link>
-        <Link to="/createGoalPage">Create Goal</Link>
       </Box>
     </Container>
   );
