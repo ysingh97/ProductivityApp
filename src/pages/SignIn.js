@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Button, CircularProgress, Container, Paper, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/client";
@@ -12,14 +12,22 @@ const SignIn = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const triggerGooglePrompt = () => {
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt();
-      setError("");
-    } else {
-      setError("Google sign-in is still loading. Please try again in a moment.");
+  const handleCredentialResponse = useCallback(async (response) => {
+    setError("");
+    setLoading(true);
+    try {
+      const { data } = await apiClient.post("/auth/google", {
+        credential: response.credential
+      });
+      saveAuth(data.token, data.user);
+      navigate("/board", { replace: true });
+    } catch (err) {
+      console.error(err);
+      setError("Sign-in failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [navigate, saveAuth]);
 
   useEffect(() => {
     if (isAuthed) {
@@ -63,24 +71,7 @@ const SignIn = () => {
       width: 280,
       shape: "pill"
     });
-  }, [scriptLoaded]);
-
-  const handleCredentialResponse = async (response) => {
-    setError("");
-    setLoading(true);
-    try {
-      const { data } = await apiClient.post("/auth/google", {
-        credential: response.credential
-      });
-      saveAuth(data.token, data.user);
-      navigate("/board", { replace: true });
-    } catch (err) {
-      console.error(err);
-      setError("Sign-in failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [scriptLoaded, handleCredentialResponse]);
 
   return (
     <Box
