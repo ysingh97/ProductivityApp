@@ -16,7 +16,7 @@ const ListView = ({ tasks, handleTaskDelete }) => {
         return (
             <div>
                 <p>No tasks found</p>
-                <Link to="/">Back to Taskboard</Link>
+                <Link to="/board">Back to Taskboard</Link>
             </div>
             
         );
@@ -33,7 +33,7 @@ const ListView = ({ tasks, handleTaskDelete }) => {
                     </li>
                 ))}
             </ul>
-            <Link to="/">Back to Taskboard</Link>
+            <Link to="/board">Back to Taskboard</Link>
         </div>
     )
 }

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { fetchTasks } from "../features/tasks/taskService";
 import { fetchLists } from "../features/lists/listService";
 import { fetchGoals } from "../features/goals/goalService";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 import {
   Container,
@@ -46,6 +47,8 @@ const TaskBoard = () => {
   const [goals, setGoals] = useState([]);
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,6 +72,11 @@ const TaskBoard = () => {
 
   if (loading) return <p>Loading...</p>;
 
+  const handleSignOut = () => {
+    logout();
+    navigate("/", { replace: true });
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       {/* Dashboard Header */}
@@ -85,7 +93,17 @@ const TaskBoard = () => {
         </Typography>
 
         {/* Header Action Buttons */}
-        <Box sx={{ display: "flex", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {user && (
+            <Box sx={{ textAlign: "right" }}>
+              <Typography variant="body2" fontWeight={600}>
+                {user.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user.email}
+              </Typography>
+            </Box>
+          )}
           <Button variant="contained" component={Link} to="/task/new">
             New Task
           </Button>
@@ -94,6 +112,9 @@ const TaskBoard = () => {
           </Button>
           <Button variant="outlined" component={Link} to="/createListPage">
             New List
+          </Button>
+          <Button variant="text" color="inherit" onClick={handleSignOut}>
+            Sign out
           </Button>
         </Box>
       </Box>

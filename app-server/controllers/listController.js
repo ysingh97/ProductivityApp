@@ -1,9 +1,9 @@
 const List = require('../models/list'); // Import the List model
+const Goal = require('../models/goal');
 
 const getLists = async (req, res) => {
     try {
-        //console.log("get lists");
-        const lists = await List.find();
+        const lists = await List.find({ userId: req.user.id });
         res.status(200).json(lists);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -12,7 +12,17 @@ const getLists = async (req, res) => {
 
 const createList = async (req, res) => {
     try {
-        const newList = new List(req.body);
+        if (req.body.goalId) {
+            const goal = await Goal.findOne({ _id: req.body.goalId, userId: req.user.id });
+            if (!goal) {
+                return res.status(400).json({ message: "Invalid goal for this user" });
+            }
+        }
+
+        const newList = new List({
+            ...req.body,
+            userId: req.user.id
+        });
         const savedList = await newList.save();
         res.status(201).json(savedList);
     } catch (err) {
@@ -22,8 +32,7 @@ const createList = async (req, res) => {
 
 const getListsByGoalId = async (req, res) => {
     try {
-        //console.log("list get for goal");
-        const lists = await List.find({ goalId: req.params.goalId });
+        const lists = await List.find({ goalId: req.params.goalId, userId: req.user.id });
         res.status(200).json(lists);
     } catch (err) {
         res.status(500).json({ error: err.message });

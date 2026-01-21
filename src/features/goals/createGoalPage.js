@@ -26,7 +26,7 @@ const CreateGoalPage = () => {
         <div>
         <h1>Create Goal</h1>
         <GoalForm onSubmit={handleGoalSubmit}/>
-        <Link to="/">Back to Taskboard</Link>
+        <Link to="/board">Back to Taskboard</Link>
         </div>
     );
 };

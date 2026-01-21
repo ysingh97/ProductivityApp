@@ -1,10 +1,10 @@
 const Task = require('../models/task'); // Import the Task model
 const Goal = require('../models/goal');
+const List = require('../models/list');
 
 const getTasks = async(req, res) => {
     try {
-        //console.log("get all tasks");
-        const tasks = await Task.find();
+        const tasks = await Task.find({ userId: req.user.id });
         res.status(200).json(tasks);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -13,28 +13,34 @@ const getTasks = async(req, res) => {
 
 const createTask = async (req, res) => {
     try {
-      console.log("task post request", req.body);
       const {title, description, listId, parentGoalId, estimatedCompletionTime} = req.body;
-      console.log("task post: ", parentGoalId);
+
+      if (listId) {
+        const list = await List.findOne({ _id: listId, userId: req.user.id });
+        if (!list) {
+          return res.status(400).json({ message: "Invalid list for this user" });
+        }
+      }
+
+      let parentGoal = null;
+      if (parentGoalId) {
+        parentGoal = await Goal.findOne({ _id: parentGoalId, userId: req.user.id });
+        if (!parentGoal) {
+          return res.status(400).json({ message: "Invalid parentGoal ID" });
+        }
+      }
+
       const newTask = new Task({  
-        title,
-        description,
-        listId,
-        parentGoalId,
-        estimatedCompletionTime
+        ...req.body,
+        userId: req.user.id
       });
       const savedTask = await newTask.save();
       res.status(201).json(savedTask);
   
       // if parentGoalId exists, add task as subtask of parentGoal
-      if (parentGoalId) {
-        const goal = await Goal.findById(parentGoalId);
-        console.log(`task post add task as subtask to goal: ${parentGoalId}. subtaskId: ${savedTask._id}`);
-        if (!goal) {
-          return res.status(400).json({ message: "Invalid parentGoal ID" });
-        }
-        goal.subTasks.push(savedTask._id);
-        await goal.save();
+      if (parentGoal) {
+        parentGoal.subTasks.push(savedTask._id);
+        await parentGoal.save();
       }
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -42,12 +48,11 @@ const createTask = async (req, res) => {
 }
 
 const updateTask = async (req, res) => {
-  console.log("task controller, update task, req.body: ", req.body);
   try {
     const { id } = req.params; // task id from URL
-    const updates = req.body;  // fields to update
+    const { userId, ...updates } = req.body;  // fields to update, disallow userId change
 
-    const updatedTask = await Task.findByIdAndUpdate(id, updates, {
+    const updatedTask = await Task.findOneAndUpdate({ _id: id, userId: req.user.id }, updates, {
       new: true,        // return the updated document
       runValidators: true // make sure updates respect schema validation
     });
@@ -64,8 +69,7 @@ const updateTask = async (req, res) => {
 
 const deleteTask = async (req, res) => {
     try {
-      //console.log("delete task request: ", req, ". params: ", req.params);
-      const deletedTask = await Task.findByIdAndDelete(req.params.id);
+      const deletedTask = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
       if (!deletedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -81,9 +85,7 @@ const deleteTask = async (req, res) => {
 
 const getTaskById = async (req, res) => {
   try {
-    // console.log("getTaskById before findBYid");
-    const task = await Task.findById(req.params.id);
-    console.log("getTaskById from controller - fetched task: ", {task});
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
@@ -99,11 +101,7 @@ const getTaskById = async (req, res) => {
 const getTasksByListId = async (req, res) => {
   try {
     const listId = req.params.listId;
-    const tasks = await Task.find({ listId });
-
-    if (!tasks || tasks.length === 0) {
-      return res.status(404).json({ message: "No tasks found for this list" });
-    }
+    const tasks = await Task.find({ listId, userId: req.user.id });
 
     res.status(200).json(tasks);
   } catch (err) {

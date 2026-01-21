@@ -10,6 +10,12 @@ const goalSchema = new mongoose.Schema({
     type: String,
     default: '', // Optional description, defaults to an empty string
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
   createdAt: {
     type: Date,
     default: Date.now, // Automatically set to the current date
