@@ -36,7 +36,7 @@ const GoalView = ({ goal }) => {
                 state={{ parentGoal: goal, isParentGoalFixed: true }}
             >Create Sub-Goal</Link>
             <Link to={`/task/new?goalId=${goal._id}`}>Create Sub-Task</Link>
-            <Link to="/">Back to Taskboard</Link>
+            <Link to="/board">Back to Taskboard</Link>
         </div>
     )
 }

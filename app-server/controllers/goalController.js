@@ -3,8 +3,7 @@ const Goal = require('../models/goal'); // Import the Goal model
 // Get all goals
 const getGoals = async (req, res) => {
     try {
-        //console.log("goal get");
-        const goals = await Goal.find();
+        const goals = await Goal.find({ userId: req.user.id });
         res.status(200).json(goals);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -13,8 +12,7 @@ const getGoals = async (req, res) => {
 
 const getGoalById = async (req, res) => {
     try {
-      //console.log("delete task request: ", req, ". params: ", req.params);
-        const goal = await Goal.findById(req.params.id);
+        const goal = await Goal.findOne({ _id: req.params.id, userId: req.user.id });
         if (!goal) {
         return res.status(404).json({ message: "Goal not found" });
         }
@@ -26,17 +24,24 @@ const getGoalById = async (req, res) => {
 
 const createGoal = async (req, res) => {
     try {
-        const newGoal = new Goal(req.body);
+        let parentGoal = null;
+        if (req.body.parentGoalId) {
+            parentGoal = await Goal.findOne({ _id: req.body.parentGoalId, userId: req.user.id });
+            if (!parentGoal) {
+                return res.status(400).json({ message: "Invalid parentGoal ID" });
+            }
+        }
+
+        const newGoal = new Goal({
+            ...req.body,
+            userId: req.user.id
+        });
         const savedGoal = await newGoal.save();
         res.status(201).json(savedGoal);
 
-        if (req.body.parentGoalId) {
-        const parentGoal = await Goal.findById(req.body.parentGoalId);
-        if (!parentGoal) {
-            return res.status(400).json({ message: "Invalid parentGoal ID" });
-        }
-        parentGoal.subGoals.push(savedGoal._id);
-        await parentGoal.save();
+        if (parentGoal) {
+            parentGoal.subGoals.push(savedGoal._id);
+            await parentGoal.save();
         }
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -49,10 +54,10 @@ const updateGoal = async (req, res) => {
 
 const deleteGoal = async (req, res) => {
     try {
-        const deletedTask = await Goal.findByIdAndDelete(req.params.id);
+        const deletedTask = await Goal.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
 
         if (!deletedTask) {
-            return res.status(404).json({ message: "Task not found" });
+            return res.status(404).json({ message: "Goal not found" });
         }
         
         res.json({

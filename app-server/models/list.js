@@ -9,6 +9,12 @@ const listSchema = new mongoose.Schema({
   description: {
     type: String
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
   goalId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Goal', // References the Goal model

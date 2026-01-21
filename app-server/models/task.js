@@ -43,6 +43,12 @@ const taskSchema = new mongoose.Schema({
     ref: 'Goal',
     required: false
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category'

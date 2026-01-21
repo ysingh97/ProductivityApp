@@ -62,7 +62,7 @@ const CreateTaskPage = () => {
         <div>
         <h1>Enter Task</h1>
         <TaskForm task={task} onSubmit={handleTaskSubmit}/>
-        <Link to="/">Back to Taskboard</Link>
+        <Link to="/board">Back to Taskboard</Link>
         </div>
     );
 };

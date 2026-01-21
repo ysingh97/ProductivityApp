@@ -1,12 +1,12 @@
-import axios from 'axios';
+import apiClient from '../../api/client';
 
 export const fetchLists = async () => {
-  const response = await axios.get(`${process.env.REACT_APP_API_URL}/lists`);
+  const response = await apiClient.get('/lists');
   //console.log("fetchLists: ", response.data);
   return response.data; // Returns the array of lists
 };
 
 export const createList = async (listData) => {
-  const response = await axios.post(`${process.env.REACT_APP_API_URL}/lists`, listData);
+  const response = await apiClient.post('/lists', listData);
   return response;
 }
