@@ -11,6 +11,7 @@ const SignIn = () => {
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const handleCredentialResponse = useCallback(async (response) => {
     setError("");
@@ -36,20 +37,43 @@ const SignIn = () => {
   }, [isAuthed, navigate]);
 
   useEffect(() => {
+    const expired = sessionStorage.getItem("authExpired");
+    if (expired) {
+      setInfo("Your session expired. Please sign in again.");
+      sessionStorage.removeItem("authExpired");
+    }
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const handleLoad = () => {
+      if (isActive) setScriptLoaded(true);
+    };
+    const handleError = () => {
+      if (isActive) setError("Failed to load Google sign-in. Check your network.");
+    };
+
     const existing = document.getElementById("google-identity-script");
-    if (existing) {
-      setScriptLoaded(true);
-      return;
+    if (!existing) {
+      handleError();
+      return () => {
+        isActive = false;
+      };
     }
 
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.id = "google-identity-script";
-    script.onload = () => setScriptLoaded(true);
-    script.onerror = () => setError("Failed to load Google sign-in. Check your network.");
-    document.body.appendChild(script);
+    if (window.google?.accounts?.id) {
+      handleLoad();
+    } else {
+      existing.addEventListener("load", handleLoad);
+      existing.addEventListener("error", handleError);
+    }
+
+    return () => {
+      isActive = false;
+      existing.removeEventListener("load", handleLoad);
+      existing.removeEventListener("error", handleError);
+    };
   }, []);
 
   useEffect(() => {
@@ -112,6 +136,12 @@ const SignIn = () => {
                 <CircularProgress size={18} sx={{ color: "#cbd5e1" }} />
                 <Typography variant="body2">Signing you in...</Typography>
               </Box>
+            )}
+
+            {info && (
+              <Typography variant="body2" color="#93c5fd">
+                {info}
+              </Typography>
             )}
 
             {error && (

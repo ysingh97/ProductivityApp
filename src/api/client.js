@@ -12,4 +12,21 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('authExpired', '1');
+        if (window.location.pathname !== '/') {
+          window.location.assign('/');
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default apiClient;

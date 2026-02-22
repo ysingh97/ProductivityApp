@@ -3,7 +3,7 @@ import { fetchLists } from '../lists/listService';
 import { fetchGoals } from '../goals/goalService';
 import Select from 'react-select';
 import DateTimePicker from '../../components/DateTimePicker';
-import { useLocation } from "react-router-dom";
+import dayjs from 'dayjs';
 
 const TaskForm = ({ task, onSubmit }) => {
   const [lists, setLists] = useState([]);
@@ -15,7 +15,7 @@ const TaskForm = ({ task, onSubmit }) => {
     task?.estimatedCompletionTime || 0
   );
   const [targetCompletionDate, setTargetCompletionDate] = useState(
-    task?.targetCompletionDate ? new Date(task.targetCompletionDate) : null
+    task?.targetCompletionDate ? dayjs(task.targetCompletionDate) : null
   );
 
 
@@ -54,7 +54,7 @@ const TaskForm = ({ task, onSubmit }) => {
     setEstimatedCompletionTime(task?.estimatedCompletionTime || 0);
     setSelectedList(null);
     setSelectedParentGoal(null);
-    setTargetCompletionDate(task?.targetCompletionDate ? new Date(task.targetCompletionDate) : null);
+    setTargetCompletionDate(task?.targetCompletionDate ? dayjs(task.targetCompletionDate) : null);
   }, [task]);
 
   // Once lists/parentGoals are loaded, set initial selected values
@@ -91,6 +91,7 @@ const TaskForm = ({ task, onSubmit }) => {
       listId: selectedList?.value,
       parentGoalId: selectedParentGoal?.value,
       estimatedCompletionTime,
+      targetCompletionDate: targetCompletionDate ? targetCompletionDate.toDate() : null
     };
     onSubmit(taskData);
 
@@ -100,6 +101,7 @@ const TaskForm = ({ task, onSubmit }) => {
     setEstimatedCompletionTime(0);
     setSelectedList(null);
     setSelectedParentGoal(null);
+    setTargetCompletionDate(null);
   };
 
   if (loading) return <p>Loading...</p>;
@@ -171,7 +173,7 @@ const TaskForm = ({ task, onSubmit }) => {
           <label htmlFor="targetCompletionDate">Target Completion Date:</label>
           <DateTimePicker
             value={targetCompletionDate}
-            onChange={(newValue) => setTargetCompletionDate(newValue?.toDate ? newValue.toDate() : newValue)}
+            onChange={setTargetCompletionDate}
           />
         </div>
         <button type="submit">Submit</button>
