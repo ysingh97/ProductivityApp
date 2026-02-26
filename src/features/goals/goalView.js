@@ -30,9 +30,13 @@ const GoalView = ({ goal }) => {
             <p>Goal test</p>
             <p>Goal: {goal.title}</p>
             <p>Description: {goal.description}</p>
+            {goal.targetCompletionDate && (
+                <p>Target Completion: {new Date(goal.targetCompletionDate).toLocaleString()}</p>
+            )}
             {parentGoal && <p>Parent Goal: {parentGoal.title}</p>}
+            <Link to={`/goal/${goal._id}/edit`}>Edit Goal</Link>
             <Link
-                to="/createGoalPage"
+                to="/goal/new"
                 state={{ parentGoal: goal, isParentGoalFixed: true }}
             >Create Sub-Goal</Link>
             <Link to={`/task/new?goalId=${goal._id}`}>Create Sub-Task</Link>

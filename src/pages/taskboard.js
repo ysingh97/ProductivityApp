@@ -57,6 +57,12 @@ const TaskBoard = () => {
     return date;
   }, [startOfToday]);
 
+  const startOfNextMonth = useMemo(() => {
+    const date = new Date(startOfToday);
+    date.setDate(date.getDate() + 30);
+    return date;
+  }, [startOfToday]);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -89,6 +95,15 @@ const TaskBoard = () => {
         dueDate: parseDate(task.targetCompletionDate)
       })),
     [tasks]
+  );
+
+  const normalizedGoals = useMemo(
+    () =>
+      goals.map((goal) => ({
+        ...goal,
+        dueDate: parseDate(goal.targetCompletionDate)
+      })),
+    [goals]
   );
 
   const overdueTasks = useMemo(
@@ -146,7 +161,7 @@ const TaskBoard = () => {
   );
 
   const goalsInFocus = useMemo(() => {
-    const focus = goals
+    const focus = normalizedGoals
       .filter((goal) => !goal.parentGoalId)
       .map((goal) => {
         const goalTasks = normalizedTasks.filter(
@@ -155,12 +170,11 @@ const TaskBoard = () => {
         const nextTask = goalTasks
           .filter((task) => task.dueDate)
           .sort((a, b) => a.dueDate - b.dueDate)[0];
-        const goalDueDate = parseDate(goal.targetCompletionDate);
         return {
           ...goal,
           nextTask,
           openTasks: goalTasks.length,
-          sortDate: nextTask?.dueDate || goalDueDate
+          sortDate: nextTask?.dueDate || goal.dueDate
         };
       })
       .sort((a, b) => {
@@ -170,7 +184,21 @@ const TaskBoard = () => {
         return a.title.localeCompare(b.title);
       });
     return focus.slice(0, 4);
-  }, [goals, normalizedTasks]);
+  }, [normalizedGoals, normalizedTasks]);
+
+  const upcomingGoals = useMemo(
+    () =>
+      normalizedGoals
+        .filter(
+          (goal) =>
+            goal.dueDate &&
+            goal.dueDate >= startOfToday &&
+            goal.dueDate < startOfNextMonth
+        )
+        .sort((a, b) => a.dueDate - b.dueDate)
+        .slice(0, 6),
+    [normalizedGoals, startOfToday, startOfNextMonth]
+  );
 
   const getTaskMeta = (task) => {
     if (task.parentGoalId && goalById.has(task.parentGoalId)) {
@@ -196,6 +224,19 @@ const TaskBoard = () => {
       return { label: "Today", color: "warning" };
     }
     return { label: dateFormatter.format(task.dueDate), color: "default" };
+  };
+
+  const getGoalDueLabel = (goal) => {
+    if (!goal.dueDate) {
+      return "No target date";
+    }
+    if (goal.dueDate < startOfToday) {
+      return `Overdue · ${dateFormatter.format(goal.dueDate)}`;
+    }
+    if (goal.dueDate < startOfTomorrow) {
+      return "Target: Today";
+    }
+    return `Target: ${dateFormatter.format(goal.dueDate)}`;
   };
 
   const renderTaskList = (items, emptyText) => {
@@ -290,7 +331,7 @@ const TaskBoard = () => {
           <Button variant="contained" component={Link} to="/task/new">
             New Task
           </Button>
-          <Button variant="contained" component={Link} to="/createGoalPage">
+          <Button variant="contained" component={Link} to="/goal/new">
             New Goal
           </Button>
           <Button variant="outlined" component={Link} to="/createListPage">
@@ -312,12 +353,14 @@ const TaskBoard = () => {
         }}
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Overdue ({overdueTasks.length})
-            </Typography>
-            {renderTaskList(overdueTasks, "All caught up.")}
-          </Paper>
+          {overdueTasks.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+              <Typography variant="h6" fontWeight={700} gutterBottom>
+                Overdue ({overdueTasks.length})
+              </Typography>
+              {renderTaskList(overdueTasks, "All caught up.")}
+            </Paper>
+          )}
 
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
             <Typography variant="h6" fontWeight={700} gutterBottom>
@@ -373,12 +416,61 @@ const TaskBoard = () => {
                         ? ` · Next: ${goal.nextTask.title}`
                         : " · No upcoming tasks"}
                     </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {getGoalDueLabel(goal)}
+                    </Typography>
                   </Box>
                 ))}
               </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 No goals yet. Create one to start tracking progress.
+              </Typography>
+            )}
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              Upcoming Goal Deadlines (30 Days)
+            </Typography>
+            {upcomingGoals.length ? (
+              <Stack spacing={1.5}>
+                {upcomingGoals.map((goal) => (
+                  <Box
+                    key={goal._id}
+                    component={Link}
+                    to={`/goals/${goal._id}`}
+                    sx={{
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 2,
+                      borderRadius: 2,
+                      p: 1.5,
+                      border: "1px solid rgba(0, 0, 0, 0.08)",
+                      transition: "0.2s",
+                      "&:hover": {
+                        borderColor: "primary.main",
+                        backgroundColor: "rgba(25, 118, 210, 0.04)"
+                      }
+                    }}
+                  >
+                    <Typography fontWeight={600} noWrap>
+                      {goal.title}
+                    </Typography>
+                    <Chip
+                      label={dateFormatter.format(goal.dueDate)}
+                      size="small"
+                      color="default"
+                    />
+                  </Box>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No goals due in the next 30 days.
               </Typography>
             )}
           </Paper>

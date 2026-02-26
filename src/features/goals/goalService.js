@@ -8,7 +8,12 @@ export const fetchGoals = async () => {
 
 export const createGoal = async (goalData) => {
   const response = await apiClient.post('/goals', goalData);
-  return response;  
+  return response.data;  
+}
+
+export const updateGoal = async (goalId, updates) => {
+  const response = await apiClient.put(`/goals/${goalId}`, updates);
+  return response.data;
 }
 
 export const deleteGoal = async (goalId) => {
