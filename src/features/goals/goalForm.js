@@ -2,20 +2,27 @@ import React, { useState, useEffect } from "react";
 import { fetchGoals } from './goalService'
 import Select from 'react-select';
 import { useLocation } from "react-router-dom";
+import dayjs from 'dayjs';
+import DateTimePicker from '../../components/DateTimePicker';
 
-const GoalForm = ({ onSubmit }) => {
+const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [parentGoals, setParentGoals] = useState([]);
+  const isEditing = Boolean(isEditingProp || goal);
 
   const location = useLocation();
-  const parentGoal = location.state?.parentGoal || null;
-  const isParentGoalFixed = location.state?.isParentGoalFixed || false;
+  const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
+  const isParentGoalFixed = !isEditing ? location.state?.isParentGoalFixed || false : false;
   //console.log("isParentGoalFixed: ", isParentGoalFixed);
   
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(goal?.title || "");
+  const [description, setDescription] = useState(goal?.description || "");
+  const [targetCompletionDate, setTargetCompletionDate] = useState(
+    goal?.targetCompletionDate ? dayjs(goal.targetCompletionDate) : null
+  );
   // const [selectedList, setSelectedList] = useState(null);
   const [selectedParentGoal, setSelectedParentGoal] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // console.log("Goal Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
   
@@ -24,17 +31,37 @@ const GoalForm = ({ onSubmit }) => {
     const goalData = {
         title,
         description,
-        parentGoalId: selectedParentGoal?.value
+        parentGoalId: selectedParentGoal?.value,
+        targetCompletionDate: targetCompletionDate ? targetCompletionDate.toDate() : null
         // listId: selectedList.value
     };
     onSubmit(goalData);
     setTitle("");
     setDescription("");
+    setTargetCompletionDate(null);
   };
+
+  useEffect(() => {
+    if (!goal) {
+      if (!isEditing) {
+        setTitle("");
+        setDescription("");
+        setTargetCompletionDate(null);
+      }
+      return;
+    }
+
+    setTitle(goal.title || "");
+    setDescription(goal.description || "");
+    setTargetCompletionDate(
+      goal.targetCompletionDate ? dayjs(goal.targetCompletionDate) : null
+    );
+  }, [goal, isEditing]);
 
   useEffect(() => {
       //console.log("goalForm useEffect");   
       const loadData = async () => {
+        setLoading(true);
         try {
           const [goalResponse] = await Promise.all([
             // fetchLists(),
@@ -46,35 +73,50 @@ const GoalForm = ({ onSubmit }) => {
         } catch (err) {
           setError('Failed to load goals');
           console.error(err.message);
-        } 
+        } finally {
+          setLoading(false);
+        }
       };
       loadData();
     }, []);
 
   useEffect(() => {
+    if (loading) return;
+
+    if (isEditing) {
+      if (!goal?.parentGoalId) {
+        setSelectedParentGoal(null);
+        return;
+      }
+      const match = parentGoals.find((pg) => pg._id === goal.parentGoalId);
+      setSelectedParentGoal(match ? { value: match._id, label: match.title } : null);
+      return;
+    }
+
     // If goal page is entered from another goal, provide parent goal as default parent goal
-    var defaultParentGoal = (parentGoal && isParentGoalFixed) ? { value: parentGoal._id, label: parentGoal.title } : null;
+    const defaultParentGoal = (parentGoal && isParentGoalFixed)
+      ? { value: parentGoal._id, label: parentGoal.title }
+      : null;
     setSelectedParentGoal(defaultParentGoal);
     //console.log("default parent goal: ", defaultParentGoal);
-  }, [parentGoal, isParentGoalFixed]);
+  }, [loading, isEditing, goal, parentGoals, parentGoal, isParentGoalFixed]);
 
-  var selectedParentGoalOptions = parentGoals.map(parentGoal => ({
-    value: parentGoal._id,
-    label: parentGoal.title
-  }));
+  const selectedParentGoalOptions = parentGoals
+    .filter((pg) => !goal || pg._id !== goal._id)
+    .map(parentGoal => ({
+      value: parentGoal._id,
+      label: parentGoal.title
+    }));
   //console.log("Parent goals: ", parentGoals);
 
-  if (isParentGoalFixed && !selectedParentGoal) {
+  if (isParentGoalFixed && parentGoal && !selectedParentGoal) {
     return <p>Loading parent goal...</p>;
-  }
-
-  if (parentGoals.length === 0) {
-    return <p>Loading goals...</p>;
   }
 
   return (
     <div>
-      <h2>Set a New Goal</h2>
+      <h2>{isEditing ? "Update Goal" : "Set a New Goal"}</h2>
+      {error && <p>{error}</p>}
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="title">Title:</label>
@@ -94,13 +136,24 @@ const GoalForm = ({ onSubmit }) => {
           />
         </div>
         <div>
+          <label htmlFor="targetCompletionDate">Target Completion Date:</label>
+          <DateTimePicker
+            value={targetCompletionDate}
+            onChange={setTargetCompletionDate}
+          />
+        </div>
+        <div>
             <label htmlFor="goal">Parent Goal:</label>
             <Select options={selectedParentGoalOptions}
                     value={selectedParentGoal}
                     onChange={(option) => setSelectedParentGoal(option)}
-                    isDisabled={isParentGoalFixed}/>
+                    isDisabled={isParentGoalFixed || loading}
+                    placeholder={loading ? "Loading goals..." : "Optional parent goal"}/>
+            {!loading && parentGoals.length === 0 && (
+              <p>No parent goals yet. This goal will be top-level.</p>
+            )}
         </div>
-        <button type="submit">Set Goal</button>
+        <button type="submit">{isEditing ? "Update Goal" : "Set Goal"}</button>
       </form>
     </div>
   );

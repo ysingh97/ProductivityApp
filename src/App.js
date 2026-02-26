@@ -37,7 +37,8 @@ function App() {
                 <Route path="/task/new" element={<CreateTaskPage />}/>
                 <Route path="/task/:taskId/edit" element={<CreateTaskPage />}/>
                 <Route path="/createListPage" element={<CreateListPage/>}/>
-                <Route path="/createGoalPage" element={<CreateGoalPage/>}/>
+                <Route path="/goal/new" element={<CreateGoalPage/>}/>
+                <Route path="/goal/:goalId/edit" element={<CreateGoalPage/>}/>
                 <Route path="/lists/:listId" element={<ListPage/>}/>
                 <Route path="/goals/:goalId" element={<GoalPage/>}/>
                 <Route path="/tasks/:taskId" element={<TaskPage/>}/>

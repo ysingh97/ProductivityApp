@@ -49,20 +49,90 @@ const createGoal = async (req, res) => {
 }
 
 const updateGoal = async (req, res) => {
-    //TODO
+    try {
+        const { id } = req.params;
+        const { userId, ...updates } = req.body;
+
+        const existingGoal = await Goal.findOne({ _id: id, userId: req.user.id });
+        if (!existingGoal) {
+            return res.status(404).json({ message: "Goal not found" });
+        }
+
+        const hasParentUpdate = Object.prototype.hasOwnProperty.call(updates, 'parentGoalId');
+        if (hasParentUpdate && updates.parentGoalId === '') {
+            updates.parentGoalId = null;
+        }
+
+        if (hasParentUpdate && updates.parentGoalId) {
+            if (String(updates.parentGoalId) === String(id)) {
+                return res.status(400).json({ message: "Goal cannot be its own parent" });
+            }
+            const parentGoal = await Goal.findOne({ _id: updates.parentGoalId, userId: req.user.id });
+            if (!parentGoal) {
+                return res.status(400).json({ message: "Invalid parentGoal ID" });
+            }
+        }
+
+        const updatedGoal = await Goal.findOneAndUpdate(
+            { _id: id, userId: req.user.id },
+            updates,
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedGoal) {
+            return res.status(404).json({ message: "Goal not found" });
+        }
+
+        if (hasParentUpdate) {
+            const previousParentId = existingGoal.parentGoalId ? String(existingGoal.parentGoalId) : null;
+            const nextParentId = updates.parentGoalId ? String(updates.parentGoalId) : null;
+
+            if (previousParentId && previousParentId !== nextParentId) {
+                await Goal.updateOne(
+                    { _id: previousParentId, userId: req.user.id },
+                    { $pull: { subGoals: existingGoal._id } }
+                );
+            }
+
+            if (nextParentId && previousParentId !== nextParentId) {
+                await Goal.updateOne(
+                    { _id: nextParentId, userId: req.user.id },
+                    { $addToSet: { subGoals: existingGoal._id } }
+                );
+            }
+        }
+
+        res.status(200).json(updatedGoal);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 }
 
 const deleteGoal = async (req, res) => {
     try {
-        const deletedTask = await Goal.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+        const goalToDelete = await Goal.findOne({ _id: req.params.id, userId: req.user.id });
 
-        if (!deletedTask) {
+        if (!goalToDelete) {
             return res.status(404).json({ message: "Goal not found" });
         }
+
+        if (goalToDelete.parentGoalId) {
+            await Goal.updateOne(
+                { _id: goalToDelete.parentGoalId, userId: req.user.id },
+                { $pull: { subGoals: goalToDelete._id } }
+            );
+        }
+
+        await Goal.updateMany(
+            { parentGoalId: goalToDelete._id, userId: req.user.id },
+            { $set: { parentGoalId: null } }
+        );
+
+        await Goal.deleteOne({ _id: goalToDelete._id, userId: req.user.id });
         
         res.json({
             message: 'Goal deleted',
-            deletedTask
+            deletedTask: goalToDelete
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
