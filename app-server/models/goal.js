@@ -10,6 +10,11 @@ const goalSchema = new mongoose.Schema({
     type: String,
     default: '', // Optional description, defaults to an empty string
   },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    default: null
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
