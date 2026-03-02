@@ -22,6 +22,7 @@ const goalRoutes = require('./routes/goalRoutes');
 const listRoutes = require('./routes/listRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const authRoutes = require('./routes/authRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
 
 // Middleware
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/goals', requireAuth, goalRoutes); // Routes for goals
 app.use('/api/lists', requireAuth, listRoutes); // Routes for lists
 app.use('/api/tasks', requireAuth, taskRoutes); // Routes for tasks
+app.use('/api/categories', requireAuth, categoryRoutes); // Routes for categories
 
 // Function to start the server
 const startServer = async () => {

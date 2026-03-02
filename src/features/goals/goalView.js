@@ -5,6 +5,9 @@ import { Link } from "react-router-dom";
 const GoalView = ({ goal }) => {
     const [parentGoal, setParentGoal] = useState(null);
     //console.log("rendering goalview goal: ", goal);
+    const categoryTitle = goal?.category && typeof goal.category === 'object'
+        ? goal.category.title
+        : goal?.category;
 
     useEffect(() => {
         //console.log("goal view useeffect: goal", goal);
@@ -30,6 +33,7 @@ const GoalView = ({ goal }) => {
             <p>Goal test</p>
             <p>Goal: {goal.title}</p>
             <p>Description: {goal.description}</p>
+            {categoryTitle && <p>Category: {categoryTitle}</p>}
             {goal.targetCompletionDate && (
                 <p>Target Completion: {new Date(goal.targetCompletionDate).toLocaleString()}</p>
             )}

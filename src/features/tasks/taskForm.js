@@ -5,12 +5,23 @@ import Select from 'react-select';
 import DateTimePicker from '../../components/DateTimePicker';
 import dayjs from 'dayjs';
 
+const getCategoryTitle = (value) => {
+  if (!value) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return value.title || "";
+};
+
 const TaskForm = ({ task, onSubmit }) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
 
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
+  const [category, setCategory] = useState(getCategoryTitle(task?.category));
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState(
     task?.estimatedCompletionTime || 0
   );
@@ -51,6 +62,7 @@ const TaskForm = ({ task, onSubmit }) => {
   useEffect(() => {
     setTitle(task?.title || "");
     setDescription(task?.description || "");
+    setCategory(getCategoryTitle(task?.category));
     setEstimatedCompletionTime(task?.estimatedCompletionTime || 0);
     setSelectedList(null);
     setSelectedParentGoal(null);
@@ -67,6 +79,7 @@ const TaskForm = ({ task, onSubmit }) => {
       const parentGoalOptions = parentGoals.map((pg) => ({
         value: pg._id,
         label: pg.title,
+        categoryTitle: getCategoryTitle(pg.category)
       }));
 
       if (task?.listId) {
@@ -79,9 +92,18 @@ const TaskForm = ({ task, onSubmit }) => {
           (o) => o.value === task.parentGoalId
         );
         setSelectedParentGoal(match || null);
+        setCategory(match?.categoryTitle || getCategoryTitle(task?.category));
+      } else {
+        setCategory(getCategoryTitle(task?.category));
       }
     }
   }, [loading, lists, parentGoals, task]);
+
+  useEffect(() => {
+    if (selectedParentGoal) {
+      setCategory(selectedParentGoal.categoryTitle || "");
+    }
+  }, [selectedParentGoal]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -93,11 +115,15 @@ const TaskForm = ({ task, onSubmit }) => {
       estimatedCompletionTime,
       targetCompletionDate: targetCompletionDate ? targetCompletionDate.toDate() : null
     };
+    if (!selectedParentGoal?.value) {
+      taskData.category = category;
+    }
     onSubmit(taskData);
 
     // clear form after submit if you're in "create" mode
     setTitle("");
     setDescription("");
+    setCategory("");
     setEstimatedCompletionTime(0);
     setSelectedList(null);
     setSelectedParentGoal(null);
@@ -114,6 +140,7 @@ const TaskForm = ({ task, onSubmit }) => {
   const parentGoalOptions = parentGoals.map((pg) => ({
     value: pg._id,
     label: pg.title,
+    categoryTitle: getCategoryTitle(pg.category)
   }));
 
   return (
@@ -137,6 +164,17 @@ const TaskForm = ({ task, onSubmit }) => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+        </div>
+        <div>
+          <label htmlFor="category">Category:</label>
+          <input
+            id="category"
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            disabled={Boolean(selectedParentGoal)}
+          />
+          {/* TODO: Add question mark icon explaining category inheritance when a parent goal is selected. */}
         </div>
 
         <div>
