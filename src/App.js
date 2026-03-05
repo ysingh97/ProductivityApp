@@ -9,7 +9,10 @@ import TaskPage from './features/tasks/taskPage';
 // import EditTaskPage from './features/tasks/editTaskPage';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import SignIn from './pages/SignIn';
+import GoalsOverview from './pages/GoalsOverview';
+import Visualizations from './pages/Visualizations';
 import RequireAuth from './components/RequireAuth';
+import AppShell from './components/AppShell';
 import { AuthProvider } from './context/AuthContext';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -33,15 +36,19 @@ function App() {
             <Routes>
               <Route path="/" element={<SignIn />} />
               <Route element={<RequireAuth />}>
-                <Route path="/board" element={<TaskBoard />}/>
-                <Route path="/task/new" element={<CreateTaskPage />}/>
-                <Route path="/task/:taskId/edit" element={<CreateTaskPage />}/>
-                <Route path="/createListPage" element={<CreateListPage/>}/>
-                <Route path="/goal/new" element={<CreateGoalPage/>}/>
-                <Route path="/goal/:goalId/edit" element={<CreateGoalPage/>}/>
-                <Route path="/lists/:listId" element={<ListPage/>}/>
-                <Route path="/goals/:goalId" element={<GoalPage/>}/>
-                <Route path="/tasks/:taskId" element={<TaskPage/>}/>
+                <Route element={<AppShell />}>
+                  <Route path="/board" element={<TaskBoard />} />
+                  <Route path="/task/new" element={<CreateTaskPage />} />
+                  <Route path="/task/:taskId/edit" element={<CreateTaskPage />} />
+                  <Route path="/createListPage" element={<CreateListPage />} />
+                  <Route path="/goal/new" element={<CreateGoalPage />} />
+                  <Route path="/goal/:goalId/edit" element={<CreateGoalPage />} />
+                  <Route path="/lists/:listId" element={<ListPage />} />
+                  <Route path="/goals/overview" element={<GoalsOverview />} />
+                  <Route path="/goals/:goalId" element={<GoalPage />} />
+                  <Route path="/tasks/:taskId" element={<TaskPage />} />
+                  <Route path="/visualizations" element={<Visualizations />} />
+                </Route>
               </Route>
             </Routes>
             
