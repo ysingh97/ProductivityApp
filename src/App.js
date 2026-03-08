@@ -10,6 +10,7 @@ import TaskPage from './features/tasks/taskPage';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import SignIn from './pages/SignIn';
 import GoalsOverview from './pages/GoalsOverview';
+import GoalTreeView from './pages/GoalTreeView';
 import Visualizations from './pages/Visualizations';
 import RequireAuth from './components/RequireAuth';
 import AppShell from './components/AppShell';
@@ -45,6 +46,7 @@ function App() {
                   <Route path="/goal/:goalId/edit" element={<CreateGoalPage />} />
                   <Route path="/lists/:listId" element={<ListPage />} />
                   <Route path="/goals/overview" element={<GoalsOverview />} />
+                  <Route path="/goals/:goalId/tree" element={<GoalTreeView />} />
                   <Route path="/goals/:goalId" element={<GoalPage />} />
                   <Route path="/tasks/:taskId" element={<TaskPage />} />
                   <Route path="/visualizations" element={<Visualizations />} />
