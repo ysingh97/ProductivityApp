@@ -141,6 +141,7 @@ const GoalTreeView = () => {
 
   const rootGoal = goalsById.get(String(goalId));
 
+  // TODO: Make tree nodes expandable/collapsible.
   const renderGoalNode = (nodeId, depth = 0) => {
     const goal = goalsById.get(String(nodeId));
     if (!goal) return null;
