@@ -11,6 +11,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import SignIn from './pages/SignIn';
 import GoalsOverview from './pages/GoalsOverview';
 import GoalTreeView from './pages/GoalTreeView';
+import CalendarView from './pages/CalendarView';
 import Visualizations from './pages/Visualizations';
 import RequireAuth from './components/RequireAuth';
 import AppShell from './components/AppShell';
@@ -49,6 +50,7 @@ function App() {
                   <Route path="/goals/:goalId/tree" element={<GoalTreeView />} />
                   <Route path="/goals/:goalId" element={<GoalPage />} />
                   <Route path="/tasks/:taskId" element={<TaskPage />} />
+                  <Route path="/calendar" element={<CalendarView />} />
                   <Route path="/visualizations" element={<Visualizations />} />
                 </Route>
               </Route>
