@@ -9,8 +9,6 @@ import {
   FormControlLabel,
   Paper,
   Stack,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -34,7 +32,6 @@ const baseColors = [
 const formatDayKey = (value) => dayjs(value).format("YYYY-MM-DD");
 
 const DashboardCalendar = ({ goals, tasks }) => {
-  const [viewMode, setViewMode] = useState("week");
   const [activeDate, setActiveDate] = useState(dayjs());
   const [selectedGoalIds, setSelectedGoalIds] = useState(new Set());
   const [hasUserFiltered, setHasUserFiltered] = useState(false);
@@ -43,28 +40,15 @@ const DashboardCalendar = ({ goals, tasks }) => {
 
   const today = useMemo(() => dayjs(), []);
 
-  const viewStart = useMemo(() => {
-    if (viewMode === "month") {
-      return activeDate.startOf("month").startOf("week");
-    }
-    return activeDate.startOf("week");
-  }, [activeDate, viewMode]);
+  const viewStart = useMemo(() => activeDate.startOf("week"), [activeDate]);
 
-  const viewEnd = useMemo(() => {
-    if (viewMode === "month") {
-      return activeDate.endOf("month").endOf("week");
-    }
-    return activeDate.endOf("week");
-  }, [activeDate, viewMode]);
+  const viewEnd = useMemo(() => activeDate.endOf("week"), [activeDate]);
 
   const rangeLabel = useMemo(() => {
-    if (viewMode === "month") {
-      return activeDate.format("MMMM YYYY");
-    }
     const startLabel = viewStart.format("MMM D");
     const endLabel = viewEnd.format("MMM D, YYYY");
     return `${startLabel} - ${endLabel}`;
-  }, [activeDate, viewEnd, viewMode, viewStart]);
+  }, [viewEnd, viewStart]);
 
   const goalsById = useMemo(() => {
     const map = new Map();
@@ -290,15 +274,7 @@ const DashboardCalendar = ({ goals, tasks }) => {
   };
 
   const handleShift = (direction) => {
-    setActiveDate((prev) =>
-      viewMode === "month" ? prev.add(direction, "month") : prev.add(direction, "week")
-    );
-  };
-
-  const handleViewChange = (_event, nextView) => {
-    if (nextView) {
-      setViewMode(nextView);
-    }
+    setActiveDate((prev) => prev.add(direction, "week"));
   };
 
   const renderCalendarItem = (item) => {
@@ -340,7 +316,6 @@ const DashboardCalendar = ({ goals, tasks }) => {
   const renderDayCell = (day) => {
     const dayKey = day.format("YYYY-MM-DD");
     const isToday = day.isSame(today, "day");
-    const isCurrentMonth = day.month() === activeDate.month();
     const items = (itemsByDayKey.get(dayKey) || []).filter((item) =>
       selectedGoalIds.has(item.topLevelId)
     );
@@ -349,26 +324,21 @@ const DashboardCalendar = ({ goals, tasks }) => {
       <Box
         key={dayKey}
         sx={{
-          minHeight: viewMode === "month" ? 140 : 200,
+          minHeight: 200,
           border: "1px solid",
           borderColor: isToday ? "primary.main" : "divider",
           borderRadius: 2,
           p: 1.5,
           backgroundColor: isToday ? alpha("#c24b2f", 0.08) : "background.paper",
-          opacity: viewMode === "month" && !isCurrentMonth ? 0.55 : 1,
           display: "flex",
           flexDirection: "column",
           gap: 1
         }}
       >
         <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-          {viewMode === "week" ? (
-            <Typography variant="subtitle2" fontWeight={600}>
-              {day.format("ddd")}
-            </Typography>
-          ) : (
-            <Box />
-          )}
+          <Typography variant="subtitle2" fontWeight={600}>
+            {day.format("ddd")}
+          </Typography>
           <Typography variant="caption" color="text.secondary">
             {day.format("D")}
           </Typography>
@@ -376,34 +346,18 @@ const DashboardCalendar = ({ goals, tasks }) => {
         <Stack spacing={0.75} sx={{ flex: 1 }}>
           {items.length > 0 ? (
             items.map((item) => renderCalendarItem(item))
-          ) : viewMode === "week" ? (
+          ) : (
             <Typography variant="caption" color="text.secondary">
               No due items
             </Typography>
-          ) : null}
+          )}
         </Stack>
       </Box>
     );
   };
 
-  const weekDays = useMemo(() => {
-    if (viewMode === "week") {
-      return Array.from({ length: 7 }, (_, index) => viewStart.add(index, "day"));
-    }
-    const days = [];
-    let cursor = viewStart;
-    while (cursor.isBefore(viewEnd, "day") || cursor.isSame(viewEnd, "day")) {
-      days.push(cursor);
-      cursor = cursor.add(1, "day");
-    }
-    return days;
-  }, [viewEnd, viewMode, viewStart]);
-
-  const dayOfWeekLabels = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, index) =>
-        viewStart.startOf("week").add(index, "day")
-      ),
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => viewStart.add(index, "day")),
     [viewStart]
   );
 
@@ -424,16 +378,6 @@ const DashboardCalendar = ({ goals, tasks }) => {
           spacing={2}
           sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
         >
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={handleViewChange}
-            size="small"
-          >
-            <ToggleButton value="week">Week</ToggleButton>
-            <ToggleButton value="month">Month</ToggleButton>
-          </ToggleButtonGroup>
-
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <Button variant="outlined" size="small" onClick={() => handleShift(-1)}>
               Prev
@@ -567,17 +511,6 @@ const DashboardCalendar = ({ goals, tasks }) => {
               gap: 1.5
             }}
           >
-            {viewMode === "month" &&
-              dayOfWeekLabels.map((day) => (
-                <Box
-                  key={`label-${day.format("ddd")}`}
-                  sx={{ textAlign: "center", color: "text.secondary" }}
-                >
-                  <Typography variant="caption" fontWeight={600}>
-                    {day.format("ddd")}
-                  </Typography>
-                </Box>
-              ))}
             {weekDays.map((day) => renderDayCell(day))}
           </Box>
         </Paper>
