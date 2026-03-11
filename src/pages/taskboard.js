@@ -4,6 +4,7 @@ import { fetchLists } from "../features/lists/listService";
 import { fetchGoals } from "../features/goals/goalService";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import DashboardCalendar from "../components/DashboardCalendar";
 
 import {
   Container,
@@ -490,6 +491,8 @@ const TaskBoard = () => {
           </Paper>
         </Box>
       </Box>
+
+      <DashboardCalendar goals={goals} tasks={tasks} />
     </Container>
   );
 };
