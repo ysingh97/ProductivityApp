@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modern Sage Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Sora:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8f5ef;
+        --paper: #ffffff;
+        --ink: #111827;
+        --muted: #5f6b6d;
+        --line: #e4ddd2;
+        --accent: #0f766e;
+        --accent-soft: rgba(15, 118, 110, 0.16);
+        --clay: #f97316;
+        --shadow: 0 18px 40px rgba(17, 24, 39, 0.1);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Manrope", sans-serif;
+        color: var(--ink);
+        background:
+          linear-gradient(0deg, rgba(248, 245, 239, 0.9), rgba(248, 245, 239, 0.9)),
+          repeating-linear-gradient(
+            45deg,
+            rgba(228, 221, 210, 0.35) 0px,
+            rgba(228, 221, 210, 0.35) 1px,
+            transparent 1px,
+            transparent 18px
+          );
+      }
+      h1,
+      h2,
+      h3,
+      .brand {
+        font-family: "Sora", sans-serif;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 2.1rem;
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 1.55rem;
+      }
+      h3 {
+        margin: 0 0 10px;
+        font-size: 1.05rem;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 28px 20px 60px;
+      }
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(8px);
+      }
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .menu-btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        padding: 8px 12px;
+        border-radius: 16px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .brand {
+        font-size: 1rem;
+        letter-spacing: 0.4px;
+      }
+      .header-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        padding: 10px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--paper);
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+        box-shadow: 0 12px 30px rgba(15, 118, 110, 0.24);
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--accent);
+        border-color: rgba(15, 118, 110, 0.4);
+      }
+      .page-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 28px 0 22px;
+      }
+      .user-meta {
+        text-align: right;
+        font-weight: 600;
+      }
+      .user-meta small {
+        display: block;
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+      }
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      .span-2 {
+        grid-column: span 2;
+      }
+      .list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: #fff8f0;
+        border: 1px solid #f1dcc6;
+      }
+      .pill {
+        display: inline-flex;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid transparent;
+      }
+      .pill.warn {
+        background: rgba(249, 115, 22, 0.18);
+        color: #b45309;
+        border-color: rgba(249, 115, 22, 0.4);
+      }
+      .pill.ok {
+        background: rgba(15, 118, 110, 0.2);
+        color: #0f766e;
+        border-color: rgba(15, 118, 110, 0.4);
+      }
+      .calendar-layout {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 18px;
+        margin-top: 18px;
+      }
+      .side-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .toggle-row {
+        display: flex;
+        gap: 10px;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        font-size: 0.85rem;
+      }
+      .goal-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .calendar-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 10px;
+      }
+      .day-cell {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 10px;
+        background: #fff;
+        min-height: 140px;
+      }
+      .day-cell.today {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .day-title {
+        display: flex;
+        justify-content: space-between;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 8px;
+      }
+      .item {
+        display: block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+        border: 1px solid rgba(15, 118, 110, 0.4);
+        background: linear-gradient(120deg, rgba(15, 118, 110, 0.2), rgba(255, 255, 255, 0.95));
+      }
+      .item.task {
+        border-radius: 12px;
+        border-style: dashed;
+      }
+      .item.clay {
+        border-color: rgba(249, 115, 22, 0.4);
+        background: linear-gradient(120deg, rgba(249, 115, 22, 0.2), rgba(255, 255, 255, 0.95));
+      }
+      .section {
+        margin-top: 36px;
+      }
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .subtitle {
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      @media (max-width: 1024px) {
+        .dashboard-grid {
+          grid-template-columns: 1fr;
+        }
+        .span-2 {
+          grid-column: span 1;
+        }
+        .calendar-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-left">
+        <button class="menu-btn">Menu</button>
+        <div class="brand">Productivity Hub</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn primary">New Task</button>
+        <button class="btn primary">New Goal</button>
+        <button class="btn ghost">New List</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Overview of priorities across tasks and goals.</p>
+        </div>
+        <div class="user-meta">
+          Yashveer Singh
+          <small>bubstubs@gmail.com</small>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card span-2">
+          <h3>Overdue (2)</h3>
+          <div class="list-item">
+            <div>
+              <strong>Finish UI Design</strong>
+              <p class="subtitle">Goal: Build Productivity Website</p>
+            </div>
+            <span class="pill warn">Overdue - Mar 2</span>
+          </div>
+          <div class="list-item" style="margin-top: 10px;">
+            <div>
+              <strong>Deploy App</strong>
+              <p class="subtitle">Goal: Build Productivity Website</p>
+            </div>
+            <span class="pill warn">Overdue - Mar 1</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Goals in Focus</h3>
+          <p>Build Productivity Website</p>
+          <div style="margin-top: 12px;">
+            <span class="pill ok">1 open task</span>
+          </div>
+        </div>
+        <div class="card span-2">
+          <h3>Today (0)</h3>
+          <p>Nothing due today. Enjoy the breathing room.</p>
+        </div>
+        <div class="card">
+          <h3>Quick Stats</h3>
+          <p>2 tasks - 2 goals - 0 lists</p>
+          <p class="subtitle">2 overdue - 0 due today</p>
+        </div>
+        <div class="card span-2">
+          <h3>Next 7 Days (0)</h3>
+          <p>No deadlines in the next week.</p>
+        </div>
+        <div class="card span-2">
+          <h3>No Date (0)</h3>
+          <p>Everything has a date assigned.</p>
+        </div>
+      </div>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <h2>Calendar</h2>
+            <p>Week view with goals and tasks layered by color.</p>
+          </div>
+          <div class="toggle-row">
+            <button class="btn">Week</button>
+            <button class="btn ghost">Month</button>
+          </div>
+        </div>
+        <div class="calendar-controls">
+          <div class="toggle-row">
+            <button class="btn ghost">Prev</button>
+            <button class="btn">Today</button>
+            <button class="btn ghost">Next</button>
+          </div>
+          <div><strong>Mar 1 - Mar 7, 2026</strong></div>
+        </div>
+
+        <div class="calendar-layout">
+          <div class="card side-panel">
+            <div>
+              <h3>Top-level goals</h3>
+              <p class="subtitle">Filter entire goal trees.</p>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle"><input type="checkbox" checked /> Show goals</div>
+              <div class="toggle"><input type="checkbox" checked /> Show tasks</div>
+            </div>
+            <div>
+              <div class="goal-line">
+                <span class="dot"></span>
+                Build Productivity Website
+              </div>
+              <div class="goal-line" style="margin-top: 10px;">
+                <span class="dot" style="background: var(--clay);"></span>
+                Deploy to Production
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="calendar-grid">
+              <div class="day-cell">
+                <div class="day-title"><span>Sun</span><span>1</span></div>
+                <span class="item">Build Productivity Website</span>
+              </div>
+              <div class="day-cell">
+                <div class="day-title"><span>Mon</span><span>2</span></div>
+                <span class="item">Deploy App</span>
+                <span class="item task">Finish UI Design</span>
+              </div>
+              <div class="day-cell today">
+                <div class="day-title"><span>Tue</span><span>3</span></div>
+                <span class="item clay">Deploy to Production</span>
+              </div>
+              <div class="day-cell">
+                <div class="day-title"><span>Wed</span><span>4</span></div>
+                <p class="subtitle">No due items</p>
+              </div>
+              <div class="day-cell">
+                <div class="day-title"><span>Thu</span><span>5</span></div>
+                <p class="subtitle">No due items</p>
+              </div>
+              <div class="day-cell">
+                <div class="day-title"><span>Fri</span><span>6</span></div>
+                <p class="subtitle">No due items</p>
+              </div>
+              <div class="day-cell">
+                <div class="day-title"><span>Sat</span><span>7</span></div>
+                <p class="subtitle">No due items</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -17,10 +17,12 @@ import MenuIcon from "@mui/icons-material/Menu";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import Brightness4OutlinedIcon from "@mui/icons-material/Brightness4Outlined";
+import Brightness7OutlinedIcon from "@mui/icons-material/Brightness7Outlined";
 
 const drawerWidth = 280;
 
-const AppShell = () => {
+const AppShell = ({ colorMode, onToggleColorMode }) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
@@ -75,9 +77,25 @@ const AppShell = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="subtitle1" fontWeight={700}>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            sx={{ fontFamily: '"Fraunces", serif', letterSpacing: 0.4 }}
+          >
             Productivity Hub
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton
+            edge="end"
+            onClick={onToggleColorMode}
+            aria-label={`Switch to ${colorMode === "light" ? "dark" : "light"} mode`}
+          >
+            {colorMode === "light" ? (
+              <Brightness4OutlinedIcon />
+            ) : (
+              <Brightness7OutlinedIcon />
+            )}
+          </IconButton>
         </Toolbar>
       </AppBar>
 
