@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Theme Previews</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --text: #0f172a;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --accent: #1d4ed8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        max-width: 900px;
+        margin: 48px auto;
+        padding: 0 20px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+      }
+      h1 {
+        font-family: "Space Grotesk", sans-serif;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 24px;
+        color: #475569;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 12px;
+      }
+      a {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #f8fafc;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+      }
+      a:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+      }
+      .label {
+        font-weight: 700;
+      }
+      .meta {
+        font-size: 0.9rem;
+        color: #64748b;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>Productivity Hub Theme Previews</h1>
+        <p>Open each preview to compare dashboard + calendar styling.</p>
+        <ul>
+          <li>
+            <a href="editorial-warm.html">
+              <div class="label">Editorial Warm</div>
+              <div class="meta">Serif headers, warm paper background, clay accents.</div>
+            </a>
+          </li>
+          <li>
+            <a href="studio-cobalt.html">
+              <div class="label">Studio Cobalt</div>
+              <div class="meta">Modern, crisp, cobalt highlights, cool gradients.</div>
+            </a>
+          </li>
+          <li>
+            <a href="modern-sage.html">
+              <div class="label">Modern Sage</div>
+              <div class="meta">Earthy, calm, green accents, textured beige base.</div>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </main>
+  </body>
+</html>
