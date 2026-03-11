@@ -16,6 +16,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 
 const drawerWidth = 280;
 
@@ -30,6 +31,12 @@ const AppShell = () => {
         to: "/goals/overview",
         description: "Deep goal timelines and milestones",
         icon: <FlagOutlinedIcon />
+      },
+      {
+        label: "Calendar",
+        to: "/calendar",
+        description: "Week and month deadline view",
+        icon: <CalendarMonthOutlinedIcon />
       },
       {
         label: "Data visualizations",
