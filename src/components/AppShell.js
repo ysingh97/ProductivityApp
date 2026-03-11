@@ -80,7 +80,14 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
           <Typography
             variant="subtitle1"
             fontWeight={700}
-            sx={{ fontFamily: '"Fraunces", serif', letterSpacing: 0.4 }}
+            component={Link}
+            to="/board"
+            sx={{
+              fontFamily: '"Fraunces", serif',
+              letterSpacing: 0.4,
+              textDecoration: "none",
+              color: "inherit"
+            }}
           >
             Productivity Hub
           </Typography>
