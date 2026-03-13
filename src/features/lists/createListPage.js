@@ -1,6 +1,5 @@
 import ListForm from './listForm';
 import React, { useState } from "react";
-import { Link } from 'react-router-dom';
 import { createList } from './listService';
 
 const CreateListPage = () => {
@@ -26,7 +25,6 @@ const CreateListPage = () => {
         <div>
         <h1>Create List</h1>
         <ListForm onSubmit={handleListSubmit}/>
-        <Link to="/board">Back to Taskboard</Link>
         </div>
     );
 };

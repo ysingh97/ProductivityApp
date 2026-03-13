@@ -1,8 +1,7 @@
 import TaskForm from './taskForm';
 import React, { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { createTask, updateTask, fetchTaskById } from './taskService';
-import { useLocation } from "react-router-dom";
 
 const CreateTaskPage = () => {
     const [tasks, setTasks] = useState([]);
@@ -62,7 +61,6 @@ const CreateTaskPage = () => {
         <div>
         <h1>Enter Task</h1>
         <TaskForm task={task} onSubmit={handleTaskSubmit}/>
-        <Link to="/board">Back to Taskboard</Link>
         </div>
     );
 };

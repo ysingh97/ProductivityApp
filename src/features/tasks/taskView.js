@@ -327,9 +327,6 @@ const TaskView = ({ task }) => {
                   Open parent goal
                 </Button>
               )}
-              <Button variant="text" component={Link} to="/board">
-                Back to dashboard
-              </Button>
             </Stack>
           </Paper>
 

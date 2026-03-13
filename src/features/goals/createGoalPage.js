@@ -1,6 +1,6 @@
 import GoalForm from './goalForm';
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { createGoal, updateGoal, fetchGoalById } from './goalService';
 
 const CreateGoalPage = () => {
@@ -60,7 +60,6 @@ const CreateGoalPage = () => {
         ) : (
           <GoalForm goal={goal} isEditing={isEditing} onSubmit={handleGoalSubmit}/>
         )}
-        <Link to="/board">Back to Taskboard</Link>
         </div>
     );
 };

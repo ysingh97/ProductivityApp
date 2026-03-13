@@ -310,9 +310,6 @@ const GoalView = ({ goal }) => {
               >
                 Create sub-task
               </Button>
-              <Button variant="text" component={Link} to="/board">
-                Back to dashboard
-              </Button>
             </Stack>
           </Paper>
 

@@ -17,6 +17,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import Brightness4OutlinedIcon from "@mui/icons-material/Brightness4Outlined";
 import Brightness7OutlinedIcon from "@mui/icons-material/Brightness7Outlined";
 
@@ -150,10 +151,26 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
             ))}
           </List>
 
-          <Divider sx={{ my: 1 }} />
-          <Typography variant="caption" color="text.secondary">
-            More insights are coming soon.
-          </Typography>
+          <Divider sx={{ my: 1, mt: "auto" }} />
+          <List>
+            <ListItemButton
+              component={Link}
+              to="/board"
+              onClick={handleToggle(false)}
+              selected={isActiveRoute("/board")}
+              sx={{ borderRadius: 2 }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <HomeOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Dashboard"
+                secondary="Back to your taskboard"
+                primaryTypographyProps={{ fontWeight: 600 }}
+                secondaryTypographyProps={{ variant: "caption" }}
+              />
+            </ListItemButton>
+          </List>
         </Box>
       </Drawer>
 
