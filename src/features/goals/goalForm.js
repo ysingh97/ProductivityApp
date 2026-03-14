@@ -31,6 +31,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
   const isEditing = Boolean(isEditingProp || goal);
+  const now = dayjs();
 
   const location = useLocation();
   const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
@@ -49,6 +50,22 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError(null);
+
+    const parentDeadline = selectedParentGoal?.targetCompletionDate
+      ? dayjs(selectedParentGoal.targetCompletionDate)
+      : null;
+
+    if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+      setError("Target completion date cannot be earlier than the current time.");
+      return;
+    }
+
+    if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
+      setError("Sub-goals cannot have a target completion date later than the parent goal.");
+      return;
+    }
+
     const goalData = {
         title,
         description,
@@ -121,7 +138,12 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
       );
       setSelectedParentGoal(
         match
-          ? { value: match._id, label: match.title, categoryTitle: getCategoryTitle(match.category) }
+          ? {
+              value: match._id,
+              label: match.title,
+              categoryTitle: getCategoryTitle(match.category),
+              targetCompletionDate: match.targetCompletionDate || null
+            }
           : null
       );
       return;
@@ -129,7 +151,12 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
 
     // If goal page is entered from another goal, provide parent goal as default parent goal
     const defaultParentGoal = (parentGoal && isParentGoalFixed)
-      ? { value: parentGoal._id, label: parentGoal.title, categoryTitle: getCategoryTitle(parentGoal.category) }
+      ? {
+          value: parentGoal._id,
+          label: parentGoal.title,
+          categoryTitle: getCategoryTitle(parentGoal.category),
+          targetCompletionDate: parentGoal.targetCompletionDate || null
+        }
       : null;
     setSelectedParentGoal(defaultParentGoal);
   }, [loading, isEditing, goal, parentGoals, parentGoal, isParentGoalFixed]);
@@ -145,9 +172,13 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
     .map(parentGoal => ({
       value: parentGoal._id,
       label: parentGoal.title,
-      categoryTitle: getCategoryTitle(parentGoal.category)
+      categoryTitle: getCategoryTitle(parentGoal.category),
+      targetCompletionDate: parentGoal.targetCompletionDate || null
     }));
   const categoryOptions = categories.map((categoryOption) => categoryOption.title);
+  const parentDeadline = selectedParentGoal?.targetCompletionDate
+    ? dayjs(selectedParentGoal.targetCompletionDate)
+    : null;
 
   return (
     <Paper
@@ -230,7 +261,15 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
               <DateTimePicker
                 value={targetCompletionDate}
                 onChange={setTargetCompletionDate}
-                textFieldProps={{ fullWidth: true, size: "small" }}
+                minDateTime={now}
+                maxDateTime={parentDeadline || undefined}
+                textFieldProps={{
+                  fullWidth: true,
+                  size: "small",
+                  helperText: parentDeadline
+                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "Choose a future target date."
+                }}
               />
 
               <Autocomplete
@@ -282,7 +321,9 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
                     Loading goal options
                   </Box>
                 ) : selectedParentGoal ? (
-                  "Sub-goals automatically inherit their parent category."
+                  parentDeadline
+                    ? `Sub-goals inherit category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "Sub-goals automatically inherit their parent category."
                 ) : (
                   "No parent selected means this will be a top-level goal."
                 )}

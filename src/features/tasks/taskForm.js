@@ -32,6 +32,7 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
+  const now = dayjs();
 
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -93,7 +94,8 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
       const parentGoalOptions = parentGoals.map((pg) => ({
         value: pg._id,
         label: pg.title,
-        categoryTitle: getCategoryTitle(pg.category)
+        categoryTitle: getCategoryTitle(pg.category),
+        targetCompletionDate: pg.targetCompletionDate || null
       }));
 
       if (task?.listId) {
@@ -121,6 +123,22 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError(null);
+
+    const parentDeadline = selectedParentGoal?.targetCompletionDate
+      ? dayjs(selectedParentGoal.targetCompletionDate)
+      : null;
+
+    if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+      setError("Target completion date cannot be earlier than the current time.");
+      return;
+    }
+
+    if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
+      setError("Subtasks cannot have a target completion date later than the parent goal.");
+      return;
+    }
+
     const taskData = {
       title,
       description,
@@ -152,9 +170,13 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
   const parentGoalOptions = parentGoals.map((pg) => ({
     value: pg._id,
     label: pg.title,
-    categoryTitle: getCategoryTitle(pg.category)
+    categoryTitle: getCategoryTitle(pg.category),
+    targetCompletionDate: pg.targetCompletionDate || null
   }));
   const categoryOptions = categories.map((categoryOption) => categoryOption.title);
+  const parentDeadline = selectedParentGoal?.targetCompletionDate
+    ? dayjs(selectedParentGoal.targetCompletionDate)
+    : null;
 
   return (
     <Paper
@@ -286,7 +308,15 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
               <DateTimePicker
                 value={targetCompletionDate}
                 onChange={setTargetCompletionDate}
-                textFieldProps={{ fullWidth: true, size: "small" }}
+                minDateTime={now}
+                maxDateTime={parentDeadline || undefined}
+                textFieldProps={{
+                  fullWidth: true,
+                  size: "small",
+                  helperText: parentDeadline
+                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "Choose a future target date."
+                }}
               />
             </Box>
 
@@ -317,7 +347,9 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
                     Loading form options
                   </Box>
                 ) : selectedParentGoal ? (
-                  "This task will follow the selected goal's category."
+                  parentDeadline
+                    ? `This task follows the goal category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "This task will follow the selected goal's category."
                 ) : (
                   "Standalone tasks can keep their own category."
                 )}

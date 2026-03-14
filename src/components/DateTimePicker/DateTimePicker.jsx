@@ -4,13 +4,14 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import TextField from '@mui/material/TextField';
 
-export default function MyDateTimePicker({ value, onChange, textFieldProps }) {
+export default function MyDateTimePicker({ value, onChange, textFieldProps, ...pickerProps }) {
   return (
     <LocalizationProvider adapterLocale="en" dateAdapter={AdapterDayjs}>
       <DateTimePicker
         label="Target Completion Date"
         value={value}
         onChange={onChange}
+        {...pickerProps}
         renderInput={(params) => <TextField {...params} {...textFieldProps} />}
       />
     </LocalizationProvider>

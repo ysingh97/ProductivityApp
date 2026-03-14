@@ -10,6 +10,7 @@ import {
   Stack,
   Typography
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { fetchGoals } from "../features/goals/goalService";
 import { fetchTasks } from "../features/tasks/taskService";
 
@@ -139,7 +140,28 @@ const GoalTreeView = () => {
     return map;
   }, [normalizedTasks]);
 
-  const rootGoal = goalsById.get(String(goalId));
+  const selectedGoal = goalsById.get(String(goalId));
+
+  const rootGoalId = useMemo(() => {
+    if (!goalId) return null;
+
+    let currentId = String(goalId);
+    const visited = new Set();
+
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const goal = goalsById.get(currentId);
+
+      if (!goal) return null;
+      if (!goal.parentGoalId) return currentId;
+
+      currentId = String(goal.parentGoalId);
+    }
+
+    return String(goalId);
+  }, [goalId, goalsById]);
+
+  const rootGoal = rootGoalId ? goalsById.get(rootGoalId) : null;
 
   // TODO: Make tree nodes expandable/collapsible.
   const renderGoalNode = (nodeId, depth = 0) => {
@@ -149,6 +171,8 @@ const GoalTreeView = () => {
     const children = goalsByParent.get(String(nodeId)) || [];
     const goalTasks = tasksByGoal.get(String(nodeId)) || [];
     const dueLabel = goal.dueDate ? dateFormatter.format(goal.dueDate) : "No deadline";
+    const isSelectedGoal = String(goal._id) === String(goalId);
+    const isTopLevelGoal = !goal.parentGoalId;
 
     return (
       <Box
@@ -161,7 +185,30 @@ const GoalTreeView = () => {
         }}
       >
         <Stack spacing={1.5}>
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+          <Paper
+            component={Link}
+            to={`/goals/${goal._id}`}
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              textDecoration: "none",
+              color: "inherit",
+              borderWidth: isTopLevelGoal ? 2 : 1,
+              borderColor: isSelectedGoal ? "primary.main" : "divider",
+              backgroundColor: isSelectedGoal
+                ? (theme) => alpha(theme.palette.primary.main, 0.08)
+                : "background.paper",
+              boxShadow: isSelectedGoal
+                ? (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.2)}`
+                : "none",
+              transition: "0.2s",
+              "&:hover": {
+                borderColor: "primary.main",
+                backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.05)
+              }
+            }}
+          >
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={1}
@@ -170,14 +217,20 @@ const GoalTreeView = () => {
               <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={700}>{goal.title}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {goal.categoryLabel} • {dueLabel}
+                  {goal.categoryLabel} | {dueLabel}
                 </Typography>
               </Box>
-              <Chip
-                label={goal.isComplete ? "Complete" : "In progress"}
-                color={goal.isComplete ? "success" : "warning"}
-                size="small"
-              />
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                {isTopLevelGoal && (
+                  <Chip label="Top-level goal" color="primary" variant="outlined" size="small" />
+                )}
+                {isSelectedGoal && <Chip label="Selected" color="primary" size="small" />}
+                <Chip
+                  label={goal.isComplete ? "Complete" : "In progress"}
+                  color={goal.isComplete ? "success" : "warning"}
+                  size="small"
+                />
+              </Stack>
             </Stack>
           </Paper>
 
@@ -186,11 +239,20 @@ const GoalTreeView = () => {
               {goalTasks.map((task) => (
                 <Paper
                   key={task._id}
+                  component={Link}
+                  to={`/tasks/${task._id}`}
                   variant="outlined"
                   sx={{
                     p: 1.25,
                     borderRadius: 2,
-                    backgroundColor: "rgba(0, 0, 0, 0.02)"
+                    textDecoration: "none",
+                    color: "inherit",
+                    backgroundColor: "rgba(0, 0, 0, 0.02)",
+                    transition: "0.2s",
+                    "&:hover": {
+                      borderColor: "primary.main",
+                      backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04)
+                    }
                   }}
                 >
                   <Stack
@@ -236,15 +298,25 @@ const GoalTreeView = () => {
           <Typography variant="body1" color="text.secondary">
             Explore the hierarchy of goals, subgoals, and subtasks.
           </Typography>
+          {selectedGoal && rootGoal && String(selectedGoal._id) !== String(rootGoal._id) && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Showing the full tree for {rootGoal.title}. The selected subgoal is highlighted.
+            </Typography>
+          )}
         </Box>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           <Button variant="outlined" component={Link} to="/goals/overview">
             Back to in-depth goals view
           </Button>
-          {rootGoal && (
-            <Button variant="contained" component={Link} to={`/goals/${rootGoal._id}`}>
-              Open goal
+          {selectedGoal && (
+            <Button variant="contained" component={Link} to={`/goals/${selectedGoal._id}`}>
+              Open selected goal
+            </Button>
+          )}
+          {rootGoal && selectedGoal && String(rootGoal._id) !== String(selectedGoal._id) && (
+            <Button variant="outlined" component={Link} to={`/goals/${rootGoal._id}`}>
+              Open top-level goal
             </Button>
           )}
         </Stack>

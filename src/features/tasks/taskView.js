@@ -141,6 +141,29 @@ const TaskView = ({ task }) => {
 
   const handleSave = async () => {
     if (!currentTask) return;
+
+    const now = dayjs();
+    const selectedParentGoal = formValues.parentGoalId
+      ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
+      : null;
+    const parentDeadline = selectedParentGoal?.targetCompletionDate
+      ? dayjs(selectedParentGoal.targetCompletionDate)
+      : null;
+
+    if (formValues.targetCompletionDate && formValues.targetCompletionDate.isBefore(now)) {
+      setSaveError("Target completion date cannot be earlier than the current time.");
+      return;
+    }
+
+    if (
+      formValues.targetCompletionDate &&
+      parentDeadline &&
+      formValues.targetCompletionDate.isAfter(parentDeadline)
+    ) {
+      setSaveError("Subtasks cannot have a target completion date later than the parent goal.");
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
     try {
@@ -198,6 +221,12 @@ const TaskView = ({ task }) => {
     : null;
   const isCategoryLocked = Boolean(formValues.parentGoalId);
   const hasEstimate = parseNumber(currentTask.estimatedCompletionTime) > 0;
+  const selectedParentGoalForEdit = formValues.parentGoalId
+    ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
+    : null;
+  const parentDeadlineForEdit = selectedParentGoalForEdit?.targetCompletionDate
+    ? dayjs(selectedParentGoalForEdit.targetCompletionDate)
+    : null;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
@@ -448,7 +477,15 @@ const TaskView = ({ task }) => {
                   onChange={(value) =>
                     setFormValues((prev) => ({ ...prev, targetCompletionDate: value }))
                   }
-                  textFieldProps={{ fullWidth: true, size: "small" }}
+                  minDateTime={dayjs()}
+                  maxDateTime={parentDeadlineForEdit || undefined}
+                  textFieldProps={{
+                    fullWidth: true,
+                    size: "small",
+                    helperText: parentDeadlineForEdit
+                      ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
+                      : "Choose a future target date."
+                  }}
                 />
                 <FormControlLabel
                   control={
