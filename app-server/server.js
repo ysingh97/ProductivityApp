@@ -23,6 +23,7 @@ const listRoutes = require('./routes/listRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const authRoutes = require('./routes/authRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const googleCalendarRoutes = require('./routes/googleCalendarRoutes');
 
 
 // Middleware
@@ -35,6 +36,7 @@ app.use('/api/goals', requireAuth, goalRoutes); // Routes for goals
 app.use('/api/lists', requireAuth, listRoutes); // Routes for lists
 app.use('/api/tasks', requireAuth, taskRoutes); // Routes for tasks
 app.use('/api/categories', requireAuth, categoryRoutes); // Routes for categories
+app.use('/api/integrations/google-calendar', googleCalendarRoutes);
 
 // Function to start the server
 const startServer = async () => {

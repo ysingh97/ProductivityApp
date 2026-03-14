@@ -1,6 +1,7 @@
 const Goal = require('../models/goal'); // Import the Goal model
 const Task = require('../models/task');
 const Category = require('../models/category');
+const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -157,13 +158,20 @@ const createGoal = async (req, res) => {
                 { $addToSet: { goals: savedGoal._id } }
             );
         }
-        await savedGoal.populate('category', 'title');
-        res.status(201).json(savedGoal);
 
         if (parentGoal) {
             parentGoal.subGoals.push(savedGoal._id);
             await parentGoal.save();
         }
+
+        await enqueueGoogleSync({
+            userId: req.user.id,
+            sourceType: 'goal',
+            sourceId: savedGoal._id
+        });
+
+        await savedGoal.populate('category', 'title');
+        res.status(201).json(savedGoal);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -251,6 +259,11 @@ const updateGoal = async (req, res) => {
         }
 
         await updatedGoal.populate('category', 'title');
+        await enqueueGoogleSync({
+            userId: req.user.id,
+            sourceType: 'goal',
+            sourceId: updatedGoal._id
+        });
         res.status(200).json(updatedGoal);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -285,6 +298,11 @@ const deleteGoal = async (req, res) => {
         );
 
         await Goal.deleteOne({ _id: goalToDelete._id, userId: req.user.id });
+        await enqueueGoogleSync({
+            userId: req.user.id,
+            sourceType: 'goal',
+            sourceId: goalToDelete._id
+        });
         
         res.json({
             message: 'Goal deleted',
