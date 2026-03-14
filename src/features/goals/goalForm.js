@@ -1,10 +1,21 @@
-import React, { useState, useEffect } from "react";
-import { fetchGoals } from './goalService'
-import { fetchCategories } from '../categories/categoryService';
-import Select from 'react-select';
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  Autocomplete,
+  Box,
+  Button,
+  CircularProgress,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import dayjs from "dayjs";
 import { useLocation } from "react-router-dom";
-import dayjs from 'dayjs';
-import DateTimePicker from '../../components/DateTimePicker';
+import { fetchCategories } from "../categories/categoryService";
+import DateTimePicker from "../../components/DateTimePicker";
+import { fetchGoals } from "./goalService";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -20,11 +31,11 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
   const isEditing = Boolean(isEditingProp || goal);
+  const now = dayjs();
 
   const location = useLocation();
   const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
   const isParentGoalFixed = !isEditing ? location.state?.isParentGoalFixed || false : false;
-  //console.log("isParentGoalFixed: ", isParentGoalFixed);
   
   const [title, setTitle] = useState(goal?.title || "");
   const [description, setDescription] = useState(goal?.description || "");
@@ -37,10 +48,24 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // console.log("Goal Form - listId: ", listId, ". isFixed: ", isListFixed, ". selectedList: ", selectedList);
-  
   const handleSubmit = (e) => {
-    e.preventDefault(); // Prevent page reload
+    e.preventDefault();
+    setError(null);
+
+    const parentDeadline = selectedParentGoal?.targetCompletionDate
+      ? dayjs(selectedParentGoal.targetCompletionDate)
+      : null;
+
+    if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+      setError("Target completion date cannot be earlier than the current time.");
+      return;
+    }
+
+    if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
+      setError("Sub-goals cannot have a target completion date later than the parent goal.");
+      return;
+    }
+
     const goalData = {
         title,
         description,
@@ -52,10 +77,12 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
       goalData.category = category;
     }
     onSubmit(goalData);
-    setTitle("");
-    setDescription("");
-    setCategory("");
-    setTargetCompletionDate(null);
+    if (!isEditing) {
+      setTitle("");
+      setDescription("");
+      setCategory("");
+      setTargetCompletionDate(null);
+    }
   };
 
   useEffect(() => {
@@ -78,19 +105,16 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   }, [goal, isEditing]);
 
   useEffect(() => {
-      //console.log("goalForm useEffect");   
       const loadData = async () => {
         setLoading(true);
+        setError(null);
         try {
           const [goalResponse, categoryResponse] = await Promise.all([
-            // fetchLists(),
             fetchGoals(),
             fetchCategories()
           ]);
-          // setLists(listResponse);
           setParentGoals(goalResponse);
           setCategories(categoryResponse);
-          // console.log("goal form use effect response: ", goalResponse);
         } catch (err) {
           setError('Failed to load goals or categories');
           console.error(err.message);
@@ -109,10 +133,17 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
         setSelectedParentGoal(null);
         return;
       }
-      const match = parentGoals.find((pg) => pg._id === goal.parentGoalId);
+      const match = parentGoals.find(
+        (pg) => String(pg._id) === String(goal.parentGoalId)
+      );
       setSelectedParentGoal(
         match
-          ? { value: match._id, label: match.title, categoryTitle: getCategoryTitle(match.category) }
+          ? {
+              value: match._id,
+              label: match.title,
+              categoryTitle: getCategoryTitle(match.category),
+              targetCompletionDate: match.targetCompletionDate || null
+            }
           : null
       );
       return;
@@ -120,10 +151,14 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
 
     // If goal page is entered from another goal, provide parent goal as default parent goal
     const defaultParentGoal = (parentGoal && isParentGoalFixed)
-      ? { value: parentGoal._id, label: parentGoal.title, categoryTitle: getCategoryTitle(parentGoal.category) }
+      ? {
+          value: parentGoal._id,
+          label: parentGoal.title,
+          categoryTitle: getCategoryTitle(parentGoal.category),
+          targetCompletionDate: parentGoal.targetCompletionDate || null
+        }
       : null;
     setSelectedParentGoal(defaultParentGoal);
-    //console.log("default parent goal: ", defaultParentGoal);
   }, [loading, isEditing, goal, parentGoals, parentGoal, isParentGoalFixed]);
 
   useEffect(() => {
@@ -133,80 +168,174 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   }, [selectedParentGoal]);
 
   const selectedParentGoalOptions = parentGoals
-    .filter((pg) => !goal || pg._id !== goal._id)
+    .filter((pg) => !goal || String(pg._id) !== String(goal._id))
     .map(parentGoal => ({
       value: parentGoal._id,
       label: parentGoal.title,
-      categoryTitle: getCategoryTitle(parentGoal.category)
+      categoryTitle: getCategoryTitle(parentGoal.category),
+      targetCompletionDate: parentGoal.targetCompletionDate || null
     }));
-  //console.log("Parent goals: ", parentGoals);
-
-  if (isParentGoalFixed && parentGoal && !selectedParentGoal) {
-    return <p>Loading parent goal...</p>;
-  }
+  const categoryOptions = categories.map((categoryOption) => categoryOption.title);
+  const parentDeadline = selectedParentGoal?.targetCompletionDate
+    ? dayjs(selectedParentGoal.targetCompletionDate)
+    : null;
 
   return (
-    <div>
-      <h2>{isEditing ? "Update Goal" : "Set a New Goal"}</h2>
-      {error && <p>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="title">Title:</label>
-          <input
-            id="title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="description">Description:</label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="category">Category:</label>
-          <input
-            id="category"
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            disabled={Boolean(selectedParentGoal)}
-            list="category-options"
-          />
-          <datalist id="category-options">
-            {categories.map((categoryOption) => (
-              <option key={categoryOption._id} value={categoryOption.title} />
-            ))}
-          </datalist>
-          {selectedParentGoal && (
-            <p>Category is inherited from the parent goal.</p>
-          )}
-        </div>
-        <div>
-          <label htmlFor="targetCompletionDate">Target Completion Date:</label>
-          <DateTimePicker
-            value={targetCompletionDate}
-            onChange={setTargetCompletionDate}
-          />
-        </div>
-        <div>
-            <label htmlFor="goal">Parent Goal:</label>
-            <Select options={selectedParentGoalOptions}
-                    value={selectedParentGoal}
-                    onChange={(option) => setSelectedParentGoal(option)}
-                    isDisabled={isParentGoalFixed || loading}
-                    placeholder={loading ? "Loading goals..." : "Optional parent goal"}/>
-            {!loading && parentGoals.length === 0 && (
-              <p>No parent goals yet. This goal will be top-level.</p>
-            )}
-        </div>
-        <button type="submit">{isEditing ? "Update Goal" : "Set Goal"}</button>
-      </form>
-    </div>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: { xs: 2.5, md: 3.5 },
+        borderRadius: 4,
+        position: "relative",
+        overflow: "hidden",
+        background: (theme) =>
+          `linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.98)}, ${theme.palette.background.paper})`,
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: "0 0 auto 0",
+          height: 4,
+          background: (theme) =>
+            `linear-gradient(90deg, ${theme.palette.primary.main}, ${alpha(
+              theme.palette.primary.main,
+              0.1
+            )})`
+        }
+      }}
+    >
+      <Stack spacing={3}>
+        <Box>
+          <Typography variant="overline" color="text.secondary" letterSpacing={1}>
+            Goal details
+          </Typography>
+          <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
+            {isEditing ? "Refine goal details" : "Set the next goal"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Start with the essentials. You can expand the goal structure and timeline later.
+          </Typography>
+        </Box>
+
+        {error && <Alert severity="error">{error}</Alert>}
+
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={2.5}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                gap: 2
+              }}
+            >
+              <TextField
+                label="Title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+                fullWidth
+                size="small"
+              />
+
+              <Autocomplete
+                freeSolo
+                options={categoryOptions}
+                value={category}
+                inputValue={category}
+                onInputChange={(_event, nextValue) => setCategory(nextValue)}
+                onChange={(_event, nextValue) => setCategory(nextValue || "")}
+                disabled={Boolean(selectedParentGoal)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Category"
+                    size="small"
+                    helperText={
+                      selectedParentGoal
+                        ? "Inherited from the selected parent goal."
+                        : "Type a category or choose an existing one."
+                    }
+                  />
+                )}
+              />
+
+              <DateTimePicker
+                value={targetCompletionDate}
+                onChange={setTargetCompletionDate}
+                minDateTime={now}
+                maxDateTime={parentDeadline || undefined}
+                textFieldProps={{
+                  fullWidth: true,
+                  size: "small",
+                  helperText: parentDeadline
+                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "Choose a future target date."
+                }}
+              />
+
+              <Autocomplete
+                options={selectedParentGoalOptions}
+                value={selectedParentGoal}
+                onChange={(_event, nextValue) => setSelectedParentGoal(nextValue)}
+                isOptionEqualToValue={(option, value) => option.value === value?.value}
+                loading={loading}
+                disabled={isParentGoalFixed || loading}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Parent goal"
+                    size="small"
+                    helperText={
+                      isParentGoalFixed
+                        ? "Locked because you opened this from a parent goal."
+                        : "Optional. Leave empty to create a top-level goal."
+                    }
+                  />
+                )}
+              />
+            </Box>
+
+            <TextField
+              label="Description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              multiline
+              minRows={4}
+              fullWidth
+              size="small"
+            />
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: { xs: "flex-start", sm: "center" },
+                justifyContent: "space-between",
+                flexDirection: { xs: "column", sm: "row" },
+                gap: 1.5,
+                pt: 0.5
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                {loading ? (
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+                    <CircularProgress size={12} />
+                    Loading goal options
+                  </Box>
+                ) : selectedParentGoal ? (
+                  parentDeadline
+                    ? `Sub-goals inherit category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "Sub-goals automatically inherit their parent category."
+                ) : (
+                  "No parent selected means this will be a top-level goal."
+                )}
+              </Typography>
+              <Button type="submit" variant="contained" size="large" disabled={loading}>
+                {isEditing ? "Update goal" : "Create goal"}
+              </Button>
+            </Box>
+          </Stack>
+        </Box>
+      </Stack>
+    </Paper>
   );
 };
 

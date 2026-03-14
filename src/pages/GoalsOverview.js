@@ -37,6 +37,7 @@ const secondarySortOptions = [
   { value: "title", label: "Alphabetical" },
   { value: "created", label: "Created date" }
 ];
+const ALL_CATEGORIES_VALUE = "__all_categories__";
 
 const GoalsOverview = () => {
   const [goals, setGoals] = useState([]);
@@ -218,7 +219,14 @@ const GoalsOverview = () => {
 
   const handleCategoryChange = (event) => {
     const value = event.target.value;
-    setCategoryFilter(typeof value === "string" ? value.split(",") : value);
+    const nextValue = typeof value === "string" ? value.split(",") : value;
+
+    if (nextValue.includes(ALL_CATEGORIES_VALUE)) {
+      setCategoryFilter([]);
+      return;
+    }
+
+    setCategoryFilter(nextValue);
   };
 
   const handleSortByChange = (event) => {
@@ -392,7 +400,9 @@ const GoalsOverview = () => {
                 placeholder="Title or description"
               />
               <FormControl size="small">
-                <InputLabel id="category-filter-label">Category</InputLabel>
+                <InputLabel id="category-filter-label" shrink>
+                  Category
+                </InputLabel>
                 <Select
                   labelId="category-filter-label"
                   multiple
@@ -400,10 +410,21 @@ const GoalsOverview = () => {
                   onChange={handleCategoryChange}
                   label="Category"
                   displayEmpty
-                  renderValue={(selected) =>
-                    selected.length ? selected.join(", ") : "All categories"
-                  }
+                  notched
+                  renderValue={(selected) => {
+                    if (selected.length) {
+                      return selected.join(", ");
+                    }
+                    return (
+                      <Typography component="span" color="text.secondary">
+                        All categories
+                      </Typography>
+                    );
+                  }}
                 >
+                  <MenuItem value={ALL_CATEGORIES_VALUE} selected={categoryFilter.length === 0}>
+                    All categories
+                  </MenuItem>
                   {categoryOptions.length ? (
                     categoryOptions.map((category) => (
                       <MenuItem key={category} value={category}>

@@ -125,6 +125,29 @@ const GoalView = ({ goal }) => {
 
   const handleSave = async () => {
     if (!currentGoal) return;
+
+    const now = dayjs();
+    const selectedParentGoal = formValues.parentGoalId
+      ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
+      : null;
+    const parentDeadline = selectedParentGoal?.targetCompletionDate
+      ? dayjs(selectedParentGoal.targetCompletionDate)
+      : null;
+
+    if (formValues.targetCompletionDate && formValues.targetCompletionDate.isBefore(now)) {
+      setSaveError("Target completion date cannot be earlier than the current time.");
+      return;
+    }
+
+    if (
+      formValues.targetCompletionDate &&
+      parentDeadline &&
+      formValues.targetCompletionDate.isAfter(parentDeadline)
+    ) {
+      setSaveError("Sub-goals cannot have a target completion date later than the parent goal.");
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
     try {
@@ -180,6 +203,12 @@ const GoalView = ({ goal }) => {
   const parentGoalOptions = parentGoals.filter(
     (pg) => String(pg._id) !== String(currentGoal._id)
   );
+  const selectedParentGoalForEdit = formValues.parentGoalId
+    ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
+    : null;
+  const parentDeadlineForEdit = selectedParentGoalForEdit?.targetCompletionDate
+    ? dayjs(selectedParentGoalForEdit.targetCompletionDate)
+    : null;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
@@ -310,9 +339,6 @@ const GoalView = ({ goal }) => {
               >
                 Create sub-task
               </Button>
-              <Button variant="text" component={Link} to="/board">
-                Back to dashboard
-              </Button>
             </Stack>
           </Paper>
 
@@ -399,7 +425,15 @@ const GoalView = ({ goal }) => {
                   onChange={(value) =>
                     setFormValues((prev) => ({ ...prev, targetCompletionDate: value }))
                   }
-                  textFieldProps={{ fullWidth: true, size: "small" }}
+                  minDateTime={dayjs()}
+                  maxDateTime={parentDeadlineForEdit || undefined}
+                  textFieldProps={{
+                    fullWidth: true,
+                    size: "small",
+                    helperText: parentDeadlineForEdit
+                      ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
+                      : "Choose a future target date."
+                  }}
                 />
                 <FormControlLabel
                   control={

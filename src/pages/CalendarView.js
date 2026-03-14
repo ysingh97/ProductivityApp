@@ -203,6 +203,7 @@ const CalendarView = () => {
         id: String(goal._id),
         title: goal.title,
         topLevelId: getTopLevelId(goal._id),
+        isTopLevel: !goal.parentGoalId,
         date: goal.targetCompletionDate
       })),
     [goalsInRange, topLevelByGoalId]
@@ -345,6 +346,7 @@ const CalendarView = () => {
     const base = alpha(color, 0.12);
     const accent = alpha(color, 0.28);
     const isGoal = item.type === "goal";
+    const isTopLevelGoal = Boolean(item.isTopLevel);
 
     return (
       <Box
@@ -357,12 +359,18 @@ const CalendarView = () => {
           px: 1.2,
           py: 0.6,
           borderRadius: isGoal ? 999 : 2,
-          border: `1px ${isGoal ? "solid" : "dashed"} ${alpha(color, 0.4)}`,
+          border: `${isTopLevelGoal ? 2 : 1}px ${isGoal ? "solid" : "dashed"} ${alpha(
+            color,
+            isTopLevelGoal ? 0.9 : 0.4
+          )}`,
           textDecoration: "none",
           color: "text.primary",
           fontSize: "0.75rem",
-          fontWeight: isGoal ? 600 : 500,
+          fontWeight: isTopLevelGoal ? 700 : isGoal ? 600 : 500,
           background: `linear-gradient(135deg, ${accent}, ${base})`,
+          boxShadow: isTopLevelGoal
+            ? `inset 0 0 0 1px ${alpha(color, 0.22)}`
+            : "none",
           "&:hover": {
             background: `linear-gradient(135deg, ${alpha(color, 0.32)}, ${alpha(
               color,
@@ -371,7 +379,27 @@ const CalendarView = () => {
           }
         }}
       >
-        {item.title}
+        {isTopLevelGoal ? (
+          <Stack spacing={0.1}>
+            <Typography
+              component="span"
+              sx={{
+                fontSize: "0.58rem",
+                fontWeight: 700,
+                letterSpacing: 0.6,
+                textTransform: "uppercase",
+                lineHeight: 1.1
+              }}
+            >
+              Top-level
+            </Typography>
+            <Typography component="span" sx={{ fontSize: "0.75rem", lineHeight: 1.2 }}>
+              {item.title}
+            </Typography>
+          </Stack>
+        ) : (
+          item.title
+        )}
       </Box>
     );
   };

@@ -2,15 +2,13 @@ import React, { useMemo, useState, useEffect } from "react";
 import { fetchTasks } from "../features/tasks/taskService";
 import { fetchLists } from "../features/lists/listService";
 import { fetchGoals } from "../features/goals/goalService";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 import DashboardCalendar from "../components/DashboardCalendar";
 
 import {
   Container,
   Box,
   Typography,
-  Button,
   Divider,
   Paper,
   Chip,
@@ -23,8 +21,6 @@ const TaskBoard = () => {
   const [goals, setGoals] = useState([]);
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const dateFormatter = useMemo(
     () =>
@@ -83,11 +79,6 @@ const TaskBoard = () => {
 
     loadData();
   }, []);
-
-  const handleSignOut = () => {
-    logout();
-    navigate("/", { replace: true });
-  };
 
   const normalizedTasks = useMemo(
     () =>
@@ -304,44 +295,21 @@ const TaskBoard = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Dashboard Header */}
       <Box
         sx={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 1,
           mb: 3
         }}
       >
         <Typography variant="h4" fontWeight={700}>
           Dashboard
         </Typography>
-
-        {/* Header Action Buttons */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {user && (
-            <Box sx={{ textAlign: "right" }}>
-              <Typography variant="body2" fontWeight={600}>
-                {user.name}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user.email}
-              </Typography>
-            </Box>
-          )}
-          <Button variant="contained" component={Link} to="/task/new">
-            New Task
-          </Button>
-          <Button variant="contained" component={Link} to="/goal/new">
-            New Goal
-          </Button>
-          <Button variant="outlined" component={Link} to="/createListPage">
-            New List
-          </Button>
-          <Button variant="text" color="inherit" onClick={handleSignOut}>
-            Sign out
-          </Button>
-        </Box>
+        <Typography variant="body1" color="text.secondary">
+          Track deadlines, stay on top of active work, and jump into the next goal that needs attention.
+        </Typography>
       </Box>
 
       <Divider sx={{ mb: 4 }} />

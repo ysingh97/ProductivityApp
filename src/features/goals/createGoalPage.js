@@ -1,7 +1,9 @@
-import GoalForm from './goalForm';
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from 'react-router-dom';
-import { createGoal, updateGoal, fetchGoalById } from './goalService';
+import { Alert, Box, CircularProgress, Container, Paper, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { useParams } from "react-router-dom";
+import GoalForm from "./goalForm";
+import { createGoal, fetchGoalById, updateGoal } from "./goalService";
 
 const CreateGoalPage = () => {
     const [goals, setGoals] = useState([]);
@@ -33,7 +35,7 @@ const CreateGoalPage = () => {
     }, [goalId, isEditing]);
 
     const handleGoalSubmit = async (goalData) => {
-        setError(null); // Clear any previous errors
+        setError(null);
     
         try {
           if (isEditing && goal) {
@@ -52,16 +54,70 @@ const CreateGoalPage = () => {
 
 
     return (
-        <div>
-        <h1>{isEditing ? "Update Goal" : "Create Goal"}</h1>
-        {error && <p>{error}</p>}
-        {loading ? (
-          <p>Loading goal...</p>
-        ) : (
-          <GoalForm goal={goal} isEditing={isEditing} onSubmit={handleGoalSubmit}/>
-        )}
-        <Link to="/board">Back to Taskboard</Link>
-        </div>
+        <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", lg: "320px minmax(0, 1fr)" },
+              gap: 3,
+              alignItems: "start"
+            }}
+          >
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                borderRadius: 4,
+                position: { lg: "sticky" },
+                top: { lg: 96 },
+                background: (theme) =>
+                  `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(
+                    theme.palette.background.paper,
+                    0.98
+                  )})`
+              }}
+            >
+              <Stack spacing={2}>
+                <Box>
+                  <Typography variant="overline" color="text.secondary" letterSpacing={1}>
+                    Goal workspace
+                  </Typography>
+                  <Typography variant="h4" fontWeight={700} sx={{ mt: 0.5 }}>
+                    {isEditing ? "Update goal" : "Create goal"}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Set the core details here, then expand the hierarchy and tracking from the goal view.
+                </Typography>
+              </Stack>
+            </Paper>
+
+            <Stack spacing={2}>
+              {error && <Alert severity="error">{error}</Alert>}
+              {loading ? (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 4,
+                    borderRadius: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
+                >
+                  <Stack spacing={1.5} sx={{ alignItems: "center" }}>
+                    <CircularProgress />
+                    <Typography variant="body2" color="text.secondary">
+                      Loading goal details
+                    </Typography>
+                  </Stack>
+                </Paper>
+              ) : (
+                <GoalForm goal={goal} isEditing={isEditing} onSubmit={handleGoalSubmit} />
+              )}
+            </Stack>
+          </Box>
+        </Container>
     );
 };
 

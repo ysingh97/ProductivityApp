@@ -1,9 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { fetchLists } from '../lists/listService';
-import { fetchGoals } from '../goals/goalService';
-import Select from 'react-select';
-import DateTimePicker from '../../components/DateTimePicker';
-import dayjs from 'dayjs';
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  Autocomplete,
+  Box,
+  Button,
+  CircularProgress,
+  InputAdornment,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import dayjs from "dayjs";
+import { fetchCategories } from "../categories/categoryService";
+import { fetchGoals } from "../goals/goalService";
+import { fetchLists } from "../lists/listService";
+import DateTimePicker from "../../components/DateTimePicker";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -15,9 +28,11 @@ const getCategoryTitle = (value) => {
   return value.title || "";
 };
 
-const TaskForm = ({ task, onSubmit }) => {
+const TaskForm = ({ task, onSubmit, isEditing = false }) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const now = dayjs();
 
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -36,19 +51,21 @@ const TaskForm = ({ task, onSubmit }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch lists and goals
   useEffect(() => {
     const loadListsAndGoals = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const [listResponse, goalResponse] = await Promise.all([
+        const [listResponse, goalResponse, categoryResponse] = await Promise.all([
           fetchLists(),
           fetchGoals(),
+          fetchCategories()
         ]);
         setLists(listResponse);
         setParentGoals(goalResponse);
+        setCategories(categoryResponse);
       } catch (err) {
-        setError("Failed to load tasks");
+        setError("Failed to load task form options.");
         console.error(err.message);
       } finally {
         setLoading(false);
@@ -58,7 +75,6 @@ const TaskForm = ({ task, onSubmit }) => {
     loadListsAndGoals();
   }, []);
 
-  // set form fields when task prop changes (e.g., when editing a different task)
   useEffect(() => {
     setTitle(task?.title || "");
     setDescription(task?.description || "");
@@ -69,7 +85,6 @@ const TaskForm = ({ task, onSubmit }) => {
     setTargetCompletionDate(task?.targetCompletionDate ? dayjs(task.targetCompletionDate) : null);
   }, [task]);
 
-  // Once lists/parentGoals are loaded, set initial selected values
   useEffect(() => {
     if (!loading) {
       const listOptions = lists.map((list) => ({
@@ -79,17 +94,18 @@ const TaskForm = ({ task, onSubmit }) => {
       const parentGoalOptions = parentGoals.map((pg) => ({
         value: pg._id,
         label: pg.title,
-        categoryTitle: getCategoryTitle(pg.category)
+        categoryTitle: getCategoryTitle(pg.category),
+        targetCompletionDate: pg.targetCompletionDate || null
       }));
 
       if (task?.listId) {
-        const match = listOptions.find((o) => o.value === task.listId);
+        const match = listOptions.find((option) => String(option.value) === String(task.listId));
         setSelectedList(match || null);
       }
 
       if (task?.parentGoalId) {
         const match = parentGoalOptions.find(
-          (o) => o.value === task.parentGoalId
+          (option) => String(option.value) === String(task.parentGoalId)
         );
         setSelectedParentGoal(match || null);
         setCategory(match?.categoryTitle || getCategoryTitle(task?.category));
@@ -107,6 +123,22 @@ const TaskForm = ({ task, onSubmit }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError(null);
+
+    const parentDeadline = selectedParentGoal?.targetCompletionDate
+      ? dayjs(selectedParentGoal.targetCompletionDate)
+      : null;
+
+    if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+      setError("Target completion date cannot be earlier than the current time.");
+      return;
+    }
+
+    if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
+      setError("Subtasks cannot have a target completion date later than the parent goal.");
+      return;
+    }
+
     const taskData = {
       title,
       description,
@@ -120,18 +152,16 @@ const TaskForm = ({ task, onSubmit }) => {
     }
     onSubmit(taskData);
 
-    // clear form after submit if you're in "create" mode
-    setTitle("");
-    setDescription("");
-    setCategory("");
-    setEstimatedCompletionTime(0);
-    setSelectedList(null);
-    setSelectedParentGoal(null);
-    setTargetCompletionDate(null);
+    if (!isEditing) {
+      setTitle("");
+      setDescription("");
+      setCategory("");
+      setEstimatedCompletionTime(0);
+      setSelectedList(null);
+      setSelectedParentGoal(null);
+      setTargetCompletionDate(null);
+    }
   };
-
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>{error}</p>;
 
   const listOptions = lists.map((list) => ({
     value: list._id,
@@ -140,83 +170,198 @@ const TaskForm = ({ task, onSubmit }) => {
   const parentGoalOptions = parentGoals.map((pg) => ({
     value: pg._id,
     label: pg.title,
-    categoryTitle: getCategoryTitle(pg.category)
+    categoryTitle: getCategoryTitle(pg.category),
+    targetCompletionDate: pg.targetCompletionDate || null
   }));
+  const categoryOptions = categories.map((categoryOption) => categoryOption.title);
+  const parentDeadline = selectedParentGoal?.targetCompletionDate
+    ? dayjs(selectedParentGoal.targetCompletionDate)
+    : null;
 
   return (
-    <div>
-      <h2>{task ? "Update Task" : "Create Task"}</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="title">Title:</label>
-          <input
-            id="title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: { xs: 2.5, md: 3.5 },
+        borderRadius: 4,
+        position: "relative",
+        overflow: "hidden",
+        background: (theme) =>
+          `linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.98)}, ${theme.palette.background.paper})`,
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: "0 0 auto 0",
+          height: 4,
+          background: (theme) =>
+            `linear-gradient(90deg, ${theme.palette.primary.main}, ${alpha(
+              theme.palette.primary.main,
+              0.1
+            )})`
+        }
+      }}
+    >
+      <Stack spacing={3}>
+        <Box>
+          <Typography variant="overline" color="text.secondary" letterSpacing={1}>
+            Task details
+          </Typography>
+          <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
+            {isEditing ? "Refine task details" : "Capture a new task"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Keep the first pass concise. You can edit the task again from its dedicated view.
+          </Typography>
+        </Box>
 
-        <div>
-          <label htmlFor="description">Description:</label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="category">Category:</label>
-          <input
-            id="category"
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            disabled={Boolean(selectedParentGoal)}
-          />
-          {/* TODO: Add question mark icon explaining category inheritance when a parent goal is selected. */}
-        </div>
+        {error && <Alert severity="error">{error}</Alert>}
 
-        <div>
-          <label htmlFor="list">List:</label>
-          <Select
-            options={listOptions}
-            value={selectedList}
-            onChange={setSelectedList}
-          />
-        </div>
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={2.5}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                gap: 2
+              }}
+            >
+              <TextField
+                label="Title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+                fullWidth
+                size="small"
+              />
 
-        <div>
-          <label htmlFor="parentGoal">Parent Goal:</label>
-          <Select
-            options={parentGoalOptions}
-            value={selectedParentGoal}
-            onChange={setSelectedParentGoal}
-          />
-        </div>
+              <Autocomplete
+                freeSolo
+                options={categoryOptions}
+                value={category}
+                inputValue={category}
+                onInputChange={(_event, nextValue) => setCategory(nextValue)}
+                onChange={(_event, nextValue) => setCategory(nextValue || "")}
+                disabled={Boolean(selectedParentGoal)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Category"
+                    size="small"
+                    helperText={
+                      selectedParentGoal
+                        ? "Inherited from the selected parent goal."
+                        : "Type a category or reuse an existing one."
+                    }
+                  />
+                )}
+              />
 
-        <div>
-          <label htmlFor="estimatedCompletionTime">
-            Estimated Completion Time:
-          </label>
-          <input
-            id="estimatedCompletionTime"
-            type="number"
-            step="0.01"
-            value={estimatedCompletionTime}
-            onChange={(e) => setEstimatedCompletionTime(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="targetCompletionDate">Target Completion Date:</label>
-          <DateTimePicker
-            value={targetCompletionDate}
-            onChange={setTargetCompletionDate}
-          />
-        </div>
-        <button type="submit">Submit</button>
-      </form>
-    </div>
+              <Autocomplete
+                options={listOptions}
+                value={selectedList}
+                onChange={(_event, nextValue) => setSelectedList(nextValue)}
+                isOptionEqualToValue={(option, value) => option.value === value?.value}
+                loading={loading}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="List"
+                    size="small"
+                    helperText="Optional. Add this task to a list."
+                  />
+                )}
+              />
+
+              <Autocomplete
+                options={parentGoalOptions}
+                value={selectedParentGoal}
+                onChange={(_event, nextValue) => setSelectedParentGoal(nextValue)}
+                isOptionEqualToValue={(option, value) => option.value === value?.value}
+                loading={loading}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Parent goal"
+                    size="small"
+                    helperText={
+                      selectedParentGoal
+                        ? "This task inherits its category from the goal."
+                        : "Optional. Link the task into a goal tree."
+                    }
+                  />
+                )}
+              />
+
+              <TextField
+                label="Estimated hours"
+                type="number"
+                value={estimatedCompletionTime}
+                onChange={(event) => setEstimatedCompletionTime(event.target.value)}
+                size="small"
+                fullWidth
+                inputProps={{ min: 0, step: 0.25 }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">hrs</InputAdornment>
+                }}
+              />
+
+              <DateTimePicker
+                value={targetCompletionDate}
+                onChange={setTargetCompletionDate}
+                minDateTime={now}
+                maxDateTime={parentDeadline || undefined}
+                textFieldProps={{
+                  fullWidth: true,
+                  size: "small",
+                  helperText: parentDeadline
+                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "Choose a future target date."
+                }}
+              />
+            </Box>
+
+            <TextField
+              label="Description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              multiline
+              minRows={4}
+              fullWidth
+              size="small"
+            />
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: { xs: "flex-start", sm: "center" },
+                justifyContent: "space-between",
+                flexDirection: { xs: "column", sm: "row" },
+                gap: 1.5,
+                pt: 0.5
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                {loading ? (
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+                    <CircularProgress size={12} />
+                    Loading form options
+                  </Box>
+                ) : selectedParentGoal ? (
+                  parentDeadline
+                    ? `This task follows the goal category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+                    : "This task will follow the selected goal's category."
+                ) : (
+                  "Standalone tasks can keep their own category."
+                )}
+              </Typography>
+              <Button type="submit" variant="contained" size="large" disabled={loading}>
+                {isEditing ? "Update task" : "Create task"}
+              </Button>
+            </Box>
+          </Stack>
+        </Box>
+      </Stack>
+    </Paper>
   );
 };
 
