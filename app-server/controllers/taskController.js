@@ -2,6 +2,7 @@ const Task = require('../models/task'); // Import the Task model
 const Goal = require('../models/goal');
 const List = require('../models/list');
 const Category = require('../models/category');
+const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -87,14 +88,20 @@ const createTask = async (req, res) => {
         userId: req.user.id
       });
       const savedTask = await newTask.save();
-      await savedTask.populate('category', 'title');
-      res.status(201).json(savedTask);
-  
-      // if parentGoalId exists, add task as subtask of parentGoal
+
       if (parentGoal) {
         parentGoal.subTasks.push(savedTask._id);
         await parentGoal.save();
       }
+
+      await enqueueGoogleSync({
+        userId: req.user.id,
+        sourceType: 'task',
+        sourceId: savedTask._id
+      });
+
+      await savedTask.populate('category', 'title');
+      res.status(201).json(savedTask);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -148,6 +155,11 @@ const updateTask = async (req, res) => {
     }
 
     await updatedTask.populate('category', 'title');
+    await enqueueGoogleSync({
+      userId: req.user.id,
+      sourceType: 'task',
+      sourceId: updatedTask._id
+    });
     res.status(200).json(updatedTask);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -160,6 +172,12 @@ const deleteTask = async (req, res) => {
       if (!deletedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
+
+      await enqueueGoogleSync({
+        userId: req.user.id,
+        sourceType: 'task',
+        sourceId: deletedTask._id
+      });
   
       res.json({
         message: "Task deleted successfully",

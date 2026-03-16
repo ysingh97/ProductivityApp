@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "cross-env NODE_ENV=development nodemon server.js",
-    "start": "cross-env NODE_ENV=production node server.js"
+    "start": "cross-env NODE_ENV=production node server.js",
+    "worker:google-calendar": "cross-env NODE_ENV=development node workers/googleCalendarSyncWorker.js"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +16,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "google-auth-library": "^9.15.0",
+    "googleapis": "^150.0.1",
     "mongoose": "^8.9.5",
     "dotenv": "^16.4.7"
   },

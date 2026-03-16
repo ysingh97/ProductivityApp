@@ -24,12 +24,26 @@
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/src",
       "port": 9876
+    },
+    {
+      // Google Calendar sync worker
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Google Calendar Worker",
+      "program": "${workspaceFolder}/app-server/workers/googleCalendarSyncWorker.js",
+      "cwd": "${workspaceFolder}/app-server",
+      "runtimeExecutable": "nodemon",
+      "restart": true,
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
     }
   ],
   "compounds": [
     {
       "name": "Debug Fullstack",
-      "configurations": ["Debug Backend", "Debug Frontend"],
+      "configurations": ["Debug Backend", "Debug Google Calendar Worker", "Debug Frontend"],
       "stopAll": true
     }
   ]

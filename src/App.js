@@ -13,6 +13,7 @@ import GoalsOverview from './pages/GoalsOverview';
 import GoalTreeView from './pages/GoalTreeView';
 import CalendarView from './pages/CalendarView';
 import Visualizations from './pages/Visualizations';
+import GoogleCalendarSettings from './pages/GoogleCalendarSettings';
 import RequireAuth from './components/RequireAuth';
 import AppShell from './components/AppShell';
 import { AuthProvider } from './context/AuthContext';
@@ -165,6 +166,7 @@ function App() {
                   <Route path="/tasks/:taskId" element={<TaskPage />} />
                   <Route path="/calendar" element={<CalendarView />} />
                   <Route path="/visualizations" element={<Visualizations />} />
+                  <Route path="/settings/google-calendar" element={<GoogleCalendarSettings />} />
                 </Route>
               </Route>
             </Routes>

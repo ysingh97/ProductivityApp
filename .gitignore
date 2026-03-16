@@ -19,6 +19,8 @@
 .env.test.local
 .env.production.local
 .env
+app-server/.env.development
+app-server/.env.production
 
 TODO.md
 

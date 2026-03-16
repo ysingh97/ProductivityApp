@@ -237,6 +237,13 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
           </Typography>
         </Box>
         <Divider />
+        <MenuItem
+          component={Link}
+          to="/settings/google-calendar"
+          onClick={handleCloseAccountMenu}
+        >
+          Google Calendar
+        </MenuItem>
         <MenuItem onClick={handleSignOut}>Sign out</MenuItem>
       </Menu>
 
