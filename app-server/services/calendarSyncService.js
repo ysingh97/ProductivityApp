@@ -83,10 +83,10 @@ const hashPayload = (payload) =>
 
 const loadSourceItem = async (job) => {
   if (job.sourceType === 'goal') {
-    return Goal.findOne({ _id: job.sourceId, userId: job.userId }).populate('category', 'title');
+    return Goal.findOne({ _id: job.sourceId, userId: job.userId });
   }
 
-  return Task.findOne({ _id: job.sourceId, userId: job.userId }).populate('category', 'title');
+  return Task.findOne({ _id: job.sourceId, userId: job.userId });
 };
 
 const shouldSyncItem = (item) =>
