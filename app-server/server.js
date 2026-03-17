@@ -17,6 +17,30 @@ dotenv.config({
 // Initialize Express
 const app = express();
 
+const defaultAllowedOrigins = process.env.NODE_ENV === 'production'
+  ? []
+  : ['http://localhost:3000'];
+
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    const effectiveAllowedOrigins = allowedOrigins.length > 0
+      ? allowedOrigins
+      : defaultAllowedOrigins;
+
+    // Requests without an Origin header are typically server-to-server, health checks, or curl.
+    if (!origin || effectiveAllowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+  }
+};
+
 // Import route files
 const goalRoutes = require('./routes/goalRoutes');
 const listRoutes = require('./routes/listRoutes');
@@ -27,7 +51,7 @@ const googleCalendarRoutes = require('./routes/googleCalendarRoutes');
 
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
