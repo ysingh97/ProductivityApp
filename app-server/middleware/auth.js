@@ -1,9 +1,15 @@
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/user');
+const { getTestAuthPayload } = require('../utils/testAuth');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const verifyGoogleToken = async (token) => {
+  const testPayload = getTestAuthPayload(token);
+  if (testPayload) {
+    return testPayload;
+  }
+
   const ticket = await googleClient.verifyIdToken({
     idToken: token,
     audience: process.env.GOOGLE_CLIENT_ID
