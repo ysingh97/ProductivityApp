@@ -43,6 +43,10 @@ const createApp = () => {
   app.use(express.json());
 
   // Routes
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
   app.use('/api/auth', authRoutes);
   app.use('/api/goals', requireAuth, goalRoutes); // Routes for goals
   app.use('/api/lists', requireAuth, listRoutes); // Routes for lists
