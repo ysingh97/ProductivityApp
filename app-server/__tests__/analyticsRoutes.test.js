@@ -125,3 +125,62 @@ test('time-by-category includes uncategorized task time', async () => {
       ]);
     });
 });
+
+test('time-by-category supports inclusive date range filtering', async () => {
+  await seedMockTasks('basic');
+
+  await request(app)
+    .get('/api/analytics/time-by-category?from=2026-01-08&to=2026-01-10')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        totalHours: 15,
+        categories: [
+          expect.objectContaining({
+            categoryTitle: 'Work',
+            hours: 10,
+            percentage: 66.67
+          }),
+          expect.objectContaining({
+            categoryTitle: 'Health',
+            hours: 5,
+            percentage: 33.33
+          })
+        ]
+      });
+    });
+});
+
+test('time-by-category returns empty totals for a valid date range with no matching tasks', async () => {
+  await seedMockTasks('basic');
+
+  await request(app)
+    .get('/api/analytics/time-by-category?from=2026-01-12&to=2026-01-13')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect({
+      totalHours: 0,
+      categories: []
+    });
+});
+
+test('time-by-category rejects invalid date formats', async () => {
+  await request(app)
+    .get('/api/analytics/time-by-category?from=01-08-2026')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(400)
+    .expect({
+      error: 'from must use YYYY-MM-DD format.'
+    });
+});
+
+test('time-by-category rejects reversed date ranges', async () => {
+  await request(app)
+    .get('/api/analytics/time-by-category?from=2026-01-10&to=2026-01-08')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(400)
+    .expect({
+      error: 'from must be on or before to.'
+    });
+});
