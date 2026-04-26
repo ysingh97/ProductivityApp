@@ -1,5 +1,5 @@
 const express = require('express');
-const { getTimeByCategory } = require('../controllers/analyticsController');
+const { getTimeByCategory, getTimeSeries } = require('../controllers/analyticsController');
 
 const router = express.Router();
 
@@ -8,5 +8,6 @@ router.get('/health', (req, res) => {
 });
 
 router.get('/time-by-category', getTimeByCategory);
+router.get('/time-series', getTimeSeries);
 
 module.exports = router;

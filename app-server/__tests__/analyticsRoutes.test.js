@@ -220,3 +220,150 @@ test('time-by-category rejects reversed date ranges', async () => {
       error: 'from must be on or before to.'
     });
 });
+
+test('time-series returns zero-filled daily buckets for the selected range', async () => {
+  await seedMockTasks('basic');
+
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-01-08&to=2026-01-12&bucket=day')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        bucket: 'day',
+        from: '2026-01-08',
+        to: '2026-01-12',
+        buckets: [
+          {
+            periodStart: '2026-01-08',
+            totalHours: 6,
+            categories: [
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Work',
+                hours: 6
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-09',
+            totalHours: 5,
+            categories: [
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Health',
+                hours: 5
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-10',
+            totalHours: 4,
+            categories: [
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Work',
+                hours: 4
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-11',
+            totalHours: 5,
+            categories: [
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Learning',
+                hours: 5
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-12',
+            totalHours: 0,
+            categories: []
+          }
+        ]
+      });
+    });
+});
+
+test('time-series supports weekly bucketing', async () => {
+  await seedMockTasks('power');
+
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-02-08&to=2026-03-15&bucket=week')
+    .set('Authorization', 'Bearer test:power')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        bucket: 'week',
+        from: '2026-02-08',
+        to: '2026-03-15',
+        buckets: [
+          { periodStart: '2026-02-08', totalHours: 23, categories: [expect.objectContaining({ categoryTitle: 'Work', hours: 23 })] },
+          { periodStart: '2026-02-15', totalHours: 9, categories: [expect.objectContaining({ categoryTitle: 'Health', hours: 9 })] },
+          { periodStart: '2026-02-22', totalHours: 11, categories: [expect.objectContaining({ categoryTitle: 'Learning', hours: 11 })] },
+          { periodStart: '2026-03-01', totalHours: 4, categories: [expect.objectContaining({ categoryTitle: 'Admin', hours: 4 })] },
+          { periodStart: '2026-03-08', totalHours: 7, categories: [expect.objectContaining({ categoryTitle: 'Creative', hours: 7 })] },
+          { periodStart: '2026-03-15', totalHours: 3, categories: [expect.objectContaining({ categoryTitle: 'Relationships', hours: 3 })] }
+        ]
+      });
+    });
+});
+
+test('time-series supports monthly bucketing', async () => {
+  await seedMockTasks('power');
+
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-02-01&to=2026-03-31&bucket=month')
+    .set('Authorization', 'Bearer test:power')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        bucket: 'month',
+        from: '2026-02-01',
+        to: '2026-03-31',
+        buckets: [
+          {
+            periodStart: '2026-02-01',
+            totalHours: 43,
+            categories: [
+              expect.objectContaining({ categoryTitle: 'Work', hours: 23 }),
+              expect.objectContaining({ categoryTitle: 'Learning', hours: 11 }),
+              expect.objectContaining({ categoryTitle: 'Health', hours: 9 })
+            ]
+          },
+          {
+            periodStart: '2026-03-01',
+            totalHours: 14,
+            categories: [
+              expect.objectContaining({ categoryTitle: 'Creative', hours: 7 }),
+              expect.objectContaining({ categoryTitle: 'Admin', hours: 4 }),
+              expect.objectContaining({ categoryTitle: 'Relationships', hours: 3 })
+            ]
+          }
+        ]
+      });
+    });
+});
+
+test('time-series requires from and to parameters', async () => {
+  await request(app)
+    .get('/api/analytics/time-series')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(400)
+    .expect({
+      error: 'from and to are required for time series analytics.'
+    });
+});
+
+test('time-series rejects invalid bucket values', async () => {
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-01-08&to=2026-01-12&bucket=hour')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(400)
+    .expect({
+      error: 'bucket must be one of day, week, or month.'
+    });
+});
