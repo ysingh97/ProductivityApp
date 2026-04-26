@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   Container,
   Paper,
@@ -89,6 +90,8 @@ const getAllowedBuckets = (periodMode) => {
 const formatBucketName = (bucket) =>
   bucket.charAt(0).toUpperCase() + bucket.slice(1);
 
+const getCategoryKey = (category) => category.categoryId || category.categoryTitle;
+
 const Visualizations = () => {
   const [summary, setSummary] = useState(createEmptySummary);
   const [timeSeries, setTimeSeries] = useState(createEmptyTimeSeries);
@@ -98,6 +101,7 @@ const Visualizations = () => {
   const [timeSeriesError, setTimeSeriesError] = useState("");
   const [periodMode, setPeriodMode] = useState("month");
   const [granularity, setGranularity] = useState("day");
+  const [selectedTrendCategories, setSelectedTrendCategories] = useState([]);
   const [activeDate, setActiveDate] = useState(() => dayjs());
   const [customRange, setCustomRange] = useState(() => ({
     from: dayjs().startOf("month").format("YYYY-MM-DD"),
@@ -358,13 +362,71 @@ const Visualizations = () => {
   const pieData = useMemo(
     () =>
       summary.categories.map((category, index) => ({
-        id: category.categoryId || category.categoryTitle,
+        id: getCategoryKey(category),
         value: category.hours,
         label: category.categoryTitle,
         color: chartColors[index % chartColors.length]
       })),
     [summary.categories]
   );
+
+  const trendCategoryOptions = useMemo(
+    () =>
+      summary.categories.map((category, index) => ({
+        key: getCategoryKey(category),
+        categoryTitle: category.categoryTitle,
+        color: chartColors[index % chartColors.length]
+      })),
+    [summary.categories]
+  );
+
+  useEffect(() => {
+    const allowedCategoryKeys = new Set(
+      trendCategoryOptions.map((category) => category.key)
+    );
+
+    setSelectedTrendCategories((prev) =>
+      prev.filter((categoryKey) => allowedCategoryKeys.has(categoryKey))
+    );
+  }, [trendCategoryOptions]);
+
+  const lineChartSeries = useMemo(() => {
+    const categoriesByKey = new Map(
+      trendCategoryOptions.map((category) => [category.key, category])
+    );
+    const categorySeries = selectedTrendCategories
+      .map((categoryKey) => categoriesByKey.get(categoryKey))
+      .filter(Boolean)
+      .map((category) => ({
+        id: `category-${category.key}`,
+        label: category.categoryTitle,
+        data: timeSeries.buckets.map((bucket) => {
+          const matchedCategory = bucket.categories.find(
+            (bucketCategory) => getCategoryKey(bucketCategory) === category.key
+          );
+
+          return matchedCategory ? matchedCategory.hours : 0;
+        }),
+        color: category.color,
+        curve: "linear"
+      }));
+
+    return [
+      {
+        id: "total-hours",
+        label: "Total hours",
+        data: lineChartValues,
+        color: "#1c2636",
+        curve: "linear"
+      },
+      ...categorySeries
+    ];
+  }, [
+    lineChartValues,
+    selectedTrendCategories,
+    timeSeries.buckets,
+    trendCategoryOptions
+  ]);
 
   const hasTrendData = useMemo(
     () => timeSeries.buckets.some((bucket) => bucket.totalHours > 0),
@@ -381,6 +443,14 @@ const Visualizations = () => {
     if (nextValue) {
       setGranularity(nextValue);
     }
+  };
+
+  const handleTrendCategoryToggle = (categoryKey) => {
+    setSelectedTrendCategories((prev) =>
+      prev.includes(categoryKey)
+        ? prev.filter((value) => value !== categoryKey)
+        : [...prev, categoryKey]
+    );
   };
 
   const handleShift = (direction) => {
@@ -523,6 +593,37 @@ const Visualizations = () => {
                   </ToggleButton>
                 ))}
               </ToggleButtonGroup>
+            </Stack>
+
+            <Stack spacing={1}>
+              <Typography variant="body2" color="text.secondary">
+                Trend categories
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                {trendCategoryOptions.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Add tracked category data to compare category lines.
+                  </Typography>
+                ) : (
+                  trendCategoryOptions.map((category) => {
+                    const selected = selectedTrendCategories.includes(category.key);
+
+                    return (
+                      <Chip
+                        key={category.key}
+                        label={category.categoryTitle}
+                        onClick={() => handleTrendCategoryToggle(category.key)}
+                        variant={selected ? "filled" : "outlined"}
+                        sx={{
+                          borderColor: category.color,
+                          color: selected ? "#fff" : category.color,
+                          backgroundColor: selected ? category.color : "transparent"
+                        }}
+                      />
+                    );
+                  })
+                )}
+              </Stack>
             </Stack>
           </Stack>
         </Paper>
@@ -754,7 +855,7 @@ const Visualizations = () => {
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Total hours across the selected range. Current granularity is{" "}
-                {selectedBucket}.
+                {selectedBucket}. Select categories above to overlay their lines.
               </Typography>
             </Box>
 
@@ -792,22 +893,13 @@ const Visualizations = () => {
                     data: lineChartLabels
                   }
                 ]}
-                series={[
-                  {
-                    id: "total-hours",
-                    label: "Total hours",
-                    data: lineChartValues,
-                    color: chartColors[0],
-                    curve: "linear"
-                  }
-                ]}
+                series={lineChartSeries}
                 yAxis={[
                   {
                     label: "Hours"
                   }
                 ]}
                 grid={{ horizontal: true }}
-                slotProps={{ legend: { hidden: true } }}
               />
             )}
           </Stack>
