@@ -1,5 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, CircularProgress, Container, Paper, Stack, Typography } from "@mui/material";
+import dayjs from "dayjs";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Paper,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { PieChart } from "@mui/x-charts/PieChart";
 import { fetchTimeByCategory } from "../features/analytics/analyticsService";
@@ -15,20 +27,134 @@ const chartColors = [
   "#46736a"
 ];
 
+const createEmptySummary = () => ({ totalHours: 0, categories: [] });
+
+const formatRangeLabel = (start, end) => {
+  if (start.isSame(end, "day")) {
+    return start.format("MMM D, YYYY");
+  }
+
+  return `${start.format("MMM D")} - ${end.format("MMM D, YYYY")}`;
+};
+
 const Visualizations = () => {
-  const [summary, setSummary] = useState({ totalHours: 0, categories: [] });
+  const [summary, setSummary] = useState(createEmptySummary);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [periodMode, setPeriodMode] = useState("month");
+  const [activeDate, setActiveDate] = useState(() => dayjs());
+  const [customRange, setCustomRange] = useState(() => ({
+    from: dayjs().startOf("month").format("YYYY-MM-DD"),
+    to: dayjs().endOf("month").format("YYYY-MM-DD")
+  }));
+
+  const rangeState = useMemo(() => {
+    if (periodMode === "week") {
+      const start = activeDate.startOf("week");
+      const end = activeDate.endOf("week");
+      return {
+        from: start.format("YYYY-MM-DD"),
+        to: end.format("YYYY-MM-DD"),
+        label: formatRangeLabel(start, end),
+        start,
+        end,
+        validationMessage: ""
+      };
+    }
+
+    if (periodMode === "month") {
+      const start = activeDate.startOf("month");
+      const end = activeDate.endOf("month");
+      return {
+        from: start.format("YYYY-MM-DD"),
+        to: end.format("YYYY-MM-DD"),
+        label: activeDate.format("MMMM YYYY"),
+        start,
+        end,
+        validationMessage: ""
+      };
+    }
+
+    if (periodMode === "year") {
+      const start = activeDate.startOf("year");
+      const end = activeDate.endOf("year");
+      return {
+        from: start.format("YYYY-MM-DD"),
+        to: end.format("YYYY-MM-DD"),
+        label: activeDate.format("YYYY"),
+        start,
+        end,
+        validationMessage: ""
+      };
+    }
+
+    if (!customRange.from || !customRange.to) {
+      return {
+        from: null,
+        to: null,
+        label: "Custom range",
+        start: null,
+        end: null,
+        validationMessage: "Select both a start and end date."
+      };
+    }
+
+    const start = dayjs(customRange.from);
+    const end = dayjs(customRange.to);
+
+    if (!start.isValid() || !end.isValid()) {
+      return {
+        from: null,
+        to: null,
+        label: "Custom range",
+        start: null,
+        end: null,
+        validationMessage: "Choose a valid custom date range."
+      };
+    }
+
+    if (start.isAfter(end, "day")) {
+      return {
+        from: null,
+        to: null,
+        label: "Custom range",
+        start,
+        end,
+        validationMessage: "Start date must be on or before end date."
+      };
+    }
+
+    return {
+      from: start.format("YYYY-MM-DD"),
+      to: end.format("YYYY-MM-DD"),
+      label: formatRangeLabel(start, end),
+      start,
+      end,
+      validationMessage: ""
+    };
+  }, [activeDate, customRange.from, customRange.to, periodMode]);
 
   useEffect(() => {
     let isActive = true;
+
+    if (rangeState.validationMessage) {
+      setSummary(createEmptySummary());
+      setError("");
+      setLoading(false);
+      return () => {
+        isActive = false;
+      };
+    }
 
     const loadSummary = async () => {
       setError("");
       setLoading(true);
 
       try {
-        const analytics = await fetchTimeByCategory();
+        const analytics = await fetchTimeByCategory({
+          from: rangeState.from,
+          to: rangeState.to
+        });
         if (isActive) {
           setSummary(analytics);
         }
@@ -48,7 +174,9 @@ const Visualizations = () => {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [rangeState.from, rangeState.to, rangeState.validationMessage]);
+
+  const displayedError = rangeState.validationMessage || error;
 
   const topCategory = useMemo(
     () => summary.categories[0] || null,
@@ -89,6 +217,42 @@ const Visualizations = () => {
     [summary.categories]
   );
 
+  const handlePeriodChange = (_event, nextValue) => {
+    if (nextValue) {
+      setPeriodMode(nextValue);
+    }
+  };
+
+  const handleShift = (direction) => {
+    if (periodMode === "custom") {
+      if (!rangeState.start || !rangeState.end || rangeState.validationMessage) {
+        return;
+      }
+
+      const spanDays =
+        rangeState.end.startOf("day").diff(rangeState.start.startOf("day"), "day") + 1;
+      const shiftDays = direction * spanDays;
+
+      setCustomRange({
+        from: rangeState.start.add(shiftDays, "day").format("YYYY-MM-DD"),
+        to: rangeState.end.add(shiftDays, "day").format("YYYY-MM-DD")
+      });
+      return;
+    }
+
+    setActiveDate((prev) => prev.add(direction, periodMode));
+  };
+
+  const handleJumpToToday = () => {
+    if (periodMode === "custom") {
+      const today = dayjs().format("YYYY-MM-DD");
+      setCustomRange({ from: today, to: today });
+      return;
+    }
+
+    setActiveDate(dayjs());
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
       <Stack spacing={3}>
@@ -101,6 +265,85 @@ const Visualizations = () => {
             on top of this analytics feed next.
           </Typography>
         </Box>
+
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+          <Stack spacing={2}>
+            <Stack
+              direction={{ xs: "column", lg: "row" }}
+              spacing={2}
+              sx={{ alignItems: { lg: "center" }, justifyContent: "space-between" }}
+            >
+              <ToggleButtonGroup
+                value={periodMode}
+                exclusive
+                onChange={handlePeriodChange}
+                size="small"
+              >
+                <ToggleButton value="week">Week</ToggleButton>
+                <ToggleButton value="month">Month</ToggleButton>
+                <ToggleButton value="year">Year</ToggleButton>
+                <ToggleButton value="custom">Custom</ToggleButton>
+              </ToggleButtonGroup>
+
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleShift(-1)}
+                  disabled={periodMode === "custom" && Boolean(rangeState.validationMessage)}
+                >
+                  Prev
+                </Button>
+                <Button variant="outlined" size="small" onClick={handleJumpToToday}>
+                  Today
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleShift(1)}
+                  disabled={periodMode === "custom" && Boolean(rangeState.validationMessage)}
+                >
+                  Next
+                </Button>
+              </Stack>
+            </Stack>
+
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
+            >
+              <Typography variant="subtitle1" fontWeight={700}>
+                {rangeState.label}
+              </Typography>
+
+              {periodMode === "custom" && (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField
+                    label="Start date"
+                    type="date"
+                    size="small"
+                    value={customRange.from}
+                    onChange={(event) =>
+                      setCustomRange((prev) => ({ ...prev, from: event.target.value }))
+                    }
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    label="End date"
+                    type="date"
+                    size="small"
+                    value={customRange.to}
+                    onChange={(event) =>
+                      setCustomRange((prev) => ({ ...prev, to: event.target.value }))
+                    }
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Stack>
+              )}
+            </Stack>
+          </Stack>
+        </Paper>
 
         <Box
           sx={{
@@ -148,7 +391,7 @@ const Visualizations = () => {
                   Time by category
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  This is the live backend response that the first pie chart will use.
+                  This pie chart reflects the currently selected range.
                 </Typography>
               </Box>
 
@@ -156,8 +399,8 @@ const Visualizations = () => {
                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                   <CircularProgress />
                 </Box>
-              ) : error ? (
-                <Typography color="error">{error}</Typography>
+              ) : displayedError ? (
+                <Typography color="error">{displayedError}</Typography>
               ) : summary.categories.length === 0 ? (
                 <Box
                   sx={{
@@ -170,11 +413,11 @@ const Visualizations = () => {
                   }}
                 >
                   <Typography variant="body1" fontWeight={600}>
-                    No tracked time yet.
+                    No tracked time in this range.
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                    Once tasks accumulate `timeSpent`, this section will turn into charts and
-                    comparisons.
+                    Try a different period or add tracked `timeSpent` to tasks that fall within
+                    these dates.
                   </Typography>
                 </Box>
               ) : (
