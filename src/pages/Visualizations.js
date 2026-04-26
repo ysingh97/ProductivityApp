@@ -13,8 +13,12 @@ import {
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { LineChart } from "@mui/x-charts/LineChart";
 import { PieChart } from "@mui/x-charts/PieChart";
-import { fetchTimeByCategory } from "../features/analytics/analyticsService";
+import {
+  fetchTimeByCategory,
+  fetchTimeSeries
+} from "../features/analytics/analyticsService";
 
 const chartColors = [
   "#c24b2f",
@@ -28,6 +32,7 @@ const chartColors = [
 ];
 
 const createEmptySummary = () => ({ totalHours: 0, categories: [] });
+const createEmptyTimeSeries = () => ({ bucket: "day", buckets: [] });
 
 const formatRangeLabel = (start, end) => {
   if (start.isSame(end, "day")) {
@@ -37,10 +42,45 @@ const formatRangeLabel = (start, end) => {
   return `${start.format("MMM D")} - ${end.format("MMM D, YYYY")}`;
 };
 
+const formatBucketLabel = (periodStart, bucket) => {
+  const date = dayjs(periodStart);
+
+  if (bucket === "month") {
+    return date.format("MMM YYYY");
+  }
+
+  return date.format("MMM D");
+};
+
+const getAutoBucket = ({ periodMode, rangeStart, rangeEnd }) => {
+  if (periodMode === "year") {
+    return "month";
+  }
+
+  if (periodMode !== "custom" || !rangeStart || !rangeEnd) {
+    return "day";
+  }
+
+  const daySpan = rangeEnd.startOf("day").diff(rangeStart.startOf("day"), "day") + 1;
+
+  if (daySpan > 180) {
+    return "month";
+  }
+
+  if (daySpan > 45) {
+    return "week";
+  }
+
+  return "day";
+};
+
 const Visualizations = () => {
   const [summary, setSummary] = useState(createEmptySummary);
+  const [timeSeries, setTimeSeries] = useState(createEmptyTimeSeries);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [timeSeriesLoading, setTimeSeriesLoading] = useState(true);
+  const [timeSeriesError, setTimeSeriesError] = useState("");
   const [periodMode, setPeriodMode] = useState("month");
   const [activeDate, setActiveDate] = useState(() => dayjs());
   const [customRange, setCustomRange] = useState(() => ({
@@ -134,6 +174,16 @@ const Visualizations = () => {
     };
   }, [activeDate, customRange.from, customRange.to, periodMode]);
 
+  const timeSeriesBucket = useMemo(
+    () =>
+      getAutoBucket({
+        periodMode,
+        rangeStart: rangeState.start,
+        rangeEnd: rangeState.end
+      }),
+    [periodMode, rangeState.end, rangeState.start]
+  );
+
   useEffect(() => {
     let isActive = true;
 
@@ -176,7 +226,52 @@ const Visualizations = () => {
     };
   }, [rangeState.from, rangeState.to, rangeState.validationMessage]);
 
+  useEffect(() => {
+    let isActive = true;
+
+    if (rangeState.validationMessage) {
+      setTimeSeries(createEmptyTimeSeries());
+      setTimeSeriesError("");
+      setTimeSeriesLoading(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const loadTimeSeries = async () => {
+      setTimeSeriesError("");
+      setTimeSeriesLoading(true);
+
+      try {
+        const analytics = await fetchTimeSeries({
+          from: rangeState.from,
+          to: rangeState.to,
+          bucket: timeSeriesBucket
+        });
+
+        if (isActive) {
+          setTimeSeries(analytics);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isActive) {
+          setTimeSeriesError("Unable to load trend analytics right now.");
+        }
+      } finally {
+        if (isActive) {
+          setTimeSeriesLoading(false);
+        }
+      }
+    };
+
+    loadTimeSeries();
+    return () => {
+      isActive = false;
+    };
+  }, [rangeState.from, rangeState.to, rangeState.validationMessage, timeSeriesBucket]);
+
   const displayedError = rangeState.validationMessage || error;
+  const displayedTimeSeriesError = rangeState.validationMessage || timeSeriesError;
 
   const topCategory = useMemo(
     () => summary.categories[0] || null,
@@ -206,6 +301,19 @@ const Visualizations = () => {
     [summary.categories.length, summary.totalHours, topCategory]
   );
 
+  const lineChartLabels = useMemo(
+    () =>
+      timeSeries.buckets.map((bucket) =>
+        formatBucketLabel(bucket.periodStart, timeSeries.bucket)
+      ),
+    [timeSeries.bucket, timeSeries.buckets]
+  );
+
+  const lineChartValues = useMemo(
+    () => timeSeries.buckets.map((bucket) => bucket.totalHours),
+    [timeSeries.buckets]
+  );
+
   const pieData = useMemo(
     () =>
       summary.categories.map((category, index) => ({
@@ -215,6 +323,11 @@ const Visualizations = () => {
         color: chartColors[index % chartColors.length]
       })),
     [summary.categories]
+  );
+
+  const hasTrendData = useMemo(
+    () => timeSeries.buckets.some((bucket) => bucket.totalHours > 0),
+    [timeSeries.buckets]
   );
 
   const handlePeriodChange = (_event, nextValue) => {
@@ -261,8 +374,7 @@ const Visualizations = () => {
             Data visualizations
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Review current time distribution by category. Date filters and charts will layer
-            on top of this analytics feed next.
+            Review category distribution and total-hours trends across the selected date range.
           </Typography>
         </Box>
 
@@ -563,6 +675,73 @@ const Visualizations = () => {
             </Stack>
           </Paper>
         </Box>
+
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>
+                Time trend
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Total hours across the selected range. Auto granularity is{" "}
+                {timeSeriesBucket}.
+              </Typography>
+            </Box>
+
+            {timeSeriesLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <CircularProgress />
+              </Box>
+            ) : displayedTimeSeriesError ? (
+              <Typography color="error">{displayedTimeSeriesError}</Typography>
+            ) : !hasTrendData ? (
+              <Box
+                sx={{
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                  p: 3,
+                  backgroundColor: (theme) =>
+                    alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.1 : 0.05)
+                }}
+              >
+                <Typography variant="body1" fontWeight={600}>
+                  No tracked trend data in this range.
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                  The line chart will appear once tasks in this range have tracked `timeSpent`.
+                </Typography>
+              </Box>
+            ) : (
+              <LineChart
+                height={320}
+                margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                xAxis={[
+                  {
+                    scaleType: "point",
+                    data: lineChartLabels
+                  }
+                ]}
+                series={[
+                  {
+                    id: "total-hours",
+                    label: "Total hours",
+                    data: lineChartValues,
+                    color: chartColors[0],
+                    curve: "linear"
+                  }
+                ]}
+                yAxis={[
+                  {
+                    label: "Hours"
+                  }
+                ]}
+                grid={{ horizontal: true }}
+                slotProps={{ legend: { hidden: true } }}
+              />
+            )}
+          </Stack>
+        </Paper>
       </Stack>
     </Container>
   );
