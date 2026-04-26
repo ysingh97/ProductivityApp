@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
   Box,
@@ -74,6 +74,21 @@ const getAutoBucket = ({ periodMode, rangeStart, rangeEnd }) => {
   return "day";
 };
 
+const getAllowedBuckets = (periodMode) => {
+  if (periodMode === "week") {
+    return ["day"];
+  }
+
+  if (periodMode === "month") {
+    return ["day", "week"];
+  }
+
+  return ["day", "week", "month"];
+};
+
+const formatBucketName = (bucket) =>
+  bucket.charAt(0).toUpperCase() + bucket.slice(1);
+
 const Visualizations = () => {
   const [summary, setSummary] = useState(createEmptySummary);
   const [timeSeries, setTimeSeries] = useState(createEmptyTimeSeries);
@@ -82,11 +97,13 @@ const Visualizations = () => {
   const [timeSeriesLoading, setTimeSeriesLoading] = useState(true);
   const [timeSeriesError, setTimeSeriesError] = useState("");
   const [periodMode, setPeriodMode] = useState("month");
+  const [granularity, setGranularity] = useState("day");
   const [activeDate, setActiveDate] = useState(() => dayjs());
   const [customRange, setCustomRange] = useState(() => ({
     from: dayjs().startOf("month").format("YYYY-MM-DD"),
     to: dayjs().endOf("month").format("YYYY-MM-DD")
   }));
+  const previousPeriodModeRef = useRef("month");
 
   const rangeState = useMemo(() => {
     if (periodMode === "week") {
@@ -174,7 +191,12 @@ const Visualizations = () => {
     };
   }, [activeDate, customRange.from, customRange.to, periodMode]);
 
-  const timeSeriesBucket = useMemo(
+  const allowedBuckets = useMemo(
+    () => getAllowedBuckets(periodMode),
+    [periodMode]
+  );
+
+  const autoBucket = useMemo(
     () =>
       getAutoBucket({
         periodMode,
@@ -183,6 +205,25 @@ const Visualizations = () => {
       }),
     [periodMode, rangeState.end, rangeState.start]
   );
+
+  const selectedBucket = useMemo(
+    () => (allowedBuckets.includes(granularity) ? granularity : autoBucket),
+    [allowedBuckets, autoBucket, granularity]
+  );
+
+  useEffect(() => {
+    const periodModeChanged = previousPeriodModeRef.current !== periodMode;
+    previousPeriodModeRef.current = periodMode;
+
+    if (periodModeChanged) {
+      setGranularity(autoBucket);
+      return;
+    }
+
+    if (!allowedBuckets.includes(granularity)) {
+      setGranularity(autoBucket);
+    }
+  }, [allowedBuckets, autoBucket, granularity, periodMode]);
 
   useEffect(() => {
     let isActive = true;
@@ -246,7 +287,7 @@ const Visualizations = () => {
         const analytics = await fetchTimeSeries({
           from: rangeState.from,
           to: rangeState.to,
-          bucket: timeSeriesBucket
+          bucket: selectedBucket
         });
 
         if (isActive) {
@@ -268,7 +309,7 @@ const Visualizations = () => {
     return () => {
       isActive = false;
     };
-  }, [rangeState.from, rangeState.to, rangeState.validationMessage, timeSeriesBucket]);
+  }, [rangeState.from, rangeState.to, rangeState.validationMessage, selectedBucket]);
 
   const displayedError = rangeState.validationMessage || error;
   const displayedTimeSeriesError = rangeState.validationMessage || timeSeriesError;
@@ -333,6 +374,12 @@ const Visualizations = () => {
   const handlePeriodChange = (_event, nextValue) => {
     if (nextValue) {
       setPeriodMode(nextValue);
+    }
+  };
+
+  const handleGranularityChange = (_event, nextValue) => {
+    if (nextValue) {
+      setGranularity(nextValue);
     }
   };
 
@@ -453,6 +500,29 @@ const Visualizations = () => {
                   />
                 </Stack>
               )}
+            </Stack>
+
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Trend granularity
+              </Typography>
+
+              <ToggleButtonGroup
+                value={selectedBucket}
+                exclusive
+                onChange={handleGranularityChange}
+                size="small"
+              >
+                {allowedBuckets.map((bucket) => (
+                  <ToggleButton key={bucket} value={bucket}>
+                    {formatBucketName(bucket)}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
             </Stack>
           </Stack>
         </Paper>
@@ -683,8 +753,8 @@ const Visualizations = () => {
                 Time trend
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Total hours across the selected range. Auto granularity is{" "}
-                {timeSeriesBucket}.
+                Total hours across the selected range. Current granularity is{" "}
+                {selectedBucket}.
               </Typography>
             </Box>
 
