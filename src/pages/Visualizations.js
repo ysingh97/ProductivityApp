@@ -1,7 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, CircularProgress, Container, Paper, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { PieChart } from "@mui/x-charts/PieChart";
 import { fetchTimeByCategory } from "../features/analytics/analyticsService";
+
+const chartColors = [
+  "#c24b2f",
+  "#4c6a5f",
+  "#b57f2a",
+  "#8b3d4c",
+  "#5d6f86",
+  "#6c5b7b",
+  "#a44a3f",
+  "#46736a"
+];
 
 const Visualizations = () => {
   const [summary, setSummary] = useState({ totalHours: 0, categories: [] });
@@ -64,6 +76,17 @@ const Visualizations = () => {
       }
     ],
     [summary.categories.length, summary.totalHours, topCategory]
+  );
+
+  const pieData = useMemo(
+    () =>
+      summary.categories.map((category, index) => ({
+        id: category.categoryId || category.categoryTitle,
+        value: category.hours,
+        label: category.categoryTitle,
+        color: chartColors[index % chartColors.length]
+      })),
+    [summary.categories]
   );
 
   return (
@@ -155,48 +178,104 @@ const Visualizations = () => {
                   </Typography>
                 </Box>
               ) : (
-                <Stack spacing={2}>
-                  {summary.categories.map((category) => (
-                    <Box key={category.categoryTitle}>
-                      <Stack
-                        direction="row"
-                        spacing={2}
-                        sx={{ alignItems: "baseline", justifyContent: "space-between", mb: 0.75 }}
-                      >
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle1" fontWeight={700} noWrap>
-                            {category.categoryTitle}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "minmax(280px, 0.9fr) minmax(0, 1.1fr)" },
+                    gap: 3,
+                    alignItems: "center"
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      minHeight: 320
+                    }}
+                  >
+                    <PieChart
+                      height={320}
+                      margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                      series={[
+                        {
+                          data: pieData,
+                          innerRadius: 70,
+                          outerRadius: 110,
+                          paddingAngle: 2,
+                          cornerRadius: 4,
+                          highlightScope: { faded: "global", highlighted: "item" },
+                          faded: { innerRadius: 64, additionalRadius: -6, color: "gray" },
+                          valueFormatter: (value) => `${value.value} hours`
+                        }
+                      ]}
+                      slotProps={{ legend: { hidden: true } }}
+                    />
+                  </Box>
+
+                  <Stack spacing={2}>
+                    {summary.categories.map((category, index) => (
+                      <Box key={category.categoryTitle}>
+                        <Stack
+                          direction="row"
+                          spacing={2}
+                          sx={{ alignItems: "baseline", justifyContent: "space-between", mb: 0.75 }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.25,
+                              minWidth: 0
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                backgroundColor: pieData[index]?.color || chartColors[0],
+                                flexShrink: 0
+                              }}
+                            />
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="subtitle1" fontWeight={700} noWrap>
+                                {category.categoryTitle}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {category.hours} hours
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Typography variant="subtitle2" fontWeight={700}>
+                            {category.percentage}%
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {category.hours} hours
-                          </Typography>
-                        </Box>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          {category.percentage}%
-                        </Typography>
-                      </Stack>
-                      <Box
-                        sx={{
-                          height: 12,
-                          borderRadius: 999,
-                          backgroundColor: (theme) =>
-                            alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.18 : 0.08),
-                          overflow: "hidden"
-                        }}
-                      >
+                        </Stack>
                         <Box
                           sx={{
-                            height: "100%",
-                            width: `${category.percentage}%`,
+                            height: 12,
                             borderRadius: 999,
-                            background: (theme) =>
-                              `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
+                            backgroundColor: (theme) =>
+                              alpha(
+                                theme.palette.text.primary,
+                                theme.palette.mode === "dark" ? 0.18 : 0.08
+                              ),
+                            overflow: "hidden"
                           }}
-                        />
+                        >
+                          <Box
+                            sx={{
+                              height: "100%",
+                              width: `${category.percentage}%`,
+                              borderRadius: 999,
+                              backgroundColor: pieData[index]?.color || chartColors[0]
+                            }}
+                          />
+                        </Box>
                       </Box>
-                    </Box>
-                  ))}
-                </Stack>
+                    ))}
+                  </Stack>
+                </Box>
               )}
             </Stack>
           </Paper>
