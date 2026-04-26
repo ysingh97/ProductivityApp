@@ -84,6 +84,11 @@ const getTimeByCategory = async (req, res) => {
         }
       },
       {
+        $match: {
+          hours: { $gt: 0 }
+        }
+      },
+      {
         $project: {
           _id: 0,
           categoryId: {

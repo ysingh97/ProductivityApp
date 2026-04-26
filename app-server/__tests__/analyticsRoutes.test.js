@@ -5,6 +5,7 @@ const createApp = require('../app');
 const Category = require('../models/category');
 const Task = require('../models/task');
 const User = require('../models/user');
+const { seedMockCategories } = require('../test-data/mockCategories');
 const { seedMockTasks } = require('../test-data/mockTasks');
 
 jest.setTimeout(60000);
@@ -91,6 +92,41 @@ test('time-by-category returns empty totals when the authenticated user has no t
   await request(app)
     .get('/api/analytics/time-by-category')
     .set('Authorization', 'Bearer test:empty')
+    .expect(200)
+    .expect({
+      totalHours: 0,
+      categories: []
+    });
+});
+
+test('time-by-category excludes categories whose summed task time is zero', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+
+  await Task.create({
+    title: 'Zero hour work task',
+    description: 'Regression test fixture',
+    estimatedCompletionTime: 3,
+    timeLeft: 3,
+    timeSpent: 0,
+    userId: user._id,
+    category: categories[0]._id,
+    targetCompletionDate: new Date('2026-01-08T18:00:00.000Z')
+  });
+
+  await Task.create({
+    title: 'Zero hour uncategorized task',
+    description: 'Regression test fixture',
+    estimatedCompletionTime: 1,
+    timeLeft: 1,
+    timeSpent: 0,
+    userId: user._id,
+    category: null,
+    targetCompletionDate: new Date('2026-01-09T18:00:00.000Z')
+  });
+
+  await request(app)
+    .get('/api/analytics/time-by-category')
+    .set('Authorization', 'Bearer test:basic')
     .expect(200)
     .expect({
       totalHours: 0,
