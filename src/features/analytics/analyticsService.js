@@ -1,6 +1,6 @@
 import apiClient from '../../api/client';
 
-export const fetchTimeByCategory = async ({ from, to } = {}) => {
+const buildAnalyticsQuery = ({ from, to, bucket } = {}) => {
   const params = new URLSearchParams();
 
   if (from) {
@@ -11,9 +11,26 @@ export const fetchTimeByCategory = async ({ from, to } = {}) => {
     params.set('to', to);
   }
 
-  const query = params.toString();
+  if (bucket) {
+    params.set('bucket', bucket);
+  }
+
+  return params.toString();
+};
+
+export const fetchTimeByCategory = async ({ from, to } = {}) => {
+  const query = buildAnalyticsQuery({ from, to });
   const response = await apiClient.get(
     `/analytics/time-by-category${query ? `?${query}` : ''}`
+  );
+
+  return response.data;
+};
+
+export const fetchTimeSeries = async ({ from, to, bucket } = {}) => {
+  const query = buildAnalyticsQuery({ from, to, bucket });
+  const response = await apiClient.get(
+    `/analytics/time-series${query ? `?${query}` : ''}`
   );
 
   return response.data;
