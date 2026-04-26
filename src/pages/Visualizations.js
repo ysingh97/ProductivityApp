@@ -433,6 +433,55 @@ const Visualizations = () => {
     [timeSeries.buckets]
   );
 
+  const peakTrendBucket = useMemo(() => {
+    const nonEmptyBuckets = timeSeries.buckets.filter((bucket) => bucket.totalHours > 0);
+
+    if (nonEmptyBuckets.length === 0) {
+      return null;
+    }
+
+    return nonEmptyBuckets.reduce((peakBucket, currentBucket) =>
+      currentBucket.totalHours > peakBucket.totalHours ? currentBucket : peakBucket
+    );
+  }, [timeSeries.buckets]);
+
+  const snapshotItems = useMemo(
+    () => [
+      {
+        label: "Selected window",
+        value: rangeState.label
+      },
+      {
+        label: "Trend bucket",
+        value: formatBucketName(selectedBucket)
+      },
+      {
+        label: "Peak period",
+        value: peakTrendBucket
+          ? `${formatBucketLabel(peakTrendBucket.periodStart, timeSeries.bucket)} (${peakTrendBucket.totalHours}h)`
+          : "No tracked hours"
+      },
+      {
+        label: "Visible lines",
+        value: `${selectedTrendCategories.length + 1} total`
+      },
+      {
+        label: "Lead category",
+        value: topCategory
+          ? `${topCategory.categoryTitle} (${topCategory.percentage}%)`
+          : "None yet"
+      }
+    ],
+    [
+      peakTrendBucket,
+      rangeState.label,
+      selectedBucket,
+      selectedTrendCategories.length,
+      timeSeries.bucket,
+      topCategory
+    ]
+  );
+
   const handlePeriodChange = (_event, nextValue) => {
     if (nextValue) {
       setPeriodMode(nextValue);
@@ -810,11 +859,10 @@ const Visualizations = () => {
             <Stack spacing={2}>
               <Box>
                 <Typography variant="h6" fontWeight={700}>
-                  Next up
+                  Range snapshot
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  The next commits will turn this raw distribution data into the actual charting
-                  UI you asked for.
+                  Live context for the selected window and the trend chart currently in view.
                 </Typography>
               </Box>
 
@@ -828,19 +876,22 @@ const Visualizations = () => {
                     "linear-gradient(135deg, rgba(25, 118, 210, 0.12), rgba(25, 118, 210, 0.02))"
                 }}
               >
-                <Stack spacing={1}>
-                  <Typography variant="subtitle2" fontWeight={700}>
-                    Planned chart layers
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Pie chart for category percentages.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Date range controls for week, month, year, and custom spans.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Line chart once the backend time-series endpoint is in place.
-                  </Typography>
+                <Stack spacing={1.5}>
+                  {snapshotItems.map((item) => (
+                    <Stack
+                      key={item.label}
+                      direction="row"
+                      spacing={2}
+                      sx={{ alignItems: "baseline", justifyContent: "space-between" }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {item.label}
+                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={700} textAlign="right">
+                        {loading || timeSeriesLoading ? "..." : item.value}
+                      </Typography>
+                    </Stack>
+                  ))}
                 </Stack>
               </Box>
             </Stack>
