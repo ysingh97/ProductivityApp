@@ -348,6 +348,91 @@ test('time-series supports monthly bucketing', async () => {
     });
 });
 
+test('time-series can filter returned category series while preserving bucket totals', async () => {
+  const { categories } = await seedMockTasks('basic');
+  const workCategoryId = categories.find(
+    (category) => category.title === 'Work'
+  )._id.toString();
+
+  await request(app)
+    .get(`/api/analytics/time-series?from=2026-01-08&to=2026-01-12&bucket=day&categoryIds=${workCategoryId}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        bucket: 'day',
+        from: '2026-01-08',
+        to: '2026-01-12',
+        buckets: [
+          {
+            periodStart: '2026-01-08',
+            totalHours: 6,
+            categories: [
+              {
+                categoryId: workCategoryId,
+                categoryTitle: 'Work',
+                hours: 6
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-09',
+            totalHours: 5,
+            categories: []
+          },
+          {
+            periodStart: '2026-01-10',
+            totalHours: 4,
+            categories: [
+              {
+                categoryId: workCategoryId,
+                categoryTitle: 'Work',
+                hours: 4
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-11',
+            totalHours: 5,
+            categories: []
+          },
+          {
+            periodStart: '2026-01-12',
+            totalHours: 0,
+            categories: []
+          }
+        ]
+      });
+    });
+});
+
+test('time-series supports uncategorized category filtering', async () => {
+  await seedMockTasks('edge');
+
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-03-08&to=2026-03-08&bucket=day&categoryIds=uncategorized')
+    .set('Authorization', 'Bearer test:edge')
+    .expect(200)
+    .expect({
+      bucket: 'day',
+      from: '2026-03-08',
+      to: '2026-03-08',
+      buckets: [
+        {
+          periodStart: '2026-03-08',
+          totalHours: 3.5,
+          categories: [
+            {
+              categoryId: null,
+              categoryTitle: 'Uncategorized',
+              hours: 2
+            }
+          ]
+        }
+      ]
+    });
+});
+
 test('time-series requires from and to parameters', async () => {
   await request(app)
     .get('/api/analytics/time-series')
@@ -365,5 +450,15 @@ test('time-series rejects invalid bucket values', async () => {
     .expect(400)
     .expect({
       error: 'bucket must be one of day, week, or month.'
+    });
+});
+
+test('time-series rejects invalid category filters', async () => {
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-01-08&to=2026-01-12&categoryIds=not-a-category-id')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(400)
+    .expect({
+      error: 'categoryIds must contain comma-separated category ids or "uncategorized".'
     });
 });

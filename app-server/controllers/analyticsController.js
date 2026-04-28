@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Task = require('../models/task');
 
 const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
@@ -81,6 +82,45 @@ const parseBucketParam = (value) => {
   }
 
   return value;
+};
+
+const parseCategoryIdsParam = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const rawValues = Array.isArray(value) ? value : [value];
+  const tokens = rawValues
+    .flatMap((rawValue) => String(rawValue).split(','))
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const categoryIds = new Set();
+  let includeUncategorized = false;
+
+  for (const token of tokens) {
+    if (token.toLowerCase() === 'uncategorized') {
+      includeUncategorized = true;
+      continue;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(token)) {
+      throw new Error(
+        'categoryIds must contain comma-separated category ids or "uncategorized".'
+      );
+    }
+
+    categoryIds.add(String(new mongoose.Types.ObjectId(token)));
+  }
+
+  return {
+    categoryIds,
+    includeUncategorized
+  };
 };
 
 const buildTaskMatch = ({ userId, fromDate, toDate }) => {
@@ -205,6 +245,7 @@ const getTimeSeries = async (req, res) => {
     const fromDate = parseDateOnlyParam(req.query.from, 'from');
     const toDate = parseDateOnlyParam(req.query.to, 'to');
     const bucket = parseBucketParam(req.query.bucket);
+    const categoryFilter = parseCategoryIdsParam(req.query.categoryIds);
 
     if (!fromDate || !toDate) {
       return res.status(400).json({
@@ -244,6 +285,17 @@ const getTimeSeries = async (req, res) => {
 
       const categoryTitle = task.category?.title || 'Uncategorized';
       const categoryId = task.category?._id ? String(task.category._id) : null;
+      const shouldIncludeCategory = !categoryFilter || (
+        categoryId
+          ? categoryFilter.categoryIds.has(categoryId)
+          : categoryFilter.includeUncategorized
+      );
+
+      if (!shouldIncludeCategory) {
+        bucketMap.set(key, existing);
+        return;
+      }
+
       const categoryExisting = existing.categories.get(categoryTitle) || {
         categoryId,
         categoryTitle,
@@ -297,7 +349,8 @@ const getTimeSeries = async (req, res) => {
       err.message === 'to must use YYYY-MM-DD format.' ||
       err.message === 'from must be a valid calendar date.' ||
       err.message === 'to must be a valid calendar date.' ||
-      err.message === 'bucket must be one of day, week, or month.'
+      err.message === 'bucket must be one of day, week, or month.' ||
+      err.message === 'categoryIds must contain comma-separated category ids or "uncategorized".'
     ) {
       return res.status(400).json({ error: err.message });
     }
