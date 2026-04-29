@@ -644,36 +644,6 @@ const Visualizations = () => {
               </ToggleButtonGroup>
             </Stack>
 
-            <Stack spacing={1}>
-              <Typography variant="body2" color="text.secondary">
-                Trend categories
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-                {trendCategoryOptions.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    Add tracked category data to compare category lines.
-                  </Typography>
-                ) : (
-                  trendCategoryOptions.map((category) => {
-                    const selected = selectedTrendCategories.includes(category.key);
-
-                    return (
-                      <Chip
-                        key={category.key}
-                        label={category.categoryTitle}
-                        onClick={() => handleTrendCategoryToggle(category.key)}
-                        variant={selected ? "filled" : "outlined"}
-                        sx={{
-                          borderColor: category.color,
-                          color: selected ? "#fff" : category.color,
-                          backgroundColor: selected ? category.color : "transparent"
-                        }}
-                      />
-                    );
-                  })
-                )}
-              </Stack>
-            </Stack>
           </Stack>
         </Paper>
 
@@ -906,7 +876,7 @@ const Visualizations = () => {
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Total hours across the selected range. Current granularity is{" "}
-                {selectedBucket}. Select categories above to overlay their lines.
+                {selectedBucket}. Toggle category lines from the chart sidebar.
               </Typography>
             </Box>
 
@@ -935,23 +905,112 @@ const Visualizations = () => {
                 </Typography>
               </Box>
             ) : (
-              <LineChart
-                height={320}
-                margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
-                xAxis={[
-                  {
-                    scaleType: "point",
-                    data: lineChartLabels
-                  }
-                ]}
-                series={lineChartSeries}
-                yAxis={[
-                  {
-                    label: "Hours"
-                  }
-                ]}
-                grid={{ horizontal: true }}
-              />
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 260px" },
+                  gap: 3,
+                  alignItems: "start"
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <LineChart
+                    height={320}
+                    margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                    xAxis={[
+                      {
+                        scaleType: "point",
+                        data: lineChartLabels
+                      }
+                    ]}
+                    series={lineChartSeries}
+                    yAxis={[
+                      {
+                        label: "Hours"
+                      }
+                    ]}
+                    grid={{ horizontal: true }}
+                    slotProps={{ legend: { hidden: true } }}
+                  />
+                </Box>
+
+                <Box
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 3,
+                    p: 2,
+                    backgroundColor: (theme) =>
+                      alpha(theme.palette.background.paper, theme.palette.mode === "dark" ? 0.35 : 0.6)
+                  }}
+                >
+                  <Stack spacing={1.5}>
+                    <Box>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        Category lines
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Add or remove category lines without leaving the chart.
+                      </Typography>
+                    </Box>
+
+                    <Stack
+                      direction="row"
+                      spacing={1.25}
+                      sx={{ alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+                        <Box
+                          sx={{
+                            width: 18,
+                            height: 3,
+                            borderRadius: 999,
+                            backgroundColor: "#1c2636",
+                            flexShrink: 0
+                          }}
+                        />
+                        <Typography variant="body2" fontWeight={700}>
+                          Total hours
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Always on
+                      </Typography>
+                    </Stack>
+
+                    {trendCategoryOptions.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Add tracked category data to compare category lines.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1}>
+                        {trendCategoryOptions.map((category) => {
+                          const selected = selectedTrendCategories.includes(category.key);
+
+                          return (
+                            <Chip
+                              key={category.key}
+                              label={category.categoryTitle}
+                              onClick={() => handleTrendCategoryToggle(category.key)}
+                              variant={selected ? "filled" : "outlined"}
+                              sx={{
+                                justifyContent: "flex-start",
+                                borderColor: category.color,
+                                color: selected ? "#fff" : category.color,
+                                backgroundColor: selected ? category.color : "transparent",
+                                "& .MuiChip-label": {
+                                  width: "100%",
+                                  textAlign: "left"
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </Stack>
+                    )}
+                  </Stack>
+                </Box>
+              </Box>
             )}
           </Stack>
         </Paper>
