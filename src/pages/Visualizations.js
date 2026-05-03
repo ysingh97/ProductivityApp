@@ -380,15 +380,26 @@ const Visualizations = () => {
     [summary.categories]
   );
 
+  const defaultTrendCategoryKeys = useMemo(
+    () => trendCategoryOptions.slice(0, 2).map((category) => category.key),
+    [trendCategoryOptions]
+  );
+
   useEffect(() => {
     const allowedCategoryKeys = new Set(
       trendCategoryOptions.map((category) => category.key)
     );
 
-    setSelectedTrendCategories((prev) =>
-      prev.filter((categoryKey) => allowedCategoryKeys.has(categoryKey))
-    );
-  }, [trendCategoryOptions]);
+    setSelectedTrendCategories((prev) => {
+      const nextSelection = prev.filter((categoryKey) => allowedCategoryKeys.has(categoryKey));
+
+      if (nextSelection.length > 0 || defaultTrendCategoryKeys.length === 0) {
+        return nextSelection;
+      }
+
+      return defaultTrendCategoryKeys;
+    });
+  }, [defaultTrendCategoryKeys, trendCategoryOptions]);
 
   const lineChartSeries = useMemo(() => {
     const categoriesByKey = new Map(
@@ -950,7 +961,8 @@ const Visualizations = () => {
                         Category lines
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Add or remove category lines without leaving the chart.
+                        Add or remove category lines without leaving the chart. Top categories are
+                        preselected for each range.
                       </Typography>
                     </Box>
 
