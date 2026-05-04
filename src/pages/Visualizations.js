@@ -163,6 +163,7 @@ const Visualizations = () => {
   const [timeSeriesError, setTimeSeriesError] = useState("");
   const [periodMode, setPeriodMode] = useState("month");
   const [granularity, setGranularity] = useState("day");
+  const [categoryChartType, setCategoryChartType] = useState("pie");
   const [selectedTrendCategories, setSelectedTrendCategories] = useState([]);
   const [activeDate, setActiveDate] = useState(() => dayjs());
   const [customRange, setCustomRange] = useState(() => ({
@@ -633,6 +634,12 @@ const Visualizations = () => {
     }
   };
 
+  const handleCategoryChartTypeChange = (_event, nextValue) => {
+    if (nextValue) {
+      setCategoryChartType(nextValue);
+    }
+  };
+
   const handleTrendCategoryToggle = (categoryKey) => {
     setSelectedTrendCategories((prev) =>
       prev.includes(categoryKey)
@@ -827,14 +834,31 @@ const Visualizations = () => {
         >
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
             <Stack spacing={2.5}>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  Time by category
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  This pie chart reflects the currently selected range.
-                </Typography>
-              </Box>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={2}
+                sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
+              >
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Time by category
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    This {categoryChartType === "pie" ? "pie" : "bar"} chart reflects the
+                    currently selected range.
+                  </Typography>
+                </Box>
+
+                <ToggleButtonGroup
+                  value={categoryChartType}
+                  exclusive
+                  onChange={handleCategoryChartTypeChange}
+                  size="small"
+                >
+                  <ToggleButton value="pie">Pie</ToggleButton>
+                  <ToggleButton value="bars">Bars</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
 
               {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -865,100 +889,178 @@ const Visualizations = () => {
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", md: "minmax(280px, 0.9fr) minmax(0, 1.1fr)" },
+                    gridTemplateColumns:
+                      categoryChartType === "pie"
+                        ? { xs: "1fr", md: "minmax(280px, 0.9fr) minmax(0, 1.1fr)" }
+                        : "1fr",
                     gap: 3,
-                    alignItems: "center"
+                    alignItems: categoryChartType === "pie" ? "center" : "stretch"
                   }}
                 >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      minHeight: 320
-                    }}
-                  >
-                    <PieChart
-                      height={320}
-                      margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                      series={[
-                        {
-                          data: pieData,
-                          innerRadius: 70,
-                          outerRadius: 110,
-                          paddingAngle: 2,
-                          cornerRadius: 4,
-                          highlightScope: { faded: "global", highlighted: "item" },
-                          faded: { innerRadius: 64, additionalRadius: -6, color: "gray" },
-                          valueFormatter: (value) => `${value.value} hours`
-                        }
-                      ]}
-                      slotProps={{ legend: { hidden: true } }}
-                    />
-                  </Box>
+                  {categoryChartType === "pie" ? (
+                    <>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          minHeight: 320,
+                          minWidth: 0
+                        }}
+                      >
+                      <PieChart
+                        height={320}
+                        margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        series={[
+                          {
+                            data: pieData,
+                            innerRadius: 70,
+                            outerRadius: 110,
+                            paddingAngle: 2,
+                            cornerRadius: 4,
+                            highlightScope: { faded: "global", highlighted: "item" },
+                            faded: { innerRadius: 64, additionalRadius: -6, color: "gray" },
+                            valueFormatter: (value) => `${value.value} hours`
+                          }
+                        ]}
+                        slotProps={{ legend: { hidden: true } }}
+                      />
+                      </Box>
 
-                  <Stack spacing={2}>
-                    {summary.categories.map((category, index) => (
-                      <Box key={category.categoryTitle}>
-                        <Stack
-                          direction="row"
-                          spacing={2}
-                          sx={{ alignItems: "baseline", justifyContent: "space-between", mb: 0.75 }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1.25,
-                              minWidth: 0
-                            }}
-                          >
+                      <Stack spacing={2}>
+                        {summary.categories.map((category, index) => (
+                          <Box key={category.categoryTitle}>
+                            <Stack
+                              direction="row"
+                              spacing={2}
+                              sx={{ alignItems: "baseline", justifyContent: "space-between", mb: 0.75 }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1.25,
+                                  minWidth: 0
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: "50%",
+                                    backgroundColor: pieData[index]?.color || chartColors[0],
+                                    flexShrink: 0
+                                  }}
+                                />
+                                <Box sx={{ minWidth: 0 }}>
+                                  <Typography variant="subtitle1" fontWeight={700} noWrap>
+                                    {category.categoryTitle}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {category.hours} hours
+                                  </Typography>
+                                </Box>
+                              </Box>
+                              <Typography variant="subtitle2" fontWeight={700}>
+                                {category.percentage}%
+                              </Typography>
+                            </Stack>
                             <Box
                               sx={{
-                                width: 12,
                                 height: 12,
-                                borderRadius: "50%",
-                                backgroundColor: pieData[index]?.color || chartColors[0],
-                                flexShrink: 0
+                                borderRadius: 999,
+                                backgroundColor: (theme) =>
+                                  alpha(
+                                    theme.palette.text.primary,
+                                    theme.palette.mode === "dark" ? 0.18 : 0.08
+                                  ),
+                                overflow: "hidden"
                               }}
-                            />
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography variant="subtitle1" fontWeight={700} noWrap>
-                                {category.categoryTitle}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {category.hours} hours
-                              </Typography>
+                            >
+                              <Box
+                                sx={{
+                                  height: "100%",
+                                  width: `${category.percentage}%`,
+                                  borderRadius: 999,
+                                  backgroundColor: pieData[index]?.color || chartColors[0]
+                                }}
+                              />
                             </Box>
                           </Box>
-                          <Typography variant="subtitle2" fontWeight={700}>
-                            {category.percentage}%
-                          </Typography>
-                        </Stack>
-                        <Box
-                          sx={{
-                            height: 12,
-                            borderRadius: 999,
-                            backgroundColor: (theme) =>
-                              alpha(
-                                theme.palette.text.primary,
-                                theme.palette.mode === "dark" ? 0.18 : 0.08
-                              ),
-                            overflow: "hidden"
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              height: "100%",
-                              width: `${category.percentage}%`,
-                              borderRadius: 999,
-                              backgroundColor: pieData[index]?.color || chartColors[0]
-                            }}
-                          />
-                        </Box>
-                      </Box>
-                    ))}
-                  </Stack>
+                        ))}
+                      </Stack>
+                    </>
+                  ) : (
+                    <Box sx={{ minWidth: 0 }}>
+                      <Stack spacing={2} sx={{ width: "100%", px: { xs: 0, md: 1 } }}>
+                        {summary.categories.map((category, index) => {
+                          const categoryColor = pieData[index]?.color || chartColors[0];
+                          const widthPercent = category.percentage;
+
+                          return (
+                            <Box key={`bar-${getCategoryKey(category)}`}>
+                              <Stack
+                                direction="row"
+                                spacing={2}
+                                sx={{
+                                  alignItems: "baseline",
+                                  justifyContent: "space-between",
+                                  mb: 0.75
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1.25,
+                                    minWidth: 0
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: "50%",
+                                      backgroundColor: categoryColor,
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                  <Typography variant="subtitle1" fontWeight={700} noWrap>
+                                    {category.categoryTitle}
+                                  </Typography>
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" textAlign="right">
+                                  {category.hours} hours ({category.percentage}%)
+                                </Typography>
+                              </Stack>
+                              <Box
+                                sx={{
+                                  height: 18,
+                                  borderRadius: 999,
+                                  backgroundColor: (theme) =>
+                                    alpha(
+                                      theme.palette.text.primary,
+                                      theme.palette.mode === "dark" ? 0.18 : 0.08
+                                    ),
+                                  overflow: "hidden"
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    height: "100%",
+                                    width: `${widthPercent}%`,
+                                    minWidth: category.hours > 0 ? 10 : 0,
+                                    borderRadius: 999,
+                                    backgroundColor: categoryColor
+                                  }}
+                                />
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  )}
                 </Box>
               )}
             </Stack>
