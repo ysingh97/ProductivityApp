@@ -92,8 +92,70 @@ const formatBucketName = (bucket) =>
 
 const getCategoryKey = (category) => category.categoryId || category.categoryTitle;
 
+const getPreviousRangeState = ({ periodMode, start, end }) => {
+  if (!start || !end) {
+    return null;
+  }
+
+  if (periodMode === "week") {
+    const previousStart = start.subtract(1, "week");
+    const previousEnd = end.subtract(1, "week");
+
+    return {
+      from: previousStart.format("YYYY-MM-DD"),
+      to: previousEnd.format("YYYY-MM-DD"),
+      label: formatRangeLabel(previousStart, previousEnd)
+    };
+  }
+
+  if (periodMode === "month") {
+    const previousAnchor = start.subtract(1, "month");
+    const previousStart = previousAnchor.startOf("month");
+    const previousEnd = previousAnchor.endOf("month");
+
+    return {
+      from: previousStart.format("YYYY-MM-DD"),
+      to: previousEnd.format("YYYY-MM-DD"),
+      label: previousAnchor.format("MMMM YYYY")
+    };
+  }
+
+  if (periodMode === "year") {
+    const previousAnchor = start.subtract(1, "year");
+    const previousStart = previousAnchor.startOf("year");
+    const previousEnd = previousAnchor.endOf("year");
+
+    return {
+      from: previousStart.format("YYYY-MM-DD"),
+      to: previousEnd.format("YYYY-MM-DD"),
+      label: previousAnchor.format("YYYY")
+    };
+  }
+
+  const spanDays = end.startOf("day").diff(start.startOf("day"), "day") + 1;
+  const previousStart = start.subtract(spanDays, "day");
+  const previousEnd = end.subtract(spanDays, "day");
+
+  return {
+    from: previousStart.format("YYYY-MM-DD"),
+    to: previousEnd.format("YYYY-MM-DD"),
+    label: formatRangeLabel(previousStart, previousEnd)
+  };
+};
+
+const formatSignedHours = (value) => {
+  const rounded = Math.round(value * 100) / 100;
+
+  if (rounded === 0) {
+    return "0h";
+  }
+
+  return `${rounded > 0 ? "+" : ""}${rounded}h`;
+};
+
 const Visualizations = () => {
   const [summary, setSummary] = useState(createEmptySummary);
+  const [previousSummary, setPreviousSummary] = useState(createEmptySummary);
   const [timeSeries, setTimeSeries] = useState(createEmptyTimeSeries);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -215,6 +277,16 @@ const Visualizations = () => {
     [allowedBuckets, autoBucket, granularity]
   );
 
+  const previousRangeState = useMemo(
+    () =>
+      getPreviousRangeState({
+        periodMode,
+        start: rangeState.start,
+        end: rangeState.end
+      }),
+    [periodMode, rangeState.end, rangeState.start]
+  );
+
   useEffect(() => {
     const periodModeChanged = previousPeriodModeRef.current !== periodMode;
     previousPeriodModeRef.current = periodMode;
@@ -234,6 +306,7 @@ const Visualizations = () => {
 
     if (rangeState.validationMessage) {
       setSummary(createEmptySummary());
+      setPreviousSummary(createEmptySummary());
       setError("");
       setLoading(false);
       return () => {
@@ -246,17 +319,27 @@ const Visualizations = () => {
       setLoading(true);
 
       try {
-        const analytics = await fetchTimeByCategory({
-          from: rangeState.from,
-          to: rangeState.to
-        });
+        const [analytics, previousAnalytics] = await Promise.all([
+          fetchTimeByCategory({
+            from: rangeState.from,
+            to: rangeState.to
+          }),
+          previousRangeState
+            ? fetchTimeByCategory({
+                from: previousRangeState.from,
+                to: previousRangeState.to
+              })
+            : Promise.resolve(createEmptySummary())
+        ]);
         if (isActive) {
           setSummary(analytics);
+          setPreviousSummary(previousAnalytics);
         }
       } catch (err) {
         console.error(err);
         if (isActive) {
           setError("Unable to load time analytics right now.");
+          setPreviousSummary(createEmptySummary());
         }
       } finally {
         if (isActive) {
@@ -269,7 +352,12 @@ const Visualizations = () => {
     return () => {
       isActive = false;
     };
-  }, [rangeState.from, rangeState.to, rangeState.validationMessage]);
+  }, [
+    previousRangeState,
+    rangeState.from,
+    rangeState.to,
+    rangeState.validationMessage
+  ]);
 
   useEffect(() => {
     let isActive = true;
@@ -321,6 +409,14 @@ const Visualizations = () => {
   const topCategory = useMemo(
     () => summary.categories[0] || null,
     [summary.categories]
+  );
+
+  const previousCategoriesByKey = useMemo(
+    () =>
+      new Map(
+        previousSummary.categories.map((category) => [getCategoryKey(category), category])
+      ),
+    [previousSummary.categories]
   );
 
   const statCards = useMemo(
@@ -444,6 +540,20 @@ const Visualizations = () => {
     [timeSeries.buckets]
   );
 
+  const totalHoursDelta = useMemo(
+    () => summary.totalHours - previousSummary.totalHours,
+    [previousSummary.totalHours, summary.totalHours]
+  );
+
+  const topCategoryDelta = useMemo(() => {
+    if (!topCategory) {
+      return null;
+    }
+
+    const previousCategory = previousCategoriesByKey.get(getCategoryKey(topCategory));
+    return topCategory.hours - (previousCategory?.hours || 0);
+  }, [previousCategoriesByKey, topCategory]);
+
   const peakTrendBucket = useMemo(() => {
     const nonEmptyBuckets = timeSeries.buckets.filter((bucket) => bucket.totalHours > 0);
 
@@ -463,8 +573,16 @@ const Visualizations = () => {
         value: rangeState.label
       },
       {
+        label: "Compared to",
+        value: previousRangeState ? previousRangeState.label : "N/A"
+      },
+      {
         label: "Trend bucket",
         value: formatBucketName(selectedBucket)
+      },
+      {
+        label: "Total change",
+        value: formatSignedHours(totalHoursDelta)
       },
       {
         label: "Peak period",
@@ -481,14 +599,24 @@ const Visualizations = () => {
         value: topCategory
           ? `${topCategory.categoryTitle} (${topCategory.percentage}%)`
           : "None yet"
+      },
+      {
+        label: "Lead category change",
+        value:
+          topCategory && topCategoryDelta !== null
+            ? `${topCategory.categoryTitle} ${formatSignedHours(topCategoryDelta)}`
+            : "None yet"
       }
     ],
     [
       peakTrendBucket,
+      previousRangeState,
       rangeState.label,
       selectedBucket,
       selectedTrendCategories.length,
       timeSeries.bucket,
+      topCategoryDelta,
+      totalHoursDelta,
       topCategory
     ]
   );
