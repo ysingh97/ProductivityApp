@@ -14,6 +14,7 @@ import {
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { BarChart } from "@mui/x-charts/BarChart";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { PieChart } from "@mui/x-charts/PieChart";
 import {
@@ -22,15 +23,17 @@ import {
 } from "../features/analytics/analyticsService";
 
 const chartColors = [
-  "#c24b2f",
-  "#4c6a5f",
-  "#b57f2a",
-  "#8b3d4c",
-  "#5d6f86",
-  "#6c5b7b",
-  "#a44a3f",
-  "#46736a"
+  "#cf5a32",
+  "#1f7a63",
+  "#c9911f",
+  "#b24c77",
+  "#2f6fb4",
+  "#6d56d6",
+  "#9a5a3a",
+  "#2d8a54"
 ];
+
+const totalTrendLineColor = "#1c2636";
 
 const createEmptySummary = () => ({ totalHours: 0, categories: [] });
 const createEmptyTimeSeries = () => ({ bucket: "day", buckets: [] });
@@ -164,6 +167,8 @@ const Visualizations = () => {
   const [periodMode, setPeriodMode] = useState("month");
   const [granularity, setGranularity] = useState("day");
   const [categoryChartType, setCategoryChartType] = useState("pie");
+  const [trendChartType, setTrendChartType] = useState("line");
+  const [showTotalTrendLine, setShowTotalTrendLine] = useState(true);
   const [selectedTrendCategories, setSelectedTrendCategories] = useState([]);
   const [activeDate, setActiveDate] = useState(() => dayjs());
   const [customRange, setCustomRange] = useState(() => ({
@@ -467,14 +472,24 @@ const Visualizations = () => {
     [summary.categories]
   );
 
+  const categoryColorByKey = useMemo(
+    () =>
+      new Map(
+        pieData.map((category) => [category.id, category.color])
+      ),
+    [pieData]
+  );
+
   const trendCategoryOptions = useMemo(
     () =>
       summary.categories.map((category, index) => ({
         key: getCategoryKey(category),
         categoryTitle: category.categoryTitle,
-        color: chartColors[index % chartColors.length]
+        color:
+          categoryColorByKey.get(getCategoryKey(category)) ||
+          chartColors[index % chartColors.length]
       })),
-    [summary.categories]
+    [categoryColorByKey, summary.categories]
   );
 
   const defaultTrendCategoryKeys = useMemo(
@@ -498,11 +513,11 @@ const Visualizations = () => {
     });
   }, [defaultTrendCategoryKeys, trendCategoryOptions]);
 
-  const lineChartSeries = useMemo(() => {
+  const selectedTrendCategorySeries = useMemo(() => {
     const categoriesByKey = new Map(
       trendCategoryOptions.map((category) => [category.key, category])
     );
-    const categorySeries = selectedTrendCategories
+    return selectedTrendCategories
       .map((categoryKey) => categoriesByKey.get(categoryKey))
       .filter(Boolean)
       .map((category) => ({
@@ -518,27 +533,62 @@ const Visualizations = () => {
         color: category.color,
         curve: "linear"
       }));
-
-    return [
-      {
-        id: "total-hours",
-        label: "Total hours",
-        data: lineChartValues,
-        color: "#1c2636",
-        curve: "linear"
-      },
-      ...categorySeries
-    ];
   }, [
-    lineChartValues,
     selectedTrendCategories,
     timeSeries.buckets,
     trendCategoryOptions
   ]);
 
+  const lineChartSeries = useMemo(() => {
+    const totalSeries = showTotalTrendLine
+      ? [
+          {
+            id: "total-hours",
+            label: "Total hours",
+            data: lineChartValues,
+            color: totalTrendLineColor,
+            curve: "linear"
+          }
+        ]
+      : [];
+
+    return [
+      ...totalSeries,
+      ...selectedTrendCategorySeries
+    ];
+  }, [
+    lineChartValues,
+    showTotalTrendLine,
+    selectedTrendCategorySeries
+  ]);
+
+  const stackedTrendSeries = useMemo(
+    () =>
+      selectedTrendCategorySeries.map((series) => ({
+        ...series,
+        type: "bar",
+        stack: "total",
+        curve: undefined
+      })),
+    [selectedTrendCategorySeries]
+  );
+
   const hasTrendData = useMemo(
     () => timeSeries.buckets.some((bucket) => bucket.totalHours > 0),
     [timeSeries.buckets]
+  );
+
+  const hasVisibleTrendSeries = useMemo(() => {
+    if (trendChartType === "stacked") {
+      return stackedTrendSeries.length > 0;
+    }
+
+    return lineChartSeries.length > 0;
+  }, [lineChartSeries.length, stackedTrendSeries.length, trendChartType]);
+
+  const visibleTrendSeriesCount = useMemo(
+    () => selectedTrendCategories.length + (showTotalTrendLine && trendChartType === "line" ? 1 : 0),
+    [selectedTrendCategories.length, showTotalTrendLine, trendChartType]
   );
 
   const totalHoursDelta = useMemo(
@@ -593,7 +643,7 @@ const Visualizations = () => {
       },
       {
         label: "Visible lines",
-        value: `${selectedTrendCategories.length + 1} total`
+        value: `${visibleTrendSeriesCount} total`
       },
       {
         label: "Lead category",
@@ -614,7 +664,7 @@ const Visualizations = () => {
       previousRangeState,
       rangeState.label,
       selectedBucket,
-      selectedTrendCategories.length,
+      visibleTrendSeriesCount,
       timeSeries.bucket,
       topCategoryDelta,
       totalHoursDelta,
@@ -638,6 +688,16 @@ const Visualizations = () => {
     if (nextValue) {
       setCategoryChartType(nextValue);
     }
+  };
+
+  const handleTrendChartTypeChange = (_event, nextValue) => {
+    if (nextValue) {
+      setTrendChartType(nextValue);
+    }
+  };
+
+  const handleTotalTrendLineToggle = () => {
+    setShowTotalTrendLine((prev) => !prev);
   };
 
   const handleTrendCategoryToggle = (categoryKey) => {
@@ -1111,15 +1171,32 @@ const Visualizations = () => {
 
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
           <Stack spacing={2.5}>
-            <Box>
-              <Typography variant="h6" fontWeight={700}>
-                Time trend
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total hours across the selected range. Current granularity is{" "}
-                {selectedBucket}. Toggle category lines from the chart sidebar.
-              </Typography>
-            </Box>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  Time trend
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {trendChartType === "line"
+                    ? `Total hours across the selected range. Current granularity is ${selectedBucket}. Toggle category lines from the chart sidebar.`
+                    : `Category contributions across the selected range, stacked by period. Current granularity is ${selectedBucket}.`}
+                </Typography>
+              </Box>
+
+              <ToggleButtonGroup
+                value={trendChartType}
+                exclusive
+                onChange={handleTrendChartTypeChange}
+                size="small"
+              >
+                <ToggleButton value="line">Lines</ToggleButton>
+                <ToggleButton value="stacked">Stacked</ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
 
             {timeSeriesLoading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -1145,6 +1222,24 @@ const Visualizations = () => {
                   The line chart will appear once tasks in this range have tracked `timeSpent`.
                 </Typography>
               </Box>
+            ) : !hasVisibleTrendSeries ? (
+              <Box
+                sx={{
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                  p: 3,
+                  backgroundColor: (theme) =>
+                    alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.1 : 0.05)
+                }}
+              >
+                <Typography variant="body1" fontWeight={600}>
+                  No visible trend series selected.
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                  Turn `Total hours` back on or select at least one category from the sidebar.
+                </Typography>
+              </Box>
             ) : (
               <Box
                 sx={{
@@ -1155,24 +1250,45 @@ const Visualizations = () => {
                 }}
               >
                 <Box sx={{ minWidth: 0 }}>
-                  <LineChart
-                    height={320}
-                    margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
-                    xAxis={[
-                      {
-                        scaleType: "point",
-                        data: lineChartLabels
-                      }
-                    ]}
-                    series={lineChartSeries}
-                    yAxis={[
-                      {
-                        label: "Hours"
-                      }
-                    ]}
-                    grid={{ horizontal: true }}
-                    slotProps={{ legend: { hidden: true } }}
-                  />
+                  {trendChartType === "line" ? (
+                    <LineChart
+                      height={320}
+                      margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                      xAxis={[
+                        {
+                          scaleType: "point",
+                          data: lineChartLabels
+                        }
+                      ]}
+                      series={lineChartSeries}
+                      yAxis={[
+                        {
+                          label: "Hours"
+                        }
+                      ]}
+                      grid={{ horizontal: true }}
+                      slotProps={{ legend: { hidden: true } }}
+                    />
+                  ) : (
+                    <BarChart
+                      height={320}
+                      margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                      xAxis={[
+                        {
+                          scaleType: "band",
+                          data: lineChartLabels
+                        }
+                      ]}
+                      yAxis={[
+                        {
+                          label: "Hours"
+                        }
+                      ]}
+                      series={stackedTrendSeries}
+                      grid={{ horizontal: true }}
+                      slotProps={{ legend: { hidden: true } }}
+                    />
+                  )}
                 </Box>
 
                 <Box
@@ -1188,37 +1304,32 @@ const Visualizations = () => {
                   <Stack spacing={1.5}>
                     <Box>
                       <Typography variant="subtitle2" fontWeight={700}>
-                        Category lines
+                        {trendChartType === "line" ? "Category lines" : "Stacked categories"}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Add or remove category lines without leaving the chart. Top categories are
-                        preselected for each range.
+                        {trendChartType === "line"
+                          ? "Add or remove category lines without leaving the chart. Top categories are preselected for each range."
+                          : "Choose which categories appear in the stacked view. Top categories are preselected for each range."}
                       </Typography>
                     </Box>
 
-                    <Stack
-                      direction="row"
-                      spacing={1.25}
-                      sx={{ alignItems: "center", justifyContent: "space-between" }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-                        <Box
-                          sx={{
-                            width: 18,
-                            height: 3,
-                            borderRadius: 999,
-                            backgroundColor: "#1c2636",
-                            flexShrink: 0
-                          }}
-                        />
-                        <Typography variant="body2" fontWeight={700}>
-                          Total hours
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Always on
-                      </Typography>
-                    </Stack>
+                    {trendChartType === "line" && (
+                      <Chip
+                        label="Total hours"
+                        onClick={handleTotalTrendLineToggle}
+                        variant={showTotalTrendLine ? "filled" : "outlined"}
+                        sx={{
+                          justifyContent: "flex-start",
+                          borderColor: totalTrendLineColor,
+                          color: showTotalTrendLine ? "#fff" : totalTrendLineColor,
+                          backgroundColor: showTotalTrendLine ? totalTrendLineColor : "transparent",
+                          "& .MuiChip-label": {
+                            width: "100%",
+                            textAlign: "left"
+                          }
+                        }}
+                      />
+                    )}
 
                     {trendCategoryOptions.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">
