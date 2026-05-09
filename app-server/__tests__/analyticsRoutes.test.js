@@ -4,8 +4,10 @@ const request = require('supertest');
 const createApp = require('../app');
 const Category = require('../models/category');
 const Task = require('../models/task');
+const TimeEntry = require('../models/timeEntry');
 const User = require('../models/user');
 const { seedMockCategories } = require('../test-data/mockCategories');
+const { seedMockTimeEntries } = require('../test-data/mockTimeEntries');
 const { seedMockTasks } = require('../test-data/mockTasks');
 
 jest.setTimeout(60000);
@@ -23,6 +25,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await TimeEntry.deleteMany({});
   await Task.deleteMany({});
   await Category.deleteMany({});
   await User.deleteMany({});
@@ -222,7 +225,7 @@ test('time-by-category rejects reversed date ranges', async () => {
 });
 
 test('time-series returns zero-filled daily buckets for the selected range', async () => {
-  await seedMockTasks('basic');
+  await seedMockTimeEntries('basic');
 
   await request(app)
     .get('/api/analytics/time-series?from=2026-01-08&to=2026-01-12&bucket=day')
@@ -236,45 +239,60 @@ test('time-series returns zero-filled daily buckets for the selected range', asy
         buckets: [
           {
             periodStart: '2026-01-08',
-            totalHours: 6,
+            totalHours: 4.42,
             categories: [
               {
                 categoryId: expect.any(String),
                 categoryTitle: 'Work',
-                hours: 6
+                hours: 2.58
+              },
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Learning',
+                hours: 1.83
               }
             ]
           },
           {
             periodStart: '2026-01-09',
-            totalHours: 5,
+            totalHours: 4.5,
             categories: [
               {
                 categoryId: expect.any(String),
+                categoryTitle: 'Work',
+                hours: 2.75
+              },
+              {
+                categoryId: expect.any(String),
                 categoryTitle: 'Health',
-                hours: 5
+                hours: 1.75
               }
             ]
           },
           {
             periodStart: '2026-01-10',
-            totalHours: 4,
+            totalHours: 7.92,
             categories: [
               {
                 categoryId: expect.any(String),
                 categoryTitle: 'Work',
-                hours: 4
+                hours: 4.67
+              },
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Health',
+                hours: 3.25
               }
             ]
           },
           {
             periodStart: '2026-01-11',
-            totalHours: 5,
+            totalHours: 3.17,
             categories: [
               {
                 categoryId: expect.any(String),
                 categoryTitle: 'Learning',
-                hours: 5
+                hours: 3.17
               }
             ]
           },
@@ -289,7 +307,7 @@ test('time-series returns zero-filled daily buckets for the selected range', asy
 });
 
 test('time-series supports weekly bucketing', async () => {
-  await seedMockTasks('power');
+  await seedMockTimeEntries('power');
 
   await request(app)
     .get('/api/analytics/time-series?from=2026-02-08&to=2026-03-15&bucket=week')
@@ -313,7 +331,7 @@ test('time-series supports weekly bucketing', async () => {
 });
 
 test('time-series supports monthly bucketing', async () => {
-  await seedMockTasks('power');
+  await seedMockTimeEntries('power');
 
   await request(app)
     .get('/api/analytics/time-series?from=2026-02-01&to=2026-03-31&bucket=month')
@@ -349,7 +367,7 @@ test('time-series supports monthly bucketing', async () => {
 });
 
 test('time-series can filter returned category series while preserving bucket totals', async () => {
-  const { categories } = await seedMockTasks('basic');
+  const { categories } = await seedMockTimeEntries('basic');
   const workCategoryId = categories.find(
     (category) => category.title === 'Work'
   )._id.toString();
@@ -366,34 +384,40 @@ test('time-series can filter returned category series while preserving bucket to
         buckets: [
           {
             periodStart: '2026-01-08',
-            totalHours: 6,
+            totalHours: 4.42,
             categories: [
               {
                 categoryId: workCategoryId,
                 categoryTitle: 'Work',
-                hours: 6
+                hours: 2.58
               }
             ]
           },
           {
             periodStart: '2026-01-09',
-            totalHours: 5,
-            categories: []
-          },
-          {
-            periodStart: '2026-01-10',
-            totalHours: 4,
+            totalHours: 4.5,
             categories: [
               {
                 categoryId: workCategoryId,
                 categoryTitle: 'Work',
-                hours: 4
+                hours: 2.75
+              }
+            ]
+          },
+          {
+            periodStart: '2026-01-10',
+            totalHours: 7.92,
+            categories: [
+              {
+                categoryId: workCategoryId,
+                categoryTitle: 'Work',
+                hours: 4.67
               }
             ]
           },
           {
             periodStart: '2026-01-11',
-            totalHours: 5,
+            totalHours: 3.17,
             categories: []
           },
           {
@@ -407,7 +431,7 @@ test('time-series can filter returned category series while preserving bucket to
 });
 
 test('time-series supports uncategorized category filtering', async () => {
-  await seedMockTasks('edge');
+  await seedMockTimeEntries('edge');
 
   await request(app)
     .get('/api/analytics/time-series?from=2026-03-08&to=2026-03-08&bucket=day&categoryIds=uncategorized')
@@ -430,6 +454,89 @@ test('time-series supports uncategorized category filtering', async () => {
           ]
         }
       ]
+    });
+});
+
+test('time-series splits overnight time entries across daily buckets', async () => {
+  await seedMockTimeEntries('edge');
+
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-12-31&to=2027-01-01&bucket=day')
+    .set('Authorization', 'Bearer test:edge')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        bucket: 'day',
+        from: '2026-12-31',
+        to: '2027-01-01',
+        buckets: [
+          {
+            periodStart: '2026-12-31',
+            totalHours: 0.5,
+            categories: [
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Learning',
+                hours: 0.5
+              }
+            ]
+          },
+          {
+            periodStart: '2027-01-01',
+            totalHours: 2.75,
+            categories: [
+              {
+                categoryId: expect.any(String),
+                categoryTitle: 'Learning',
+                hours: 2.75
+              }
+            ]
+          }
+        ]
+      });
+    });
+});
+
+test('time-series returns no data when no time entries exist in the selected range', async () => {
+  await seedMockTasks('basic');
+
+  await request(app)
+    .get('/api/analytics/time-series?from=2026-01-08&to=2026-01-12&bucket=day')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        bucket: 'day',
+        from: '2026-01-08',
+        to: '2026-01-12',
+        buckets: [
+          {
+            periodStart: '2026-01-08',
+            totalHours: 0,
+            categories: []
+          },
+          {
+            periodStart: '2026-01-09',
+            totalHours: 0,
+            categories: []
+          },
+          {
+            periodStart: '2026-01-10',
+            totalHours: 0,
+            categories: []
+          },
+          {
+            periodStart: '2026-01-11',
+            totalHours: 0,
+            categories: []
+          },
+          {
+            periodStart: '2026-01-12',
+            totalHours: 0,
+            categories: []
+          }
+        ]
+      });
     });
 });
 

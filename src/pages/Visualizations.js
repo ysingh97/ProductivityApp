@@ -1216,10 +1216,10 @@ const Visualizations = () => {
                 }}
               >
                 <Typography variant="body1" fontWeight={600}>
-                  No tracked trend data in this range.
+                  No time entry data is available for this range.
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                  The line chart will appear once tasks in this range have tracked `timeSpent`.
+                  The trend chart will appear once this date range includes recorded time entries.
                 </Typography>
               </Box>
             ) : !hasVisibleTrendSeries ? (

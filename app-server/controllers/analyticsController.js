@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Task = require('../models/task');
+const TimeEntry = require('../models/timeEntry');
 
 const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
 const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -143,6 +144,136 @@ const buildTaskMatch = ({ userId, fromDate, toDate }) => {
   return match;
 };
 
+const buildTimeEntryMatch = ({ userId, fromDate, toDate }) => ({
+  userId,
+  startedAt: {
+    $lt: addUtcDays(toDate, 1)
+  },
+  endedAt: {
+    $gt: fromDate
+  }
+});
+
+const buildBucketsFromMap = ({ bucketMap, fromDate, toDate, bucket }) => {
+  const buckets = [];
+  let cursor = getBucketStart(fromDate, bucket);
+  const lastBucket = getBucketStart(toDate, bucket);
+
+  while (cursor <= lastBucket) {
+    const key = formatDateOnly(cursor);
+    const bucketData = bucketMap.get(key);
+    const categories = bucketData
+      ? Array.from(bucketData.categories.values())
+          .filter((category) => category.hours > 0)
+          .sort((a, b) =>
+            b.hours - a.hours ||
+            a.categoryTitle.localeCompare(b.categoryTitle, undefined, { sensitivity: 'base' })
+          )
+          .map((category) => ({
+            categoryId: category.categoryId,
+            categoryTitle: category.categoryTitle,
+            hours: roundToTwoDecimals(category.hours)
+          }))
+      : [];
+
+    buckets.push({
+      periodStart: key,
+      totalHours: roundToTwoDecimals(bucketData ? bucketData.totalHours : 0),
+      categories
+    });
+
+    cursor = addBucket(cursor, bucket);
+  }
+
+  return buckets;
+};
+
+const buildTimeEntryBackedTimeSeries = async ({
+  userId,
+  fromDate,
+  toDate,
+  bucket,
+  categoryFilter
+}) => {
+  const timeEntries = await TimeEntry.find(
+    buildTimeEntryMatch({
+      userId,
+      fromDate,
+      toDate
+    })
+  )
+    .select('startedAt endedAt category')
+    .populate('category', 'title')
+    .lean();
+
+  const bucketMap = new Map();
+  const rangeStart = fromDate;
+  const rangeEndExclusive = addUtcDays(toDate, 1);
+
+  timeEntries.forEach((entry) => {
+    const entryStart = new Date(entry.startedAt);
+    const entryEnd = new Date(entry.endedAt);
+    const effectiveStart = entryStart > rangeStart ? entryStart : rangeStart;
+    const effectiveEnd = entryEnd < rangeEndExclusive ? entryEnd : rangeEndExclusive;
+
+    if (effectiveEnd <= effectiveStart) {
+      return;
+    }
+
+    const categoryTitle = entry.category?.title || 'Uncategorized';
+    const categoryId = entry.category?._id ? String(entry.category._id) : null;
+    const shouldIncludeCategory = !categoryFilter || (
+      categoryId
+        ? categoryFilter.categoryIds.has(categoryId)
+        : categoryFilter.includeUncategorized
+    );
+
+    let bucketCursor = getBucketStart(effectiveStart, bucket);
+
+    while (bucketCursor < effectiveEnd) {
+      const bucketStart = bucketCursor;
+      const bucketEnd = addBucket(bucketStart, bucket);
+      const overlapStart = effectiveStart > bucketStart ? effectiveStart : bucketStart;
+      const overlapEnd = effectiveEnd < bucketEnd ? effectiveEnd : bucketEnd;
+      const overlapMinutes = (overlapEnd - overlapStart) / 60000;
+
+      if (overlapMinutes > 0) {
+        const key = formatDateOnly(bucketStart);
+        const existing = bucketMap.get(key) || {
+          periodStart: key,
+          totalHours: 0,
+          categories: new Map()
+        };
+        const overlapHours = overlapMinutes / 60;
+
+        existing.totalHours += overlapHours;
+
+        if (shouldIncludeCategory) {
+          const categoryExisting = existing.categories.get(categoryTitle) || {
+            categoryId,
+            categoryTitle,
+            hours: 0
+          };
+
+          categoryExisting.hours += overlapHours;
+          existing.categories.set(categoryTitle, categoryExisting);
+        }
+
+        bucketMap.set(key, existing);
+      }
+
+      bucketCursor = bucketEnd;
+    }
+  });
+
+  return buildBucketsFromMap({
+    bucketMap,
+    fromDate,
+    toDate,
+    bucket
+  });
+};
+
 const getTimeByCategory = async (req, res) => {
   try {
     const fromDate = parseDateOnlyParam(req.query.from, 'from');
@@ -259,83 +390,13 @@ const getTimeSeries = async (req, res) => {
       });
     }
 
-    const tasks = await Task.find(
-      buildTaskMatch({
-        userId: req.user.id,
-        fromDate,
-        toDate
-      })
-    )
-      .select('timeSpent targetCompletionDate category')
-      .populate('category', 'title')
-      .lean();
-
-    const bucketMap = new Map();
-
-    tasks.forEach((task) => {
-      const bucketStart = getBucketStart(new Date(task.targetCompletionDate), bucket);
-      const key = formatDateOnly(bucketStart);
-      const existing = bucketMap.get(key) || {
-        periodStart: key,
-        totalHours: 0,
-        categories: new Map()
-      };
-
-      existing.totalHours += task.timeSpent || 0;
-
-      const categoryTitle = task.category?.title || 'Uncategorized';
-      const categoryId = task.category?._id ? String(task.category._id) : null;
-      const shouldIncludeCategory = !categoryFilter || (
-        categoryId
-          ? categoryFilter.categoryIds.has(categoryId)
-          : categoryFilter.includeUncategorized
-      );
-
-      if (!shouldIncludeCategory) {
-        bucketMap.set(key, existing);
-        return;
-      }
-
-      const categoryExisting = existing.categories.get(categoryTitle) || {
-        categoryId,
-        categoryTitle,
-        hours: 0
-      };
-
-      categoryExisting.hours += task.timeSpent || 0;
-      existing.categories.set(categoryTitle, categoryExisting);
-      bucketMap.set(key, existing);
+    const buckets = await buildTimeEntryBackedTimeSeries({
+      userId: req.user.id,
+      fromDate,
+      toDate,
+      bucket,
+      categoryFilter
     });
-
-    const buckets = [];
-    let cursor = getBucketStart(fromDate, bucket);
-    const lastBucket = getBucketStart(toDate, bucket);
-
-    while (cursor <= lastBucket) {
-      const key = formatDateOnly(cursor);
-      const bucketData = bucketMap.get(key);
-      const categories = bucketData
-        ? Array.from(bucketData.categories.values())
-            .filter((category) => category.hours > 0)
-            .sort((a, b) =>
-              b.hours - a.hours ||
-              a.categoryTitle.localeCompare(b.categoryTitle, undefined, { sensitivity: 'base' })
-            )
-            .map((category) => ({
-              categoryId: category.categoryId,
-              categoryTitle: category.categoryTitle,
-              hours: roundToTwoDecimals(category.hours)
-            }))
-        : [];
-
-      buckets.push({
-        periodStart: key,
-        totalHours: roundToTwoDecimals(bucketData ? bucketData.totalHours : 0),
-        categories
-      });
-
-      cursor = addBucket(cursor, bucket);
-    }
 
     res.status(200).json({
       bucket,
