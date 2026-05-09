@@ -5,6 +5,7 @@ const connectDB = require('../config/db');
 const User = require('../models/user');
 const Task = require('../models/task');
 const Category = require('../models/category');
+const TimeEntry = require('../models/timeEntry');
 
 const envFile = process.env.NODE_ENV === 'production'
   ? '.env.production'
@@ -173,13 +174,24 @@ const seedUser = async (email) => {
     categoriesByTitle.set(title, category);
   }
 
+  const existingSeedTasks = await Task.find({
+    userId: user._id,
+    description: seedMarker
+  }, { _id: 1 }).lean();
+
+  if (existingSeedTasks.length > 0) {
+    await TimeEntry.deleteMany({
+      taskId: { $in: existingSeedTasks.map((task) => task._id) }
+    });
+  }
+
   await Task.deleteMany({
     userId: user._id,
     description: seedMarker
   });
 
   const seedTasks = buildSeedTasks();
-  await Task.insertMany(
+  const insertedTasks = await Task.insertMany(
     seedTasks.map((task) => ({
       title: task.title,
       description: seedMarker,
@@ -194,7 +206,26 @@ const seedUser = async (email) => {
     }))
   );
 
-  console.log(`Seeded ${seedTasks.length} historical visualization tasks for ${normalizedEmail}.`);
+  await TimeEntry.insertMany(
+    insertedTasks.map((task) => {
+      const durationMinutes = Math.round(task.timeSpent * 60);
+      const endedAt = new Date(task.targetCompletionDate);
+      const startedAt = new Date(endedAt.getTime() - durationMinutes * 60000);
+
+      return {
+        userId: user._id,
+        taskId: task._id,
+        category: task.category || null,
+        startedAt,
+        endedAt,
+        durationMinutes,
+        createdAt: startedAt
+      };
+    })
+  );
+
+  console.log(`Seeded ${insertedTasks.length} historical visualization tasks for ${normalizedEmail}.`);
+  console.log(`Seeded ${insertedTasks.length} matching time entries for ${normalizedEmail}.`);
   console.log('Categories used: Work, Health, Learning, Admin, Creative, Relationships, Uncategorized');
   console.log('Range covered: roughly the last 14 weeks, including the current week.');
 };
