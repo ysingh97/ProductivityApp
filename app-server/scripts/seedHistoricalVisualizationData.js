@@ -32,8 +32,8 @@ const startOfUtcWeek = (date) => {
   return addUtcDays(start, -start.getUTCDay());
 };
 
-const withSeedHour = (date) =>
-  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 18, 0, 0));
+const withSeedTime = (date, hour) =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour, 0, 0));
 
 const parseArgs = () => {
   const args = process.argv.slice(2);
@@ -68,19 +68,22 @@ const buildSeedTasks = () => {
 
   for (let weekIndex = 0; weekIndex < 14; weekIndex += 1) {
     const weekStart = addUtcDays(currentWeekStart, -7 * weekIndex);
+    const focusDay = addUtcDays(weekStart, 1);
+    const adminHealthDay = addUtcDays(weekStart, 3);
+    const creativeRelationshipDay = addUtcDays(weekStart, 5);
 
     tasks.push({
       title: `[viz-seed] Deep work block W${weekIndex + 1}`,
       categoryTitle: 'Work',
       timeSpent: workPattern[weekIndex % workPattern.length],
-      targetCompletionDate: withSeedHour(addUtcDays(weekStart, 1))
+      targetCompletionDate: withSeedTime(focusDay, 17)
     });
 
     tasks.push({
       title: `[viz-seed] Learning session W${weekIndex + 1}`,
       categoryTitle: 'Learning',
       timeSpent: learningPattern[weekIndex % learningPattern.length],
-      targetCompletionDate: withSeedHour(addUtcDays(weekStart, 4))
+      targetCompletionDate: withSeedTime(focusDay, 20)
     });
 
     if (weekIndex % 2 === 0) {
@@ -88,7 +91,7 @@ const buildSeedTasks = () => {
         title: `[viz-seed] Health session W${weekIndex + 1}`,
         categoryTitle: 'Health',
         timeSpent: healthPattern[weekIndex % healthPattern.length],
-        targetCompletionDate: withSeedHour(addUtcDays(weekStart, 3))
+        targetCompletionDate: withSeedTime(adminHealthDay, 17)
       });
     }
 
@@ -97,7 +100,7 @@ const buildSeedTasks = () => {
         title: `[viz-seed] Admin catch-up W${weekIndex + 1}`,
         categoryTitle: 'Admin',
         timeSpent: adminPattern[weekIndex % adminPattern.length],
-        targetCompletionDate: withSeedHour(addUtcDays(weekStart, 5))
+        targetCompletionDate: withSeedTime(adminHealthDay, 20)
       });
     }
 
@@ -106,7 +109,7 @@ const buildSeedTasks = () => {
         title: `[viz-seed] Creative sprint W${weekIndex + 1}`,
         categoryTitle: 'Creative',
         timeSpent: creativePattern[weekIndex % creativePattern.length],
-        targetCompletionDate: withSeedHour(addUtcDays(weekStart, 6))
+        targetCompletionDate: withSeedTime(creativeRelationshipDay, 16)
       });
     }
 
@@ -115,7 +118,7 @@ const buildSeedTasks = () => {
         title: `[viz-seed] Relationship check-in W${weekIndex + 1}`,
         categoryTitle: 'Relationships',
         timeSpent: relationshipPattern[weekIndex % relationshipPattern.length],
-        targetCompletionDate: withSeedHour(addUtcDays(weekStart, 2))
+        targetCompletionDate: withSeedTime(creativeRelationshipDay, 19)
       });
     }
 
@@ -124,7 +127,7 @@ const buildSeedTasks = () => {
         title: `[viz-seed] Legacy uncategorized task W${weekIndex + 1}`,
         categoryTitle: null,
         timeSpent: 1.25,
-        targetCompletionDate: withSeedHour(weekStart)
+        targetCompletionDate: withSeedTime(focusDay, 13)
       });
     }
   }
