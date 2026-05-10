@@ -58,7 +58,7 @@ test('analytics routes are reachable with test authentication', async () => {
 });
 
 test('time-by-category returns category totals and percentages for the authenticated user', async () => {
-  await seedMockTasks('basic');
+  await seedMockTimeEntries('basic');
 
   await request(app)
     .get('/api/analytics/time-by-category')
@@ -88,9 +88,9 @@ test('time-by-category returns category totals and percentages for the authentic
     });
 });
 
-test('time-by-category returns empty totals when the authenticated user has no tasks', async () => {
-  await seedMockTasks('basic');
-  await seedMockTasks('empty');
+test('time-by-category returns empty totals when the authenticated user has no time entries', async () => {
+  await seedMockTimeEntries('basic');
+  await seedMockTimeEntries('empty');
 
   await request(app)
     .get('/api/analytics/time-by-category')
@@ -102,29 +102,24 @@ test('time-by-category returns empty totals when the authenticated user has no t
     });
 });
 
-test('time-by-category excludes categories whose summed task time is zero', async () => {
+test('time-by-category excludes categories whose summed time-entry hours are zero', async () => {
   const { user, categories } = await seedMockCategories('basic');
+  const zeroTime = new Date('2026-01-08T18:00:00.000Z');
 
-  await Task.create({
-    title: 'Zero hour work task',
-    description: 'Regression test fixture',
-    estimatedCompletionTime: 3,
-    timeLeft: 3,
-    timeSpent: 0,
+  await TimeEntry.create({
     userId: user._id,
     category: categories[0]._id,
-    targetCompletionDate: new Date('2026-01-08T18:00:00.000Z')
+    startedAt: zeroTime,
+    endedAt: zeroTime,
+    durationMinutes: 0
   });
 
-  await Task.create({
-    title: 'Zero hour uncategorized task',
-    description: 'Regression test fixture',
-    estimatedCompletionTime: 1,
-    timeLeft: 1,
-    timeSpent: 0,
+  await TimeEntry.create({
     userId: user._id,
     category: null,
-    targetCompletionDate: new Date('2026-01-09T18:00:00.000Z')
+    startedAt: zeroTime,
+    endedAt: zeroTime,
+    durationMinutes: 0
   });
 
   await request(app)
@@ -138,7 +133,7 @@ test('time-by-category excludes categories whose summed task time is zero', asyn
 });
 
 test('time-by-category includes uncategorized task time', async () => {
-  await seedMockTasks('edge');
+  await seedMockTimeEntries('edge');
 
   await request(app)
     .get('/api/analytics/time-by-category')
@@ -166,7 +161,7 @@ test('time-by-category includes uncategorized task time', async () => {
 });
 
 test('time-by-category supports inclusive date range filtering', async () => {
-  await seedMockTasks('basic');
+  await seedMockTimeEntries('basic');
 
   await request(app)
     .get('/api/analytics/time-by-category?from=2026-01-08&to=2026-01-10')
@@ -174,17 +169,22 @@ test('time-by-category supports inclusive date range filtering', async () => {
     .expect(200)
     .expect(({ body }) => {
       expect(body).toEqual({
-        totalHours: 15,
+        totalHours: 16.83,
         categories: [
           expect.objectContaining({
             categoryTitle: 'Work',
             hours: 10,
-            percentage: 66.67
+            percentage: 59.41
           }),
           expect.objectContaining({
             categoryTitle: 'Health',
             hours: 5,
-            percentage: 33.33
+            percentage: 29.7
+          }),
+          expect.objectContaining({
+            categoryTitle: 'Learning',
+            hours: 1.83,
+            percentage: 10.89
           })
         ]
       });
@@ -192,10 +192,45 @@ test('time-by-category supports inclusive date range filtering', async () => {
 });
 
 test('time-by-category returns empty totals for a valid date range with no matching tasks', async () => {
-  await seedMockTasks('basic');
+  await seedMockTimeEntries('basic');
 
   await request(app)
     .get('/api/analytics/time-by-category?from=2026-01-12&to=2026-01-13')
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect({
+      totalHours: 0,
+      categories: []
+    });
+});
+
+test('time-by-category counts only the overlapping portion of cross-boundary time entries', async () => {
+  await seedMockTimeEntries('edge');
+
+  await request(app)
+    .get('/api/analytics/time-by-category?from=2027-01-01&to=2027-01-01')
+    .set('Authorization', 'Bearer test:edge')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toEqual({
+        totalHours: 2.75,
+        categories: [
+          {
+            categoryId: expect.any(String),
+            categoryTitle: 'Learning',
+            hours: 2.75,
+            percentage: 100
+          }
+        ]
+      });
+    });
+});
+
+test('time-by-category returns no data when only task totals exist', async () => {
+  await seedMockTasks('basic');
+
+  await request(app)
+    .get('/api/analytics/time-by-category')
     .set('Authorization', 'Bearer test:basic')
     .expect(200)
     .expect({

@@ -430,19 +430,19 @@ const Visualizations = () => {
       {
         title: "Tracked hours",
         value: `${summary.totalHours}`,
-        caption: "Total time pulled from current task totals."
+        caption: "Total time pulled from recorded time entries."
       },
       {
         title: "Top category",
         value: topCategory ? topCategory.categoryTitle : "None yet",
         caption: topCategory
           ? `${topCategory.hours} hours (${topCategory.percentage}%)`
-          : "Add tracked task time to see a leader."
+          : "Add recorded time entries to see a leader."
       },
       {
         title: "Categories",
         value: `${summary.categories.length}`,
-        caption: "Distinct categories contributing to tracked time."
+        caption: "Distinct categories contributing to recorded time."
       }
     ],
     [summary.categories.length, summary.totalHours, topCategory]
@@ -938,11 +938,11 @@ const Visualizations = () => {
                   }}
                 >
                   <Typography variant="body1" fontWeight={600}>
-                    No tracked time in this range.
+                    No time entry data is available for this range.
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                    Try a different period or add tracked `timeSpent` to tasks that fall within
-                    these dates.
+                    Try a different period or add recorded time entries that fall within these
+                    dates.
                   </Typography>
                 </Box>
               ) : (

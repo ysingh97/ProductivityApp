@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const Task = require('../models/task');
 const TimeEntry = require('../models/timeEntry');
 
 const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
@@ -124,35 +123,42 @@ const parseCategoryIdsParam = (value) => {
   };
 };
 
-const buildTaskMatch = ({ userId, fromDate, toDate }) => {
-  const match = {
-    userId
-  };
+const buildTimeEntryMatch = ({ userId, fromDate, toDate }) => {
+  const match = { userId };
 
-  if (fromDate || toDate) {
-    match.targetCompletionDate = {};
+  if (toDate) {
+    match.startedAt = {
+      $lt: addUtcDays(toDate, 1)
+    };
+  }
 
-    if (fromDate) {
-      match.targetCompletionDate.$gte = fromDate;
-    }
-
-    if (toDate) {
-      match.targetCompletionDate.$lt = addUtcDays(toDate, 1);
-    }
+  if (fromDate) {
+    match.endedAt = {
+      $gt: fromDate
+    };
   }
 
   return match;
 };
 
-const buildTimeEntryMatch = ({ userId, fromDate, toDate }) => ({
-  userId,
-  startedAt: {
-    $lt: addUtcDays(toDate, 1)
-  },
-  endedAt: {
-    $gt: fromDate
+const getTimeEntryOverlapHours = ({ entry, fromDate, toDate }) => {
+  if (!fromDate && !toDate) {
+    return entry.durationMinutes / 60;
   }
-});
+
+  const entryStart = new Date(entry.startedAt);
+  const entryEnd = new Date(entry.endedAt);
+  const rangeStart = fromDate || entryStart;
+  const rangeEndExclusive = toDate ? addUtcDays(toDate, 1) : entryEnd;
+  const effectiveStart = entryStart > rangeStart ? entryStart : rangeStart;
+  const effectiveEnd = entryEnd < rangeEndExclusive ? entryEnd : rangeEndExclusive;
+
+  if (effectiveEnd <= effectiveStart) {
+    return 0;
+  }
+
+  return (effectiveEnd - effectiveStart) / 3600000;
+};
 
 const buildBucketsFromMap = ({ bucketMap, fromDate, toDate, bucket }) => {
   const buckets = [];
@@ -285,67 +291,54 @@ const getTimeByCategory = async (req, res) => {
       });
     }
 
-    const match = buildTaskMatch({
-      userId: req.user.id,
-      fromDate,
-      toDate
+    const timeEntries = await TimeEntry.find(
+      buildTimeEntryMatch({
+        userId: req.user.id,
+        fromDate,
+        toDate
+      })
+    )
+      .select('startedAt endedAt durationMinutes category')
+      .populate('category', 'title')
+      .lean();
+
+    const categoryMap = new Map();
+
+    timeEntries.forEach((entry) => {
+      const overlapHours = getTimeEntryOverlapHours({
+        entry,
+        fromDate,
+        toDate
+      });
+
+      if (overlapHours <= 0) {
+        return;
+      }
+
+      const categoryId = entry.category?._id ? String(entry.category._id) : null;
+      const categoryTitle = entry.category?.title || 'Uncategorized';
+      const categoryKey = categoryId || categoryTitle;
+      const existing = categoryMap.get(categoryKey) || {
+        categoryId,
+        categoryTitle,
+        hours: 0
+      };
+
+      existing.hours += overlapHours;
+      categoryMap.set(categoryKey, existing);
     });
 
-    const rows = await Task.aggregate([
-      {
-        $match: match
-      },
-      {
-        $lookup: {
-          from: 'categories',
-          localField: 'category',
-          foreignField: '_id',
-          as: 'category'
-        }
-      },
-      {
-        $unwind: {
-          path: '$category',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      {
-        $group: {
-          _id: {
-            categoryId: '$category._id',
-            categoryTitle: '$category.title'
-          },
-          hours: { $sum: '$timeSpent' }
-        }
-      },
-      {
-        $match: {
-          hours: { $gt: 0 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          categoryId: {
-            $ifNull: [{ $toString: '$_id.categoryId' }, null]
-          },
-          categoryTitle: {
-            $ifNull: ['$_id.categoryTitle', 'Uncategorized']
-          },
-          hours: 1
-        }
-      },
-      {
-        $sort: {
-          hours: -1,
-          categoryTitle: 1
-        }
-      }
-    ]);
+    const rows = Array.from(categoryMap.values())
+      .filter((row) => row.hours > 0)
+      .sort((a, b) =>
+        b.hours - a.hours ||
+        a.categoryTitle.localeCompare(b.categoryTitle, undefined, { sensitivity: 'base' })
+      );
 
     const totalHours = rows.reduce((sum, row) => sum + row.hours, 0);
     const categories = rows.map((row) => ({
-      ...row,
+      categoryId: row.categoryId,
+      categoryTitle: row.categoryTitle,
       hours: roundToTwoDecimals(row.hours),
       percentage: totalHours > 0
         ? roundToTwoDecimals((row.hours / totalHours) * 100)
