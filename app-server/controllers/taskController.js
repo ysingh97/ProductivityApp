@@ -2,9 +2,11 @@ const Task = require('../models/task'); // Import the Task model
 const Goal = require('../models/goal');
 const List = require('../models/list');
 const Category = require('../models/category');
+const TimeEntry = require('../models/timeEntry');
 const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
+const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
 
 const resolveCategory = async (input, userId) => {
   const title = normalizeCategoryTitle(
@@ -45,6 +47,33 @@ const getTopLevelGoal = async (goalId, userId) => {
   }
 
   return currentGoal;
+};
+
+const syncTaskTimeTotals = async (task) => {
+  const aggregate = await TimeEntry.aggregate([
+    {
+      $match: {
+        taskId: task._id,
+        userId: task.userId
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalMinutes: { $sum: '$durationMinutes' }
+      }
+    }
+  ]);
+
+  const totalMinutes = aggregate[0]?.totalMinutes || 0;
+  const totalHours = roundToTwoDecimals(totalMinutes / 60);
+  const estimatedHours = Number(task.estimatedCompletionTime) || 0;
+
+  task.timeSpent = totalHours;
+  task.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - totalHours, 0));
+  await task.save();
+
+  return task;
 };
 
 const getTasks = async(req, res) => {
@@ -166,6 +195,54 @@ const updateTask = async (req, res) => {
   }
 };
 
+const createTaskTimeEntry = async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const startedAt = new Date(req.body.startedAt);
+    const endedAt = new Date(req.body.endedAt);
+
+    if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+      return res.status(400).json({
+        error: 'startedAt and endedAt must be valid ISO date-time values.'
+      });
+    }
+
+    if (endedAt <= startedAt) {
+      return res.status(400).json({
+        error: 'endedAt must be after startedAt.'
+      });
+    }
+
+    const durationMinutes = (endedAt - startedAt) / 60000;
+    const timeEntry = await TimeEntry.create({
+      userId: req.user.id,
+      taskId: task._id,
+      category: task.category || null,
+      startedAt,
+      endedAt,
+      durationMinutes
+    });
+
+    const updatedTask = await syncTaskTimeTotals(task);
+    await updatedTask.populate('category', 'title');
+
+    return res.status(201).json({
+      timeEntry,
+      task: updatedTask
+    });
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ error: err.message });
+    }
+
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 const deleteTask = async (req, res) => {
     try {
       const deletedTask = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
@@ -221,6 +298,7 @@ module.exports = {
     getTasks,
     createTask,
     updateTask,
+    createTaskTimeEntry,
     deleteTask,
     getTasksByListId,
     getTaskById
