@@ -74,6 +74,38 @@ test('task time-entry endpoint creates a time entry and refreshes cached task to
   expect(String(persistedEntries[0].category)).toBe(String(workTask.category));
 });
 
+test('task time-entry endpoint is idempotent for duplicate task/start/end submissions', async () => {
+  const { tasks } = await seedMockTasks('basic');
+  const workTask = tasks.find((task) => task.title === 'Project planning');
+  const payload = {
+    startedAt: '2026-01-12T09:15:00.000Z',
+    endedAt: '2026-01-12T10:15:00.000Z'
+  };
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send(payload)
+    .expect(201)
+    .expect(({ body }) => {
+      expect(body.duplicate).toBe(false);
+      expect(body.task.timeSpent).toBe(1);
+    });
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send(payload)
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.duplicate).toBe(true);
+      expect(body.task.timeSpent).toBe(1);
+    });
+
+  const persistedEntries = await TimeEntry.find({ taskId: workTask._id }).lean();
+  expect(persistedEntries).toHaveLength(1);
+});
+
 test('task time-entry endpoint rejects invalid timestamps', async () => {
   const { tasks } = await seedMockTasks('basic');
 

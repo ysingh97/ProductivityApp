@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -24,7 +24,7 @@ import TaskCompletionBar from "./taskCompletionBar";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
 import { fetchCategories } from "../categories/categoryService";
-import { updateTask } from "./taskService";
+import { createTaskTimeEntry, updateTask } from "./taskService";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -59,6 +59,16 @@ const parseNumber = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+const buildDefaultTimeEntryValues = () => {
+  const end = dayjs();
+  const start = end.subtract(1, "hour");
+
+  return {
+    startedAt: start,
+    endedAt: end
+  };
+};
+
 const TaskView = ({ task }) => {
   const [currentTask, setCurrentTask] = useState(task);
   const [parentGoals, setParentGoals] = useState([]);
@@ -69,10 +79,18 @@ const TaskView = ({ task }) => {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(task));
+  const [timeEntryValues, setTimeEntryValues] = useState(buildDefaultTimeEntryValues);
+  const [timeEntrySaving, setTimeEntrySaving] = useState(false);
+  const [timeEntryError, setTimeEntryError] = useState("");
+  const [timeEntrySuccess, setTimeEntrySuccess] = useState("");
+  const timeEntryRequestInFlightRef = useRef(false);
 
   useEffect(() => {
     setCurrentTask(task);
     setFormValues(buildFormValues(task));
+    setTimeEntryValues(buildDefaultTimeEntryValues());
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
     setSaveError("");
     setEditOpen(false);
   }, [task]);
@@ -199,6 +217,80 @@ const TaskView = ({ task }) => {
     setSaveError("");
   };
 
+  const loggedDurationHours = useMemo(() => {
+    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
+      return null;
+    }
+
+    if (
+      !timeEntryValues.startedAt.isValid() ||
+      !timeEntryValues.endedAt.isValid() ||
+      !timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)
+    ) {
+      return null;
+    }
+
+    return Math.round(
+      timeEntryValues.endedAt.diff(timeEntryValues.startedAt, "minute", true) / 60 * 100
+    ) / 100;
+  }, [timeEntryValues.endedAt, timeEntryValues.startedAt]);
+
+  const handleLogTime = async () => {
+    if (!currentTask) return;
+    if (timeEntryRequestInFlightRef.current) return;
+
+    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
+      setTimeEntryError("Select both a start and end time.");
+      return;
+    }
+
+    if (
+      !timeEntryValues.startedAt.isValid() ||
+      !timeEntryValues.endedAt.isValid()
+    ) {
+      setTimeEntryError("Choose valid start and end times.");
+      return;
+    }
+
+    if (!timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)) {
+      setTimeEntryError("End time must be after start time.");
+      return;
+    }
+
+    if (timeEntryValues.endedAt.isAfter(dayjs())) {
+      setTimeEntryError("End time cannot be in the future.");
+      return;
+    }
+
+    setTimeEntrySaving(true);
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    timeEntryRequestInFlightRef.current = true;
+    try {
+      const response = await createTaskTimeEntry(currentTask._id, {
+        startedAt: timeEntryValues.startedAt.toDate(),
+        endedAt: timeEntryValues.endedAt.toDate()
+      });
+
+      setCurrentTask(response.task);
+      setTimeEntryValues(buildDefaultTimeEntryValues());
+      const loggedHours = Math.round((response.timeEntry.durationMinutes / 60) * 100) / 100;
+      setTimeEntrySuccess(
+        response.duplicate
+          ? `That exact time range was already logged. Total time remains ${response.task.timeSpent} hours.`
+          : `Logged ${loggedHours} hours. Total time is now ${response.task.timeSpent} hours.`
+      );
+    } catch (err) {
+      console.error(err);
+      setTimeEntryError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to log time right now."
+      );
+    } finally {
+      timeEntryRequestInFlightRef.current = false;
+      setTimeEntrySaving(false);
+    }
+  };
+
   if (!currentTask) {
     return (
       <Container maxWidth="lg" sx={{ py: 6, textAlign: "left" }}>
@@ -290,6 +382,64 @@ const TaskView = ({ task }) => {
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
             <Typography variant="h6" fontWeight={700} gutterBottom>
+              Log time
+            </Typography>
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Record a concrete block of time for this task. This updates both the task progress
+                cache and the visualization analytics.
+              </Typography>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={2}
+              >
+                <DateTimePicker
+                  label="Start time"
+                  value={timeEntryValues.startedAt}
+                  onChange={(value) =>
+                    setTimeEntryValues((prev) => ({ ...prev, startedAt: value }))
+                  }
+                  maxDateTime={dayjs()}
+                  textFieldProps={{
+                    fullWidth: true,
+                    size: "small"
+                  }}
+                />
+                <DateTimePicker
+                  label="End time"
+                  value={timeEntryValues.endedAt}
+                  onChange={(value) =>
+                    setTimeEntryValues((prev) => ({ ...prev, endedAt: value }))
+                  }
+                  minDateTime={timeEntryValues.startedAt || undefined}
+                  maxDateTime={dayjs()}
+                  textFieldProps={{
+                    fullWidth: true,
+                    size: "small"
+                  }}
+                />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {loggedDurationHours !== null
+                  ? `This entry will add ${loggedDurationHours} hours.`
+                  : "Choose a valid time range to preview the logged duration."}
+              </Typography>
+              {timeEntryError && <Typography color="error">{timeEntryError}</Typography>}
+              {timeEntrySuccess && <Typography color="success.main">{timeEntrySuccess}</Typography>}
+              <Box>
+                <Button
+                  variant="contained"
+                  onClick={handleLogTime}
+                  disabled={timeEntrySaving}
+                >
+                  {timeEntrySaving ? "Logging..." : "Log time"}
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
               Task details
             </Typography>
             <Box
@@ -331,7 +481,7 @@ const TaskView = ({ task }) => {
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Time spent
+                  Total time spent
                 </Typography>
                 <Typography>{currentTask.timeSpent || 0}</Typography>
               </Box>

@@ -217,6 +217,24 @@ const createTaskTimeEntry = async (req, res) => {
       });
     }
 
+    const existingTimeEntry = await TimeEntry.findOne({
+      userId: req.user.id,
+      taskId: task._id,
+      startedAt,
+      endedAt
+    });
+
+    if (existingTimeEntry) {
+      const updatedTask = await syncTaskTimeTotals(task);
+      await updatedTask.populate('category', 'title');
+
+      return res.status(200).json({
+        timeEntry: existingTimeEntry,
+        task: updatedTask,
+        duplicate: true
+      });
+    }
+
     const durationMinutes = (endedAt - startedAt) / 60000;
     const timeEntry = await TimeEntry.create({
       userId: req.user.id,
@@ -232,7 +250,8 @@ const createTaskTimeEntry = async (req, res) => {
 
     return res.status(201).json({
       timeEntry,
-      task: updatedTask
+      task: updatedTask,
+      duplicate: false
     });
   } catch (err) {
     if (err.name === 'ValidationError') {
