@@ -28,6 +28,7 @@ import {
   createTaskTimeEntry,
   deleteTaskTimeEntry,
   fetchTaskTimeEntries,
+  updateTaskTimeEntry,
   updateTask
 } from "./taskService";
 
@@ -74,6 +75,11 @@ const buildDefaultTimeEntryValues = () => {
   };
 };
 
+const buildEditTimeEntryValues = (entry) => ({
+  startedAt: dayjs(entry.startedAt),
+  endedAt: dayjs(entry.endedAt)
+});
+
 const formatDurationLabel = (durationMinutes) => {
   const totalMinutes = Math.round(durationMinutes || 0);
   const hours = Math.floor(totalMinutes / 60);
@@ -108,6 +114,10 @@ const TaskView = ({ task }) => {
   const [timeEntriesLoading, setTimeEntriesLoading] = useState(false);
   const [timeEntriesError, setTimeEntriesError] = useState("");
   const [deletingTimeEntryId, setDeletingTimeEntryId] = useState("");
+  const [editingTimeEntryId, setEditingTimeEntryId] = useState("");
+  const [editingTimeEntryValues, setEditingTimeEntryValues] = useState(null);
+  const [editingTimeEntryError, setEditingTimeEntryError] = useState("");
+  const [editingTimeEntrySaving, setEditingTimeEntrySaving] = useState(false);
   const timeEntryRequestInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -119,6 +129,9 @@ const TaskView = ({ task }) => {
     setTimeEntries([]);
     setTimeEntriesError("");
     setDeletingTimeEntryId("");
+    setEditingTimeEntryId("");
+    setEditingTimeEntryValues(null);
+    setEditingTimeEntryError("");
     setSaveError("");
     setEditOpen(false);
   }, [task]);
@@ -389,6 +402,78 @@ const TaskView = ({ task }) => {
     }
   };
 
+  const handleStartEditingTimeEntry = (entry) => {
+    setEditingTimeEntryId(entry._id);
+    setEditingTimeEntryValues(buildEditTimeEntryValues(entry));
+    setEditingTimeEntryError("");
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+  };
+
+  const handleCancelEditingTimeEntry = () => {
+    setEditingTimeEntryId("");
+    setEditingTimeEntryValues(null);
+    setEditingTimeEntryError("");
+  };
+
+  const handleSaveEditedTimeEntry = async (entryId) => {
+    if (!currentTask || !editingTimeEntryValues) return;
+
+    if (!editingTimeEntryValues.startedAt || !editingTimeEntryValues.endedAt) {
+      setEditingTimeEntryError("Select both a start and end time.");
+      return;
+    }
+
+    if (
+      !editingTimeEntryValues.startedAt.isValid() ||
+      !editingTimeEntryValues.endedAt.isValid()
+    ) {
+      setEditingTimeEntryError("Choose valid start and end times.");
+      return;
+    }
+
+    if (!editingTimeEntryValues.endedAt.isAfter(editingTimeEntryValues.startedAt)) {
+      setEditingTimeEntryError("End time must be after start time.");
+      return;
+    }
+
+    if (editingTimeEntryValues.endedAt.isAfter(dayjs())) {
+      setEditingTimeEntryError("End time cannot be in the future.");
+      return;
+    }
+
+    setEditingTimeEntrySaving(true);
+    setEditingTimeEntryError("");
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    try {
+      const response = await updateTaskTimeEntry(currentTask._id, entryId, {
+        startedAt: editingTimeEntryValues.startedAt.toDate(),
+        endedAt: editingTimeEntryValues.endedAt.toDate()
+      });
+
+      setCurrentTask(response.task);
+      setTimeEntries((prev) =>
+        prev
+          .map((entry) => (String(entry._id) === String(entryId) ? response.timeEntry : entry))
+          .sort((left, right) => new Date(right.endedAt).getTime() - new Date(left.endedAt).getTime())
+      );
+      const updatedHours = Math.round((response.timeEntry.durationMinutes / 60) * 100) / 100;
+      setTimeEntrySuccess(
+        `Updated time entry to ${updatedHours} hours. Total time is now ${response.task.timeSpent} hours.`
+      );
+      setEditingTimeEntryId("");
+      setEditingTimeEntryValues(null);
+    } catch (err) {
+      console.error(err);
+      setEditingTimeEntryError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to update time entry right now."
+      );
+    } finally {
+      setEditingTimeEntrySaving(false);
+    }
+  };
+
   if (!currentTask) {
     return (
       <Container maxWidth="lg" sx={{ py: 6, textAlign: "left" }}>
@@ -605,6 +690,7 @@ const TaskView = ({ task }) => {
                 {timeEntries.map((entry) => {
                   const start = dayjs(entry.startedAt);
                   const end = dayjs(entry.endedAt);
+                  const isEditing = editingTimeEntryId === entry._id;
 
                   return (
                     <Box
@@ -636,14 +722,79 @@ const TaskView = ({ task }) => {
                           </Typography>
                           <Button
                             size="small"
+                            onClick={() => handleStartEditingTimeEntry(entry)}
+                            disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
                             color="error"
                             onClick={() => handleDeleteTimeEntry(entry._id)}
-                            disabled={deletingTimeEntryId === entry._id}
+                            disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
                           >
                             {deletingTimeEntryId === entry._id ? "Deleting..." : "Delete"}
                           </Button>
                         </Stack>
                       </Stack>
+                      {isEditing && editingTimeEntryValues && (
+                        <Stack spacing={1.5} sx={{ mt: 2 }}>
+                          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                            <DateTimePicker
+                              label="Edit start time"
+                              value={editingTimeEntryValues.startedAt}
+                              onChange={(value) =>
+                                setEditingTimeEntryValues((prev) => ({
+                                  ...prev,
+                                  startedAt: value
+                                }))
+                              }
+                              maxDateTime={dayjs()}
+                              textFieldProps={{
+                                fullWidth: true,
+                                size: "small"
+                              }}
+                            />
+                            <DateTimePicker
+                              label="Edit end time"
+                              value={editingTimeEntryValues.endedAt}
+                              onChange={(value) =>
+                                setEditingTimeEntryValues((prev) => ({
+                                  ...prev,
+                                  endedAt: value
+                                }))
+                              }
+                              minDateTime={editingTimeEntryValues.startedAt || undefined}
+                              maxDateTime={dayjs()}
+                              textFieldProps={{
+                                fullWidth: true,
+                                size: "small"
+                              }}
+                            />
+                          </Stack>
+                          {editingTimeEntryError && (
+                            <Typography color="error">{editingTimeEntryError}</Typography>
+                          )}
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => handleSaveEditedTimeEntry(entry._id)}
+                              disabled={editingTimeEntrySaving}
+                            >
+                              {editingTimeEntrySaving ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={handleCancelEditingTimeEntry}
+                              disabled={editingTimeEntrySaving}
+                            >
+                              Cancel
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      )}
                     </Box>
                   );
                 })}
