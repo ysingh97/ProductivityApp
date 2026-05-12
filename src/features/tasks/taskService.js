@@ -42,6 +42,16 @@ export const fetchTaskTimeEntries = async (taskId) => {
   }
 };
 
+export const deleteTaskTimeEntry = async (taskId, entryId) => {
+  try {
+    const res = await apiClient.delete(`/tasks/${taskId}/time-entries/${entryId}`);
+    return res.data;
+  } catch (err) {
+    console.error("Error deleting task time entry:", err);
+    throw err;
+  }
+};
+
 export const deleteTask = async (taskId) => {
   const response = await apiClient.delete(`/tasks/${taskId}`);
   return response.data;

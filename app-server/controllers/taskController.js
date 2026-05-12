@@ -262,6 +262,35 @@ const createTaskTimeEntry = async (req, res) => {
   }
 };
 
+const deleteTaskTimeEntry = async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const deletedTimeEntry = await TimeEntry.findOneAndDelete({
+      _id: req.params.entryId,
+      taskId: task._id,
+      userId: req.user.id
+    });
+
+    if (!deletedTimeEntry) {
+      return res.status(404).json({ message: 'Time entry not found' });
+    }
+
+    const updatedTask = await syncTaskTimeTotals(task);
+    await updatedTask.populate('category', 'title');
+
+    return res.status(200).json({
+      deletedTimeEntry,
+      task: updatedTask
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 const deleteTask = async (req, res) => {
     try {
       const deletedTask = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
@@ -339,6 +368,7 @@ module.exports = {
     createTask,
     updateTask,
     createTaskTimeEntry,
+    deleteTaskTimeEntry,
     deleteTask,
     getTasksByListId,
     getTaskById,

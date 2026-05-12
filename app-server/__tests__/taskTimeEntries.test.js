@@ -115,6 +115,44 @@ test('task time-entry endpoint lists time entries newest first for the task owne
     });
 });
 
+test('task time-entry delete endpoint removes the entry and refreshes cached task totals', async () => {
+  const { tasks } = await seedMockTasks('basic');
+  const workTask = tasks.find((task) => task.title === 'Project planning');
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:00:00.000Z',
+      endedAt: '2026-01-12T08:00:00.000Z'
+    })
+    .expect(201);
+
+  const createdEntry = await TimeEntry.findOne({ taskId: workTask._id }).lean();
+
+  await request(app)
+    .delete(`/api/tasks/${workTask._id}/time-entries/${createdEntry._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.deletedTimeEntry).toMatchObject({
+        _id: String(createdEntry._id)
+      });
+      expect(body.task).toMatchObject({
+        _id: String(workTask._id),
+        timeSpent: 0,
+        timeLeft: 5
+      });
+    });
+
+  const persistedEntries = await TimeEntry.find({ taskId: workTask._id }).lean();
+  const persistedTask = await Task.findById(workTask._id).lean();
+
+  expect(persistedEntries).toHaveLength(0);
+  expect(persistedTask.timeSpent).toBe(0);
+  expect(persistedTask.timeLeft).toBe(5);
+});
+
 test('task time-entry endpoint is idempotent for duplicate task/start/end submissions', async () => {
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');
@@ -194,6 +232,12 @@ test('task time-entry endpoint is isolated by user', async () => {
 
   await request(app)
     .get(`/api/tasks/${tasks[0]._id}/time-entries`)
+    .set('Authorization', 'Bearer test:empty')
+    .expect(404)
+    .expect({ message: 'Task not found' });
+
+  await request(app)
+    .delete(`/api/tasks/${tasks[0]._id}/time-entries/${new mongoose.Types.ObjectId()}`)
     .set('Authorization', 'Bearer test:empty')
     .expect(404)
     .expect({ message: 'Task not found' });

@@ -26,6 +26,7 @@ import { fetchLists } from "../lists/listService";
 import { fetchCategories } from "../categories/categoryService";
 import {
   createTaskTimeEntry,
+  deleteTaskTimeEntry,
   fetchTaskTimeEntries,
   updateTask
 } from "./taskService";
@@ -106,6 +107,7 @@ const TaskView = ({ task }) => {
   const [timeEntries, setTimeEntries] = useState([]);
   const [timeEntriesLoading, setTimeEntriesLoading] = useState(false);
   const [timeEntriesError, setTimeEntriesError] = useState("");
+  const [deletingTimeEntryId, setDeletingTimeEntryId] = useState("");
   const timeEntryRequestInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -116,6 +118,7 @@ const TaskView = ({ task }) => {
     setTimeEntrySuccess("");
     setTimeEntries([]);
     setTimeEntriesError("");
+    setDeletingTimeEntryId("");
     setSaveError("");
     setEditOpen(false);
   }, [task]);
@@ -365,6 +368,27 @@ const TaskView = ({ task }) => {
     }
   };
 
+  const handleDeleteTimeEntry = async (entryId) => {
+    if (!currentTask || !entryId) return;
+
+    setDeletingTimeEntryId(entryId);
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    try {
+      const response = await deleteTaskTimeEntry(currentTask._id, entryId);
+      setCurrentTask(response.task);
+      setTimeEntries((prev) => prev.filter((entry) => String(entry._id) !== String(entryId)));
+      setTimeEntrySuccess(`Deleted time entry. Total time is now ${response.task.timeSpent} hours.`);
+    } catch (err) {
+      console.error(err);
+      setTimeEntryError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to delete time entry right now."
+      );
+    } finally {
+      setDeletingTimeEntryId("");
+    }
+  };
+
   if (!currentTask) {
     return (
       <Container maxWidth="lg" sx={{ py: 6, textAlign: "left" }}>
@@ -606,9 +630,19 @@ const TaskView = ({ task }) => {
                             {start.format("MMM D, YYYY h:mm A")} - {end.format("h:mm A")}
                           </Typography>
                         </Box>
-                        <Typography variant="caption" color="text.secondary">
-                          {Math.round((entry.durationMinutes / 60) * 100) / 100}h
-                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {Math.round((entry.durationMinutes / 60) * 100) / 100}h
+                          </Typography>
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteTimeEntry(entry._id)}
+                            disabled={deletingTimeEntryId === entry._id}
+                          >
+                            {deletingTimeEntryId === entry._id ? "Deleting..." : "Delete"}
+                          </Button>
+                        </Stack>
                       </Stack>
                     </Box>
                   );

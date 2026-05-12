@@ -8,12 +8,14 @@ const {
   getTaskById,
   updateTask,
   createTaskTimeEntry,
-  getTaskTimeEntries
+  getTaskTimeEntries,
+  deleteTaskTimeEntry
 } = require('../controllers/taskController');
 
 router.get('/', getTasks);
 router.post('/', createTask);
 router.post('/:id/time-entries', createTaskTimeEntry);
+router.delete('/:id/time-entries/:entryId', deleteTaskTimeEntry);
 router.delete('/:id', deleteTask);
 router.get('/:id/time-entries', getTaskTimeEntries);
 router.get('/list/:listId', getTasksByListId);
