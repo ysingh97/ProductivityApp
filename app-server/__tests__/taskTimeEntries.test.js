@@ -153,6 +153,51 @@ test('task time-entry delete endpoint removes the entry and refreshes cached tas
   expect(persistedTask.timeLeft).toBe(5);
 });
 
+test('task time-entry update endpoint edits the range and refreshes cached task totals', async () => {
+  const { tasks } = await seedMockTasks('basic');
+  const workTask = tasks.find((task) => task.title === 'Project planning');
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:00:00.000Z',
+      endedAt: '2026-01-12T08:00:00.000Z'
+    })
+    .expect(201);
+
+  const createdEntry = await TimeEntry.findOne({ taskId: workTask._id }).lean();
+
+  await request(app)
+    .put(`/api/tasks/${workTask._id}/time-entries/${createdEntry._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:15:00.000Z',
+      endedAt: '2026-01-12T09:00:00.000Z'
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.timeEntry).toMatchObject({
+        _id: String(createdEntry._id),
+        durationMinutes: 105
+      });
+      expect(body.task).toMatchObject({
+        _id: String(workTask._id),
+        timeSpent: 1.75,
+        timeLeft: 3.25
+      });
+    });
+
+  const persistedEntry = await TimeEntry.findById(createdEntry._id).lean();
+  const persistedTask = await Task.findById(workTask._id).lean();
+
+  expect(persistedEntry.durationMinutes).toBe(105);
+  expect(new Date(persistedEntry.startedAt).toISOString()).toBe('2026-01-12T07:15:00.000Z');
+  expect(new Date(persistedEntry.endedAt).toISOString()).toBe('2026-01-12T09:00:00.000Z');
+  expect(persistedTask.timeSpent).toBe(1.75);
+  expect(persistedTask.timeLeft).toBe(3.25);
+});
+
 test('task time-entry endpoint is idempotent for duplicate task/start/end submissions', async () => {
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');
@@ -183,6 +228,43 @@ test('task time-entry endpoint is idempotent for duplicate task/start/end submis
 
   const persistedEntries = await TimeEntry.find({ taskId: workTask._id }).lean();
   expect(persistedEntries).toHaveLength(1);
+});
+
+test('task time-entry update endpoint rejects exact duplicate collisions', async () => {
+  const { tasks } = await seedMockTasks('basic');
+  const workTask = tasks.find((task) => task.title === 'Project planning');
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:00:00.000Z',
+      endedAt: '2026-01-12T08:00:00.000Z'
+    })
+    .expect(201);
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T09:15:00.000Z',
+      endedAt: '2026-01-12T10:15:00.000Z'
+    })
+    .expect(201);
+
+  const entries = await TimeEntry.find({ taskId: workTask._id }).sort({ startedAt: 1 }).lean();
+
+  await request(app)
+    .put(`/api/tasks/${workTask._id}/time-entries/${entries[1]._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:00:00.000Z',
+      endedAt: '2026-01-12T08:00:00.000Z'
+    })
+    .expect(409)
+    .expect({
+      error: 'A matching time entry already exists for this task.'
+    });
 });
 
 test('task time-entry endpoint rejects invalid timestamps', async () => {
@@ -239,6 +321,16 @@ test('task time-entry endpoint is isolated by user', async () => {
   await request(app)
     .delete(`/api/tasks/${tasks[0]._id}/time-entries/${new mongoose.Types.ObjectId()}`)
     .set('Authorization', 'Bearer test:empty')
+    .expect(404)
+    .expect({ message: 'Task not found' });
+
+  await request(app)
+    .put(`/api/tasks/${tasks[0]._id}/time-entries/${new mongoose.Types.ObjectId()}`)
+    .set('Authorization', 'Bearer test:empty')
+    .send({
+      startedAt: '2026-01-12T09:15:00.000Z',
+      endedAt: '2026-01-12T10:15:00.000Z'
+    })
     .expect(404)
     .expect({ message: 'Task not found' });
 });

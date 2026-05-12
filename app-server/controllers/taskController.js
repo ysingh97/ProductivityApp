@@ -76,6 +76,50 @@ const syncTaskTimeTotals = async (task) => {
   return task;
 };
 
+const parseTimeEntryRange = (body) => {
+  const startedAt = new Date(body.startedAt);
+  const endedAt = new Date(body.endedAt);
+
+  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+    return {
+      error: 'startedAt and endedAt must be valid ISO date-time values.'
+    };
+  }
+
+  if (endedAt <= startedAt) {
+    return {
+      error: 'endedAt must be after startedAt.'
+    };
+  }
+
+  return {
+    startedAt,
+    endedAt,
+    durationMinutes: (endedAt - startedAt) / 60000
+  };
+};
+
+const findExactDuplicateTimeEntry = async ({
+  userId,
+  taskId,
+  startedAt,
+  endedAt,
+  excludeEntryId
+}) => {
+  const query = {
+    userId,
+    taskId,
+    startedAt,
+    endedAt
+  };
+
+  if (excludeEntryId) {
+    query._id = { $ne: excludeEntryId };
+  }
+
+  return TimeEntry.findOne(query);
+};
+
 const getTasks = async(req, res) => {
     try {
         const tasks = await Task.find({ userId: req.user.id }).populate('category', 'title');
@@ -202,22 +246,14 @@ const createTaskTimeEntry = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    const startedAt = new Date(req.body.startedAt);
-    const endedAt = new Date(req.body.endedAt);
-
-    if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
-      return res.status(400).json({
-        error: 'startedAt and endedAt must be valid ISO date-time values.'
-      });
+    const parsedRange = parseTimeEntryRange(req.body);
+    if (parsedRange.error) {
+      return res.status(400).json({ error: parsedRange.error });
     }
 
-    if (endedAt <= startedAt) {
-      return res.status(400).json({
-        error: 'endedAt must be after startedAt.'
-      });
-    }
+    const { startedAt, endedAt, durationMinutes } = parsedRange;
 
-    const existingTimeEntry = await TimeEntry.findOne({
+    const existingTimeEntry = await findExactDuplicateTimeEntry({
       userId: req.user.id,
       taskId: task._id,
       startedAt,
@@ -235,7 +271,6 @@ const createTaskTimeEntry = async (req, res) => {
       });
     }
 
-    const durationMinutes = (endedAt - startedAt) / 60000;
     const timeEntry = await TimeEntry.create({
       userId: req.user.id,
       taskId: task._id,
@@ -252,6 +287,66 @@ const createTaskTimeEntry = async (req, res) => {
       timeEntry,
       task: updatedTask,
       duplicate: false
+    });
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ error: err.message });
+    }
+
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+const updateTaskTimeEntry = async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const timeEntry = await TimeEntry.findOne({
+      _id: req.params.entryId,
+      taskId: task._id,
+      userId: req.user.id
+    });
+
+    if (!timeEntry) {
+      return res.status(404).json({ message: 'Time entry not found' });
+    }
+
+    const parsedRange = parseTimeEntryRange(req.body);
+    if (parsedRange.error) {
+      return res.status(400).json({ error: parsedRange.error });
+    }
+
+    const { startedAt, endedAt, durationMinutes } = parsedRange;
+
+    const exactDuplicate = await findExactDuplicateTimeEntry({
+      userId: req.user.id,
+      taskId: task._id,
+      startedAt,
+      endedAt,
+      excludeEntryId: timeEntry._id
+    });
+
+    if (exactDuplicate) {
+      return res.status(409).json({
+        error: 'A matching time entry already exists for this task.'
+      });
+    }
+
+    timeEntry.startedAt = startedAt;
+    timeEntry.endedAt = endedAt;
+    timeEntry.durationMinutes = durationMinutes;
+    timeEntry.category = task.category || null;
+    await timeEntry.save();
+
+    const updatedTask = await syncTaskTimeTotals(task);
+    await updatedTask.populate('category', 'title');
+
+    return res.status(200).json({
+      timeEntry,
+      task: updatedTask
     });
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -368,6 +463,7 @@ module.exports = {
     createTask,
     updateTask,
     createTaskTimeEntry,
+    updateTaskTimeEntry,
     deleteTaskTimeEntry,
     deleteTask,
     getTasksByListId,
