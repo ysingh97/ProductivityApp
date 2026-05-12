@@ -299,6 +299,27 @@ const getTaskById = async (req, res) => {
   }
 }
 
+const getTaskTimeEntries = async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const timeEntries = await TimeEntry.find({
+      taskId: task._id,
+      userId: req.user.id
+    })
+      .sort({ endedAt: -1, startedAt: -1 })
+      .populate('category', 'title')
+      .lean();
+
+    return res.status(200).json(timeEntries);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 // Get all tasks for a list
 const getTasksByListId = async (req, res) => {
   try {
@@ -320,5 +341,6 @@ module.exports = {
     createTaskTimeEntry,
     deleteTask,
     getTasksByListId,
-    getTaskById
+    getTaskById,
+    getTaskTimeEntries
 };

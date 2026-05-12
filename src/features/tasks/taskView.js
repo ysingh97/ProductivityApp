@@ -24,7 +24,11 @@ import TaskCompletionBar from "./taskCompletionBar";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
 import { fetchCategories } from "../categories/categoryService";
-import { createTaskTimeEntry, updateTask } from "./taskService";
+import {
+  createTaskTimeEntry,
+  fetchTaskTimeEntries,
+  updateTask
+} from "./taskService";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -69,6 +73,22 @@ const buildDefaultTimeEntryValues = () => {
   };
 };
 
+const formatDurationLabel = (durationMinutes) => {
+  const totalMinutes = Math.round(durationMinutes || 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
+};
+
 const TaskView = ({ task }) => {
   const [currentTask, setCurrentTask] = useState(task);
   const [parentGoals, setParentGoals] = useState([]);
@@ -83,6 +103,9 @@ const TaskView = ({ task }) => {
   const [timeEntrySaving, setTimeEntrySaving] = useState(false);
   const [timeEntryError, setTimeEntryError] = useState("");
   const [timeEntrySuccess, setTimeEntrySuccess] = useState("");
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [timeEntriesLoading, setTimeEntriesLoading] = useState(false);
+  const [timeEntriesError, setTimeEntriesError] = useState("");
   const timeEntryRequestInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -91,9 +114,49 @@ const TaskView = ({ task }) => {
     setTimeEntryValues(buildDefaultTimeEntryValues());
     setTimeEntryError("");
     setTimeEntrySuccess("");
+    setTimeEntries([]);
+    setTimeEntriesError("");
     setSaveError("");
     setEditOpen(false);
   }, [task]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!currentTask?._id) {
+      setTimeEntries([]);
+      setTimeEntriesLoading(false);
+      setTimeEntriesError("");
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const loadTimeEntries = async () => {
+      setTimeEntriesLoading(true);
+      setTimeEntriesError("");
+      try {
+        const entries = await fetchTaskTimeEntries(currentTask._id);
+        if (isActive) {
+          setTimeEntries(entries);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isActive) {
+          setTimeEntriesError("Unable to load logged time right now.");
+        }
+      } finally {
+        if (isActive) {
+          setTimeEntriesLoading(false);
+        }
+      }
+    };
+
+    loadTimeEntries();
+    return () => {
+      isActive = false;
+    };
+  }, [currentTask]);
 
   useEffect(() => {
     let isActive = true;
@@ -273,6 +336,17 @@ const TaskView = ({ task }) => {
       });
 
       setCurrentTask(response.task);
+      setTimeEntries((prev) => {
+        const entryId = String(response.timeEntry._id);
+        const existingIndex = prev.findIndex((entry) => String(entry._id) === entryId);
+        const nextEntries = existingIndex >= 0
+          ? prev.map((entry, index) => (index === existingIndex ? response.timeEntry : entry))
+          : [response.timeEntry, ...prev];
+
+        return nextEntries.sort(
+          (left, right) => new Date(right.endedAt).getTime() - new Date(left.endedAt).getTime()
+        );
+      });
       setTimeEntryValues(buildDefaultTimeEntryValues());
       const loggedHours = Math.round((response.timeEntry.durationMinutes / 60) * 100) / 100;
       setTimeEntrySuccess(
@@ -486,6 +560,61 @@ const TaskView = ({ task }) => {
                 <Typography>{currentTask.timeSpent || 0}</Typography>
               </Box>
             </Box>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              Recent time entries
+            </Typography>
+            {timeEntriesLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : timeEntriesError ? (
+              <Typography color="error">{timeEntriesError}</Typography>
+            ) : timeEntries.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No logged time yet for this task.
+              </Typography>
+            ) : (
+              <Stack spacing={1.5}>
+                {timeEntries.map((entry) => {
+                  const start = dayjs(entry.startedAt);
+                  const end = dayjs(entry.endedAt);
+
+                  return (
+                    <Box
+                      key={entry._id}
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1.5
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={2}
+                        sx={{ alignItems: "baseline", justifyContent: "space-between" }}
+                      >
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={700}>
+                            {formatDurationLabel(entry.durationMinutes)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {start.format("MMM D, YYYY h:mm A")} - {end.format("h:mm A")}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {Math.round((entry.durationMinutes / 60) * 100) / 100}h
+                        </Typography>
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
           </Paper>
         </Stack>
 

@@ -74,6 +74,47 @@ test('task time-entry endpoint creates a time entry and refreshes cached task to
   expect(String(persistedEntries[0].category)).toBe(String(workTask.category));
 });
 
+test('task time-entry endpoint lists time entries newest first for the task owner', async () => {
+  const { tasks } = await seedMockTasks('basic');
+  const workTask = tasks.find((task) => task.title === 'Project planning');
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:00:00.000Z',
+      endedAt: '2026-01-12T08:00:00.000Z'
+    })
+    .expect(201);
+
+  await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T09:15:00.000Z',
+      endedAt: '2026-01-12T11:00:00.000Z'
+    })
+    .expect(201);
+
+  await request(app)
+    .get(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toHaveLength(2);
+      expect(body[0]).toMatchObject({
+        taskId: String(workTask._id),
+        durationMinutes: 105
+      });
+      expect(body[1]).toMatchObject({
+        taskId: String(workTask._id),
+        durationMinutes: 60
+      });
+      expect(new Date(body[0].endedAt).getTime())
+        .toBeGreaterThan(new Date(body[1].endedAt).getTime());
+    });
+});
+
 test('task time-entry endpoint is idempotent for duplicate task/start/end submissions', async () => {
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');
@@ -148,6 +189,12 @@ test('task time-entry endpoint is isolated by user', async () => {
       startedAt: '2026-01-12T09:15:00.000Z',
       endedAt: '2026-01-12T11:00:00.000Z'
     })
+    .expect(404)
+    .expect({ message: 'Task not found' });
+
+  await request(app)
+    .get(`/api/tasks/${tasks[0]._id}/time-entries`)
+    .set('Authorization', 'Bearer test:empty')
     .expect(404)
     .expect({ message: 'Task not found' });
 });
