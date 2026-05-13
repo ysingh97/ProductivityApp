@@ -11,6 +11,7 @@ import {
   FormControl,
   FormControlLabel,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -39,12 +40,24 @@ const buildFormValues = (goalData) => ({
   title: goalData?.title || "",
   description: goalData?.description || "",
   category: getCategoryValue(goalData?.category),
+  estimatedHours:
+    goalData?.estimatedHours !== undefined ? String(goalData.estimatedHours) : "0",
   parentGoalId: goalData?.parentGoalId ? String(goalData.parentGoalId) : "",
   targetCompletionDate: goalData?.targetCompletionDate
     ? dayjs(goalData.targetCompletionDate)
     : null,
   isComplete: Boolean(goalData?.isComplete)
 });
+
+const parseNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const formatHours = (value) => {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+};
 
 const GoalView = ({ goal }) => {
   const [currentGoal, setCurrentGoal] = useState(goal);
@@ -127,6 +140,7 @@ const GoalView = ({ goal }) => {
     if (!currentGoal) return;
 
     const now = dayjs();
+    const estimatedHours = parseNumber(formValues.estimatedHours);
     const selectedParentGoal = formValues.parentGoalId
       ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
       : null;
@@ -148,12 +162,18 @@ const GoalView = ({ goal }) => {
       return;
     }
 
+    if (Number.isNaN(estimatedHours) || estimatedHours < 0) {
+      setSaveError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
     try {
       const updates = {
         title: formValues.title.trim(),
         description: formValues.description,
+        estimatedHours,
         parentGoalId: formValues.parentGoalId || null,
         targetCompletionDate: formValues.targetCompletionDate
           ? formValues.targetCompletionDate.toDate()
@@ -209,6 +229,11 @@ const GoalView = ({ goal }) => {
   const parentDeadlineForEdit = selectedParentGoalForEdit?.targetCompletionDate
     ? dayjs(selectedParentGoalForEdit.targetCompletionDate)
     : null;
+  const estimatedHours = Number(currentGoal.estimatedHours) || 0;
+  const timeSpent = Number(currentGoal.timeSpent) || 0;
+  const timeLeft = Number(currentGoal.timeLeft) || 0;
+  const progressValue =
+    estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
@@ -258,6 +283,58 @@ const GoalView = ({ goal }) => {
             <Typography variant="h6" fontWeight={700} gutterBottom>
               Goal details
             </Typography>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="caption" color="text.secondary">
+                Goal progress
+              </Typography>
+              {estimatedHours > 0 ? (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatHours(timeSpent)} / {formatHours(estimatedHours)} hrs
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={progressValue}
+                    sx={{ height: 8, borderRadius: 999 }}
+                  />
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add an estimate to track remaining time for this goal.
+                </Typography>
+              )}
+            </Box>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                Time tracking
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                  gap: 2
+                }}
+              >
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Estimated hours
+                  </Typography>
+                  <Typography>{formatHours(estimatedHours)}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Time spent
+                  </Typography>
+                  <Typography>{formatHours(timeSpent)}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Time left
+                  </Typography>
+                  <Typography>{formatHours(timeLeft)}</Typography>
+                </Box>
+              </Box>
+            </Box>
             <Box
               sx={{
                 display: "grid",
@@ -392,6 +469,21 @@ const GoalView = ({ goal }) => {
                       ? "Category is inherited from the parent goal."
                       : "Select or type a category."
                   }
+                  fullWidth
+                />
+                <TextField
+                  label="Estimated hours"
+                  value={formValues.estimatedHours}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      estimatedHours: event.target.value
+                    }))
+                  }
+                  type="number"
+                  size="small"
+                  inputProps={{ min: 0, step: "0.25" }}
+                  helperText="Used to track time spent and remaining time."
                   fullWidth
                 />
                 <datalist id="goal-category-options">

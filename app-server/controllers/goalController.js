@@ -4,6 +4,7 @@ const Category = require('../models/category');
 const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
+const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
 
 const resolveCategory = async (input, userId) => {
     const title = normalizeCategoryTitle(
@@ -73,6 +74,45 @@ const collectDescendantGoalIds = async (rootId, userId) => {
     return descendantIds;
 };
 
+const syncGoalTimeTotals = async (goalId, userId) => {
+    const goal = await Goal.findOne({ _id: goalId, userId });
+    if (!goal) {
+        return null;
+    }
+
+    const descendantIds = await collectDescendantGoalIds(goal._id, userId);
+    const aggregate = await Task.aggregate([
+        {
+            $match: {
+                userId: goal.userId,
+                parentGoalId: { $in: [goal._id, ...descendantIds] }
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalHours: { $sum: '$timeSpent' }
+            }
+        }
+    ]);
+
+    const totalHours = roundToTwoDecimals(aggregate[0]?.totalHours || 0);
+    const estimatedHours = Number(goal.estimatedHours) || 0;
+
+    goal.timeSpent = totalHours;
+    goal.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - totalHours, 0));
+    await goal.save();
+
+    return goal;
+};
+
+const syncAllGoalTimeTotals = async (userId) => {
+    const goals = await Goal.find({ userId }, { _id: 1 });
+    for (const goal of goals) {
+        await syncGoalTimeTotals(goal._id, userId);
+    }
+};
+
 const applyCategoryToGoalTree = async (rootId, userId, nextCategoryId, previousCategoryId) => {
     const descendantIds = await collectDescendantGoalIds(rootId, userId);
     const goalIds = [rootId, ...descendantIds];
@@ -106,6 +146,7 @@ const applyCategoryToGoalTree = async (rootId, userId, nextCategoryId, previousC
 // Get all goals
 const getGoals = async (req, res) => {
     try {
+        await syncAllGoalTimeTotals(req.user.id);
         const goals = await Goal.find({ userId: req.user.id }).populate('category', 'title');
         res.status(200).json(goals);
     } catch (err) {
@@ -115,6 +156,7 @@ const getGoals = async (req, res) => {
 
 const getGoalById = async (req, res) => {
     try {
+        await syncGoalTimeTotals(req.params.id, req.user.id);
         const goal = await Goal.findOne({ _id: req.params.id, userId: req.user.id })
             .populate('category', 'title');
         if (!goal) {

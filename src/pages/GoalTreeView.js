@@ -6,6 +6,7 @@ import {
   Chip,
   CircularProgress,
   Container,
+  LinearProgress,
   Paper,
   Stack,
   Typography
@@ -74,6 +75,11 @@ const GoalTreeView = () => {
       return goal.category.title;
     }
     return "Uncategorized";
+  };
+
+  const formatHours = (value) => {
+    const rounded = Math.round((Number(value) || 0) * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded);
   };
 
   const normalizedGoals = useMemo(
@@ -173,6 +179,11 @@ const GoalTreeView = () => {
     const dueLabel = goal.dueDate ? dateFormatter.format(goal.dueDate) : "No deadline";
     const isSelectedGoal = String(goal._id) === String(goalId);
     const isTopLevelGoal = !goal.parentGoalId;
+    const estimatedHours = Number(goal.estimatedHours) || 0;
+    const timeSpent = Number(goal.timeSpent) || 0;
+    const timeLeft = Number(goal.timeLeft) || 0;
+    const progressValue =
+      estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
 
     return (
       <Box
@@ -219,6 +230,23 @@ const GoalTreeView = () => {
                 <Typography variant="body2" color="text.secondary">
                   {goal.categoryLabel} | {dueLabel}
                 </Typography>
+                <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Estimated {formatHours(estimatedHours)}h | Spent {formatHours(timeSpent)}h | Left{" "}
+                    {formatHours(timeLeft)}h
+                  </Typography>
+                  {estimatedHours > 0 ? (
+                    <LinearProgress
+                      variant="determinate"
+                      value={progressValue}
+                      sx={{ height: 6, borderRadius: 999, maxWidth: 220 }}
+                    />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      No estimate set for this goal yet.
+                    </Typography>
+                  )}
+                </Stack>
               </Box>
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                 {isTopLevelGoal && (

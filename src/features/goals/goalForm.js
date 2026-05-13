@@ -27,6 +27,11 @@ const getCategoryTitle = (value) => {
   return value.title || "";
 };
 
+const parseNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
 const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -40,6 +45,9 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [title, setTitle] = useState(goal?.title || "");
   const [description, setDescription] = useState(goal?.description || "");
   const [category, setCategory] = useState(getCategoryTitle(goal?.category));
+  const [estimatedHours, setEstimatedHours] = useState(
+    goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0"
+  );
   const [targetCompletionDate, setTargetCompletionDate] = useState(
     goal?.targetCompletionDate ? dayjs(goal.targetCompletionDate) : null
   );
@@ -51,6 +59,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError(null);
+    const parsedEstimatedHours = parseNumber(estimatedHours);
 
     const parentDeadline = selectedParentGoal?.targetCompletionDate
       ? dayjs(selectedParentGoal.targetCompletionDate)
@@ -66,9 +75,15 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
       return;
     }
 
+    if (Number.isNaN(parsedEstimatedHours) || parsedEstimatedHours < 0) {
+      setError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
     const goalData = {
         title,
         description,
+        estimatedHours: parsedEstimatedHours,
         parentGoalId: selectedParentGoal?.value,
         targetCompletionDate: targetCompletionDate ? targetCompletionDate.toDate() : null
         // listId: selectedList.value
@@ -81,6 +96,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
       setTitle("");
       setDescription("");
       setCategory("");
+      setEstimatedHours("0");
       setTargetCompletionDate(null);
     }
   };
@@ -91,6 +107,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
         setTitle("");
         setDescription("");
         setCategory("");
+        setEstimatedHours("0");
         setTargetCompletionDate(null);
       }
       return;
@@ -99,6 +116,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
     setTitle(goal.title || "");
     setDescription(goal.description || "");
     setCategory(getCategoryTitle(goal.category));
+    setEstimatedHours(goal.estimatedHours !== undefined ? String(goal.estimatedHours) : "0");
     setTargetCompletionDate(
       goal.targetCompletionDate ? dayjs(goal.targetCompletionDate) : null
     );
@@ -256,6 +274,17 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
                     }
                   />
                 )}
+              />
+
+              <TextField
+                label="Estimated hours"
+                value={estimatedHours}
+                onChange={(event) => setEstimatedHours(event.target.value)}
+                type="number"
+                fullWidth
+                size="small"
+                inputProps={{ min: 0, step: "0.25" }}
+                helperText="Used to track progress and remaining time for this goal."
               />
 
               <DateTimePicker
