@@ -68,10 +68,19 @@ const GoalView = ({ goal }) => {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(goal));
+  const [estimatedHoursEditOpen, setEstimatedHoursEditOpen] = useState(false);
+  const [estimatedHoursEditValue, setEstimatedHoursEditValue] = useState(
+    goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0"
+  );
+  const [estimatedHoursEditSaving, setEstimatedHoursEditSaving] = useState(false);
+  const [estimatedHoursEditError, setEstimatedHoursEditError] = useState("");
 
   useEffect(() => {
     setCurrentGoal(goal);
     setFormValues(buildFormValues(goal));
+    setEstimatedHoursEditOpen(false);
+    setEstimatedHoursEditValue(goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0");
+    setEstimatedHoursEditError("");
     setSaveError("");
     setEditOpen(false);
   }, [goal]);
@@ -201,6 +210,51 @@ const GoalView = ({ goal }) => {
     setSaveError("");
   };
 
+  const handleStartEstimatedHoursEdit = () => {
+    setEstimatedHoursEditOpen(true);
+    setEstimatedHoursEditValue(
+      currentGoal?.estimatedHours !== undefined ? String(currentGoal.estimatedHours) : "0"
+    );
+    setEstimatedHoursEditError("");
+  };
+
+  const handleCancelEstimatedHoursEdit = () => {
+    setEstimatedHoursEditOpen(false);
+    setEstimatedHoursEditValue(
+      currentGoal?.estimatedHours !== undefined ? String(currentGoal.estimatedHours) : "0"
+    );
+    setEstimatedHoursEditError("");
+  };
+
+  const handleSaveEstimatedHours = async () => {
+    if (!currentGoal) return;
+
+    const nextEstimatedHours = parseNumber(estimatedHoursEditValue);
+    if (Number.isNaN(nextEstimatedHours) || nextEstimatedHours < 0) {
+      setEstimatedHoursEditError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
+    setEstimatedHoursEditSaving(true);
+    setEstimatedHoursEditError("");
+    try {
+      const updatedGoal = await updateGoal(currentGoal._id, {
+        estimatedHours: nextEstimatedHours
+      });
+      setCurrentGoal(updatedGoal);
+      setFormValues(buildFormValues(updatedGoal));
+      setEstimatedHoursEditValue(
+        updatedGoal?.estimatedHours !== undefined ? String(updatedGoal.estimatedHours) : "0"
+      );
+      setEstimatedHoursEditOpen(false);
+    } catch (err) {
+      console.error(err);
+      setEstimatedHoursEditError("Unable to update estimated hours right now.");
+    } finally {
+      setEstimatedHoursEditSaving(false);
+    }
+  };
+
   if (!currentGoal) {
     return (
       <Container maxWidth="lg" sx={{ py: 6, textAlign: "left" }}>
@@ -319,7 +373,47 @@ const GoalView = ({ goal }) => {
                   <Typography variant="caption" color="text.secondary">
                     Estimated hours
                   </Typography>
-                  <Typography>{formatHours(estimatedHours)}</Typography>
+                  {estimatedHoursEditOpen ? (
+                    <Stack spacing={1} sx={{ mt: 0.5 }}>
+                      <TextField
+                        value={estimatedHoursEditValue}
+                        onChange={(event) => setEstimatedHoursEditValue(event.target.value)}
+                        type="number"
+                        size="small"
+                        inputProps={{ min: 0, step: "0.25" }}
+                      />
+                      {estimatedHoursEditError && (
+                        <Typography variant="caption" color="error">
+                          {estimatedHoursEditError}
+                        </Typography>
+                      )}
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={handleSaveEstimatedHours}
+                          disabled={estimatedHoursEditSaving}
+                        >
+                          {estimatedHoursEditSaving ? "Saving..." : "Save"}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={handleCancelEstimatedHoursEdit}
+                          disabled={estimatedHoursEditSaving}
+                        >
+                          Cancel
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  ) : (
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
+                      <Typography>{formatHours(estimatedHours)}</Typography>
+                      <Button size="small" onClick={handleStartEstimatedHoursEdit}>
+                        Edit
+                      </Button>
+                    </Stack>
+                  )}
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary">
