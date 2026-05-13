@@ -264,49 +264,78 @@ const GoalTreeView = () => {
 
           {goalTasks.length > 0 && (
             <Stack spacing={1} sx={{ pl: 2 }}>
-              {goalTasks.map((task) => (
-                <Paper
-                  key={task._id}
-                  component={Link}
-                  to={`/tasks/${task._id}`}
-                  variant="outlined"
-                  sx={{
-                    p: 1.25,
-                    borderRadius: 2,
-                    textDecoration: "none",
-                    color: "inherit",
-                    backgroundColor: "rgba(0, 0, 0, 0.02)",
-                    transition: "0.2s",
-                    "&:hover": {
-                      borderColor: "primary.main",
-                      backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04)
-                    }
-                  }}
-                >
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1}
-                    sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
+              {goalTasks.map((task) => {
+                const taskEstimatedHours = Number(task.estimatedCompletionTime) || 0;
+                const taskTimeSpent = Number(task.timeSpent) || 0;
+                const taskProgressValue =
+                  taskEstimatedHours > 0
+                    ? Math.min((taskTimeSpent / taskEstimatedHours) * 100, 100)
+                    : 0;
+
+                return (
+                  <Paper
+                    key={task._id}
+                    component={Link}
+                    to={`/tasks/${task._id}`}
+                    variant="outlined"
+                    sx={{
+                      p: 1.25,
+                      borderRadius: 2,
+                      textDecoration: "none",
+                      color: "inherit",
+                      backgroundColor: "rgba(0, 0, 0, 0.02)",
+                      transition: "0.2s",
+                      "&:hover": {
+                        borderColor: "primary.main",
+                        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04)
+                      }
+                    }}
                   >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={600}>
-                        {task.title}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {task.dueDate
-                          ? `Due ${dateFormatter.format(task.dueDate)}`
-                          : "No deadline"}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      label={task.isComplete ? "Complete" : "Open"}
-                      size="small"
-                      color={task.isComplete ? "success" : "default"}
-                      variant={task.isComplete ? "filled" : "outlined"}
-                    />
-                  </Stack>
-                </Paper>
-              ))}
+                    <Stack spacing={1}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
+                      >
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {task.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {task.dueDate
+                              ? `Due ${dateFormatter.format(task.dueDate)}`
+                              : "No deadline"}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={task.isComplete ? "Complete" : "Open"}
+                          size="small"
+                          color={task.isComplete ? "success" : "default"}
+                          variant={task.isComplete ? "filled" : "outlined"}
+                        />
+                      </Stack>
+                      <Box>
+                        {taskEstimatedHours > 0 ? (
+                          <Stack spacing={0.75}>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatHours(taskTimeSpent)} / {formatHours(taskEstimatedHours)} hrs
+                            </Typography>
+                            <LinearProgress
+                              variant="determinate"
+                              value={taskProgressValue}
+                              sx={{ height: 6, borderRadius: 999, maxWidth: 220 }}
+                            />
+                          </Stack>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            Logged {formatHours(taskTimeSpent)}h. No estimate set for this task yet.
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
+                  </Paper>
+                );
+              })}
             </Stack>
           )}
 
