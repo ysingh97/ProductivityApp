@@ -49,6 +49,103 @@ const getTopLevelGoal = async (goalId, userId) => {
   return currentGoal;
 };
 
+const collectDescendantGoalIds = async (rootId, userId) => {
+  const descendantIds = [];
+  const queue = [rootId];
+  const seen = new Set([String(rootId)]);
+
+  while (queue.length) {
+    const batch = queue.splice(0, queue.length);
+    const children = await Goal.find(
+      { parentGoalId: { $in: batch }, userId },
+      { _id: 1 }
+    );
+
+    for (const child of children) {
+      const childId = String(child._id);
+      if (seen.has(childId)) {
+        continue;
+      }
+
+      seen.add(childId);
+      descendantIds.push(child._id);
+      queue.push(child._id);
+    }
+  }
+
+  return descendantIds;
+};
+
+const collectAncestorGoalIds = async (goalId, userId) => {
+  const ancestorGoalIds = [];
+  let currentGoal = await Goal.findOne({ _id: goalId, userId }, { _id: 1, parentGoalId: 1 });
+  const seen = new Set();
+
+  while (currentGoal) {
+    const currentId = String(currentGoal._id);
+    if (seen.has(currentId)) {
+      break;
+    }
+
+    seen.add(currentId);
+    ancestorGoalIds.push(currentGoal._id);
+
+    if (!currentGoal.parentGoalId) {
+      break;
+    }
+
+    currentGoal = await Goal.findOne(
+      { _id: currentGoal.parentGoalId, userId },
+      { _id: 1, parentGoalId: 1 }
+    );
+  }
+
+  return ancestorGoalIds;
+};
+
+const syncGoalTimeTotals = async (goalId, userId) => {
+  const goal = await Goal.findOne({ _id: goalId, userId });
+  if (!goal) {
+    return null;
+  }
+
+  const descendantGoalIds = await collectDescendantGoalIds(goal._id, userId);
+  const aggregate = await Task.aggregate([
+    {
+      $match: {
+        userId: goal.userId,
+        parentGoalId: { $in: [goal._id, ...descendantGoalIds] }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalHours: { $sum: '$timeSpent' }
+      }
+    }
+  ]);
+
+  const totalHours = roundToTwoDecimals(aggregate[0]?.totalHours || 0);
+  const estimatedHours = Number(goal.estimatedHours) || 0;
+
+  goal.timeSpent = totalHours;
+  goal.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - totalHours, 0));
+  await goal.save();
+
+  return goal;
+};
+
+const syncParentGoalTimeTotals = async (task) => {
+  if (!task.parentGoalId) {
+    return;
+  }
+
+  const ancestorGoalIds = await collectAncestorGoalIds(task.parentGoalId, task.userId);
+  for (const goalId of ancestorGoalIds) {
+    await syncGoalTimeTotals(goalId, task.userId);
+  }
+};
+
 const syncTaskTimeTotals = async (task) => {
   const aggregate = await TimeEntry.aggregate([
     {
@@ -72,6 +169,7 @@ const syncTaskTimeTotals = async (task) => {
   task.timeSpent = totalHours;
   task.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - totalHours, 0));
   await task.save();
+  await syncParentGoalTimeTotals(task);
 
   return task;
 };

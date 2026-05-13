@@ -4,6 +4,7 @@ const request = require('supertest');
 
 const createApp = require('../app');
 const Category = require('../models/category');
+const Goal = require('../models/goal');
 const Task = require('../models/task');
 const TimeEntry = require('../models/timeEntry');
 const User = require('../models/user');
@@ -26,6 +27,7 @@ beforeAll(async () => {
 afterEach(async () => {
   await TimeEntry.deleteMany({});
   await Task.deleteMany({});
+  await Goal.deleteMany({});
   await Category.deleteMany({});
   await User.deleteMany({});
 });
@@ -196,6 +198,99 @@ test('task time-entry update endpoint edits the range and refreshes cached task 
   expect(new Date(persistedEntry.endedAt).toISOString()).toBe('2026-01-12T09:00:00.000Z');
   expect(persistedTask.timeSpent).toBe(1.75);
   expect(persistedTask.timeLeft).toBe(3.25);
+});
+
+test('task time-entry mutations refresh parent-goal totals through the ancestor chain', async () => {
+  const { user, categories } = await seedMockTasks('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const rootGoal = await Goal.create({
+    title: 'Career growth',
+    description: 'Seeded parent goal',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 12,
+    timeLeft: 12
+  });
+
+  const childGoal = await Goal.create({
+    title: 'Ship major project',
+    description: 'Seeded child goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: rootGoal._id,
+    estimatedHours: 10,
+    timeLeft: 10
+  });
+
+  const workTask = await Task.create({
+    title: 'Goal-linked execution',
+    description: 'Seeded goal-linked task',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: childGoal._id,
+    estimatedCompletionTime: 5,
+    timeLeft: 5,
+    timeSpent: 0,
+    targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  const createResponse = await request(app)
+    .post(`/api/tasks/${workTask._id}/time-entries`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:00:00.000Z',
+      endedAt: '2026-01-12T08:45:00.000Z'
+    })
+    .expect(201);
+
+  expect(createResponse.body.task.timeSpent).toBe(1.75);
+
+  let refreshedChildGoal = await Goal.findById(childGoal._id).lean();
+  let refreshedRootGoal = await Goal.findById(rootGoal._id).lean();
+
+  expect(refreshedChildGoal.timeSpent).toBe(1.75);
+  expect(refreshedChildGoal.timeLeft).toBe(8.25);
+  expect(refreshedRootGoal.timeSpent).toBe(1.75);
+  expect(refreshedRootGoal.timeLeft).toBe(10.25);
+
+  const createdEntry = await TimeEntry.findOne({ taskId: workTask._id }).lean();
+
+  await request(app)
+    .put(`/api/tasks/${workTask._id}/time-entries/${createdEntry._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      startedAt: '2026-01-12T07:30:00.000Z',
+      endedAt: '2026-01-12T09:30:00.000Z'
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.task.timeSpent).toBe(2);
+    });
+
+  refreshedChildGoal = await Goal.findById(childGoal._id).lean();
+  refreshedRootGoal = await Goal.findById(rootGoal._id).lean();
+
+  expect(refreshedChildGoal.timeSpent).toBe(2);
+  expect(refreshedChildGoal.timeLeft).toBe(8);
+  expect(refreshedRootGoal.timeSpent).toBe(2);
+  expect(refreshedRootGoal.timeLeft).toBe(10);
+
+  await request(app)
+    .delete(`/api/tasks/${workTask._id}/time-entries/${createdEntry._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.task.timeSpent).toBe(0);
+    });
+
+  refreshedChildGoal = await Goal.findById(childGoal._id).lean();
+  refreshedRootGoal = await Goal.findById(rootGoal._id).lean();
+
+  expect(refreshedChildGoal.timeSpent).toBe(0);
+  expect(refreshedChildGoal.timeLeft).toBe(10);
+  expect(refreshedRootGoal.timeSpent).toBe(0);
+  expect(refreshedRootGoal.timeLeft).toBe(12);
 });
 
 test('task time-entry endpoint is idempotent for duplicate task/start/end submissions', async () => {
