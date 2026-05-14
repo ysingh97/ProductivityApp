@@ -142,6 +142,91 @@ test('goal read endpoints refresh stale cached time totals from descendant tasks
   expect(persistedChildGoal.timeLeft).toBe(0);
 });
 
+test('goal create endpoint ignores client supplied derived time totals', async () => {
+  const { categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  await request(app)
+    .post('/api/goals')
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      title: 'Finish Website',
+      description: 'Top-level goal',
+      category: workCategory.title,
+      estimatedHours: 8,
+      timeSpent: 99,
+      timeLeft: 1
+    })
+    .expect(201)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        title: 'Finish Website',
+        estimatedHours: 8,
+        timeSpent: 0,
+        timeLeft: 8
+      });
+    });
+
+  const persistedGoal = await Goal.findOne({ title: 'Finish Website' }).lean();
+
+  expect(persistedGoal.estimatedHours).toBe(8);
+  expect(persistedGoal.timeSpent).toBe(0);
+  expect(persistedGoal.timeLeft).toBe(8);
+});
+
+test('goal update endpoint returns refreshed time totals when estimate changes', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const goal = await Goal.create({
+    title: 'Finish Website',
+    description: 'Top-level goal',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 5,
+    timeSpent: 0,
+    timeLeft: 5
+  });
+
+  const task = await Task.create({
+    title: 'Add CI/CD pipeline',
+    description: 'Task with logged time',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: goal._id,
+    estimatedCompletionTime: 5,
+    timeSpent: 3.25,
+    timeLeft: 1.75,
+    targetCompletionDate: new Date('2026-05-16T18:00:00.000Z')
+  });
+
+  await Goal.updateOne({ _id: goal._id }, { $addToSet: { subTasks: task._id } });
+
+  await request(app)
+    .put(`/api/goals/${goal._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      estimatedHours: 10,
+      timeSpent: 99,
+      timeLeft: 99
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(goal._id),
+        estimatedHours: 10,
+        timeSpent: 3.25,
+        timeLeft: 6.75
+      });
+    });
+
+  const persistedGoal = await Goal.findById(goal._id).lean();
+
+  expect(persistedGoal.estimatedHours).toBe(10);
+  expect(persistedGoal.timeSpent).toBe(3.25);
+  expect(persistedGoal.timeLeft).toBe(6.75);
+});
+
 test('goal update endpoint refreshes old and new ancestor totals when parent changes', async () => {
   const { user, categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');

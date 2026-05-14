@@ -216,8 +216,9 @@ const getGoalById = async (req, res) => {
 
 const createGoal = async (req, res) => {
     try {
+        const { userId, timeSpent, timeLeft, ...goalBody } = req.body;
         let parentGoal = null;
-        const parentGoalId = req.body.parentGoalId || null;
+        const parentGoalId = goalBody.parentGoalId || null;
         if (parentGoalId) {
             parentGoal = await Goal.findOne({ _id: parentGoalId, userId: req.user.id });
             if (!parentGoal) {
@@ -230,12 +231,12 @@ const createGoal = async (req, res) => {
             const topLevelGoal = await getTopLevelGoal(parentGoal._id, req.user.id);
             categoryId = topLevelGoal ? topLevelGoal.category || null : null;
         } else {
-            const category = await resolveCategory(req.body.category, req.user.id);
+            const category = await resolveCategory(goalBody.category, req.user.id);
             categoryId = category ? category._id : null;
         }
 
         const newGoal = new Goal({
-            ...req.body,
+            ...goalBody,
             category: categoryId,
             userId: req.user.id
         });
@@ -252,14 +253,16 @@ const createGoal = async (req, res) => {
             await parentGoal.save();
         }
 
+        const responseGoal = await syncGoalTimeTotals(savedGoal._id, req.user.id) || savedGoal;
+
         await enqueueGoogleSync({
             userId: req.user.id,
             sourceType: 'goal',
             sourceId: savedGoal._id
         });
 
-        await savedGoal.populate('category', 'title');
-        res.status(201).json(savedGoal);
+        await responseGoal.populate('category', 'title');
+        res.status(201).json(responseGoal);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -268,7 +271,7 @@ const createGoal = async (req, res) => {
 const updateGoal = async (req, res) => {
     try {
         const { id } = req.params;
-        const { userId, ...updates } = req.body;
+        const { userId, timeSpent, timeLeft, ...updates } = req.body;
 
         const existingGoal = await Goal.findOne({ _id: id, userId: req.user.id });
         if (!existingGoal) {
@@ -353,13 +356,16 @@ const updateGoal = async (req, res) => {
             });
         }
 
-        await updatedGoal.populate('category', 'title');
+        const refreshedUpdatedGoal = await syncGoalTimeTotals(updatedGoal._id, req.user.id);
+        const responseGoal = refreshedUpdatedGoal || updatedGoal;
+
+        await responseGoal.populate('category', 'title');
         await enqueueGoogleSync({
             userId: req.user.id,
             sourceType: 'goal',
-            sourceId: updatedGoal._id
+            sourceId: responseGoal._id
         });
-        res.status(200).json(updatedGoal);
+        res.status(200).json(responseGoal);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
