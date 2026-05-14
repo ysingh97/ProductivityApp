@@ -135,16 +135,31 @@ const syncGoalTimeTotals = async (goalId, userId) => {
   return goal;
 };
 
-const syncParentGoalTimeTotals = async (task) => {
-  if (!task.parentGoalId) {
-    return;
+const syncParentGoalTimeTotalsForIds = async ({ userId, parentGoalIds }) => {
+  const goalIdsToSync = new Map();
+
+  for (const parentGoalId of parentGoalIds) {
+    if (!parentGoalId) {
+      continue;
+    }
+
+    const ancestorGoalIds = await collectAncestorGoalIds(parentGoalId, userId);
+    for (const goalId of ancestorGoalIds) {
+      goalIdsToSync.set(String(goalId), goalId);
+    }
   }
 
-  const ancestorGoalIds = await collectAncestorGoalIds(task.parentGoalId, task.userId);
-  for (const goalId of ancestorGoalIds) {
-    await syncGoalTimeTotals(goalId, task.userId);
+  for (const goalId of goalIdsToSync.values()) {
+    await syncGoalTimeTotals(goalId, userId);
   }
 };
+
+const syncParentGoalTimeTotals = async (task) => (
+  syncParentGoalTimeTotalsForIds({
+    userId: task.userId,
+    parentGoalIds: [task.parentGoalId]
+  })
+);
 
 const syncTaskTimeTotals = async (task) => {
   const aggregate = await TimeEntry.aggregate([
@@ -293,7 +308,10 @@ const updateTask = async (req, res) => {
       updates.parentGoalId = null;
     }
 
+    const previousParentGoalId = existingTask.parentGoalId || null;
     const nextParentGoalId = hasParentUpdate ? updates.parentGoalId : existingTask.parentGoalId;
+    const previousParentGoalIdString = previousParentGoalId ? String(previousParentGoalId) : null;
+    const nextParentGoalIdString = nextParentGoalId ? String(nextParentGoalId) : null;
 
     if (hasParentUpdate && nextParentGoalId) {
       const parentGoal = await Goal.findOne({ _id: nextParentGoalId, userId: req.user.id });
@@ -329,6 +347,28 @@ const updateTask = async (req, res) => {
     const spentHours = Number(updatedTask.timeSpent) || 0;
     updatedTask.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - spentHours, 0));
     await updatedTask.save();
+
+    const parentChanged = hasParentUpdate && previousParentGoalIdString !== nextParentGoalIdString;
+    if (parentChanged) {
+      if (previousParentGoalIdString) {
+        await Goal.updateOne(
+          { _id: previousParentGoalIdString, userId: req.user.id },
+          { $pull: { subTasks: updatedTask._id } }
+        );
+      }
+
+      if (nextParentGoalIdString) {
+        await Goal.updateOne(
+          { _id: nextParentGoalIdString, userId: req.user.id },
+          { $addToSet: { subTasks: updatedTask._id } }
+        );
+      }
+
+      await syncParentGoalTimeTotalsForIds({
+        userId: req.user.id,
+        parentGoalIds: [previousParentGoalId, nextParentGoalId]
+      });
+    }
 
     await updatedTask.populate('category', 'title');
     await enqueueGoogleSync({

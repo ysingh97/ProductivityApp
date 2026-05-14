@@ -8,6 +8,7 @@ const Goal = require('../models/goal');
 const Task = require('../models/task');
 const TimeEntry = require('../models/timeEntry');
 const User = require('../models/user');
+const { seedMockCategories } = require('../test-data/mockCategories');
 const { seedMockTasks } = require('../test-data/mockTasks');
 
 jest.setTimeout(60000);
@@ -114,6 +115,110 @@ test('task update endpoint refreshes cached time left when estimate changes', as
 
   const persistedTask = await Task.findById(workTask._id).lean();
   expect(persistedTask.timeLeft).toBe(0);
+});
+
+test('task update endpoint refreshes old and new goal totals when parent goal changes', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+  const healthCategory = categories.find((category) => category.title === 'Health');
+
+  const sourceRootGoal = await Goal.create({
+    title: 'Source root',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 10,
+    timeSpent: 3.25,
+    timeLeft: 6.75
+  });
+
+  const sourceChildGoal = await Goal.create({
+    title: 'Source child',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: sourceRootGoal._id,
+    estimatedHours: 5,
+    timeSpent: 3.25,
+    timeLeft: 1.75
+  });
+
+  const targetRootGoal = await Goal.create({
+    title: 'Target root',
+    userId: user._id,
+    category: healthCategory._id,
+    estimatedHours: 10,
+    timeSpent: 0,
+    timeLeft: 10
+  });
+
+  const targetChildGoal = await Goal.create({
+    title: 'Target child',
+    userId: user._id,
+    category: healthCategory._id,
+    parentGoalId: targetRootGoal._id,
+    estimatedHours: 5,
+    timeSpent: 0,
+    timeLeft: 5
+  });
+
+  await Goal.updateOne(
+    { _id: sourceRootGoal._id },
+    { $addToSet: { subGoals: sourceChildGoal._id } }
+  );
+  await Goal.updateOne(
+    { _id: targetRootGoal._id },
+    { $addToSet: { subGoals: targetChildGoal._id } }
+  );
+
+  const task = await Task.create({
+    title: 'Movable task',
+    description: 'Task with cached time',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: sourceChildGoal._id,
+    estimatedCompletionTime: 4,
+    timeSpent: 3.25,
+    timeLeft: 0.75,
+    targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  await Goal.updateOne(
+    { _id: sourceChildGoal._id },
+    { $addToSet: { subTasks: task._id } }
+  );
+
+  await request(app)
+    .put(`/api/tasks/${task._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      parentGoalId: String(targetChildGoal._id)
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(task._id),
+        parentGoalId: String(targetChildGoal._id),
+        timeSpent: 3.25,
+        timeLeft: 0.75
+      });
+      expect(body.category._id).toBe(String(healthCategory._id));
+    });
+
+  const refreshedSourceRoot = await Goal.findById(sourceRootGoal._id).lean();
+  const refreshedSourceChild = await Goal.findById(sourceChildGoal._id).lean();
+  const refreshedTargetRoot = await Goal.findById(targetRootGoal._id).lean();
+  const refreshedTargetChild = await Goal.findById(targetChildGoal._id).lean();
+
+  expect(refreshedSourceRoot.timeSpent).toBe(0);
+  expect(refreshedSourceRoot.timeLeft).toBe(10);
+  expect(refreshedSourceChild.timeSpent).toBe(0);
+  expect(refreshedSourceChild.timeLeft).toBe(5);
+  expect(refreshedSourceChild.subTasks.map(String)).not.toContain(String(task._id));
+
+  expect(refreshedTargetRoot.timeSpent).toBe(3.25);
+  expect(refreshedTargetRoot.timeLeft).toBe(6.75);
+  expect(refreshedTargetChild.timeSpent).toBe(3.25);
+  expect(refreshedTargetChild.timeLeft).toBe(1.75);
+  expect(refreshedTargetChild.subTasks.map(String)).toContain(String(task._id));
 });
 
 test('task time-entry endpoint lists time entries newest first for the task owner', async () => {
