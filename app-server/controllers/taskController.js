@@ -244,8 +244,9 @@ const getTasks = async(req, res) => {
 
 const createTask = async (req, res) => {
     try {
-      const { listId } = req.body;
-      const parentGoalId = req.body.parentGoalId || null;
+      const { userId, timeSpent, timeLeft, ...taskBody } = req.body;
+      const { listId } = taskBody;
+      const parentGoalId = taskBody.parentGoalId || null;
 
       if (listId) {
         const list = await List.findOne({ _id: listId, userId: req.user.id });
@@ -264,15 +265,17 @@ const createTask = async (req, res) => {
         const topLevelGoal = await getTopLevelGoal(parentGoalId, req.user.id);
         categoryId = topLevelGoal ? topLevelGoal.category || null : null;
       } else {
-        const category = await resolveCategory(req.body.category, req.user.id);
+        const category = await resolveCategory(taskBody.category, req.user.id);
         categoryId = category ? category._id : null;
       }
 
       const newTask = new Task({  
-        ...req.body,
+        ...taskBody,
         category: categoryId,
         userId: req.user.id
       });
+      newTask.timeSpent = 0;
+      newTask.timeLeft = roundToTwoDecimals(Number(newTask.estimatedCompletionTime) || 0);
       const savedTask = await newTask.save();
 
       if (parentGoal) {
@@ -296,7 +299,7 @@ const createTask = async (req, res) => {
 const updateTask = async (req, res) => {
   try {
     const { id } = req.params; // task id from URL
-    const { userId, ...updates } = req.body;  // fields to update, disallow userId change
+    const { userId, timeSpent, timeLeft, ...updates } = req.body;  // fields to update, disallow userId and derived time changes
 
     const existingTask = await Task.findOne({ _id: id, userId: req.user.id });
     if (!existingTask) {

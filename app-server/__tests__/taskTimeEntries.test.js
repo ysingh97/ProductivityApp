@@ -79,6 +79,39 @@ test('task time-entry endpoint creates a time entry and refreshes cached task to
   expect(String(persistedEntries[0].category)).toBe(String(workTask.category));
 });
 
+test('task create endpoint ignores client supplied derived time totals', async () => {
+  const { categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  await request(app)
+    .post('/api/tasks')
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      title: 'Write implementation notes',
+      description: 'Task created through the API',
+      category: workCategory.title,
+      estimatedCompletionTime: 3.5,
+      timeSpent: 99,
+      timeLeft: 1,
+      targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+    })
+    .expect(201)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        title: 'Write implementation notes',
+        estimatedCompletionTime: 3.5,
+        timeSpent: 0,
+        timeLeft: 3.5
+      });
+    });
+
+  const persistedTask = await Task.findOne({ title: 'Write implementation notes' }).lean();
+
+  expect(persistedTask.estimatedCompletionTime).toBe(3.5);
+  expect(persistedTask.timeSpent).toBe(0);
+  expect(persistedTask.timeLeft).toBe(3.5);
+});
+
 test('task update endpoint refreshes cached time left when estimate changes', async () => {
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');
@@ -87,7 +120,9 @@ test('task update endpoint refreshes cached time left when estimate changes', as
     .put(`/api/tasks/${workTask._id}`)
     .set('Authorization', 'Bearer test:basic')
     .send({
-      estimatedCompletionTime: 6
+      estimatedCompletionTime: 6,
+      timeSpent: 99,
+      timeLeft: 99
     })
     .expect(200)
     .expect(({ body }) => {
@@ -103,7 +138,9 @@ test('task update endpoint refreshes cached time left when estimate changes', as
     .put(`/api/tasks/${workTask._id}`)
     .set('Authorization', 'Bearer test:basic')
     .send({
-      estimatedCompletionTime: 2
+      estimatedCompletionTime: 2,
+      timeSpent: 99,
+      timeLeft: 99
     })
     .expect(200)
     .expect(({ body }) => {
@@ -116,6 +153,7 @@ test('task update endpoint refreshes cached time left when estimate changes', as
     });
 
   const persistedTask = await Task.findById(workTask._id).lean();
+  expect(persistedTask.timeSpent).toBe(4);
   expect(persistedTask.timeLeft).toBe(0);
 });
 
