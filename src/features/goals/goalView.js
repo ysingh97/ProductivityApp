@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Box,
@@ -21,7 +21,7 @@ import {
   Typography
 } from "@mui/material";
 import DateTimePicker from "../../components/DateTimePicker";
-import { fetchGoals, updateGoal } from "./goalService";
+import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
 import { fetchCategories } from "../categories/categoryService";
 
 const getCategoryValue = (value) => {
@@ -60,6 +60,7 @@ const formatHours = (value) => {
 };
 
 const GoalView = ({ goal }) => {
+  const navigate = useNavigate();
   const [currentGoal, setCurrentGoal] = useState(goal);
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -67,6 +68,9 @@ const GoalView = ({ goal }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingGoal, setDeletingGoal] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(goal));
   const [estimatedHoursEditOpen, setEstimatedHoursEditOpen] = useState(false);
   const [estimatedHoursEditValue, setEstimatedHoursEditValue] = useState(
@@ -82,6 +86,9 @@ const GoalView = ({ goal }) => {
     setEstimatedHoursEditValue(goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0");
     setEstimatedHoursEditError("");
     setSaveError("");
+    setDeleteConfirmOpen(false);
+    setDeletingGoal(false);
+    setDeleteError("");
     setEditOpen(false);
   }, [goal]);
 
@@ -252,6 +259,24 @@ const GoalView = ({ goal }) => {
       setEstimatedHoursEditError("Unable to update estimated hours right now.");
     } finally {
       setEstimatedHoursEditSaving(false);
+    }
+  };
+
+  const handleDeleteGoal = async () => {
+    if (!currentGoal?._id) return;
+
+    setDeletingGoal(true);
+    setDeleteError("");
+    try {
+      await deleteGoal(currentGoal._id);
+      navigate("/goals/overview");
+    } catch (err) {
+      console.error(err);
+      setDeleteError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to delete goal right now."
+      );
+    } finally {
+      setDeletingGoal(false);
     }
   };
 
@@ -510,6 +535,33 @@ const GoalView = ({ goal }) => {
               >
                 Create sub-task
               </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  setDeleteConfirmOpen((prev) => !prev);
+                  setDeleteError("");
+                }}
+                disabled={deletingGoal}
+              >
+                {deleteConfirmOpen ? "Cancel delete" : "Delete goal"}
+              </Button>
+              {deleteConfirmOpen && (
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    This deletes this goal. Existing child goals are detached by the current backend behavior.
+                  </Typography>
+                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleDeleteGoal}
+                    disabled={deletingGoal}
+                  >
+                    {deletingGoal ? "Deleting..." : "Confirm delete"}
+                  </Button>
+                </Stack>
+              )}
             </Stack>
           </Paper>
 
