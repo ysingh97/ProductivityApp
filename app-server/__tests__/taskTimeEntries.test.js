@@ -76,6 +76,46 @@ test('task time-entry endpoint creates a time entry and refreshes cached task to
   expect(String(persistedEntries[0].category)).toBe(String(workTask.category));
 });
 
+test('task update endpoint refreshes cached time left when estimate changes', async () => {
+  const { tasks } = await seedMockTasks('basic');
+  const workTask = tasks.find((task) => task.title === 'Project planning');
+
+  await request(app)
+    .put(`/api/tasks/${workTask._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      estimatedCompletionTime: 6
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(workTask._id),
+        estimatedCompletionTime: 6,
+        timeSpent: 4,
+        timeLeft: 2
+      });
+    });
+
+  await request(app)
+    .put(`/api/tasks/${workTask._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      estimatedCompletionTime: 2
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(workTask._id),
+        estimatedCompletionTime: 2,
+        timeSpent: 4,
+        timeLeft: 0
+      });
+    });
+
+  const persistedTask = await Task.findById(workTask._id).lean();
+  expect(persistedTask.timeLeft).toBe(0);
+});
+
 test('task time-entry endpoint lists time entries newest first for the task owner', async () => {
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');

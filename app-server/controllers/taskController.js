@@ -325,6 +325,11 @@ const updateTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
+    const estimatedHours = Number(updatedTask.estimatedCompletionTime) || 0;
+    const spentHours = Number(updatedTask.timeSpent) || 0;
+    updatedTask.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - spentHours, 0));
+    await updatedTask.save();
+
     await updatedTask.populate('category', 'title');
     await enqueueGoogleSync({
       userId: req.user.id,

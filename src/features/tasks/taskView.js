@@ -65,6 +65,11 @@ const parseNumber = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+const parseEditableNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
 const buildDefaultTimeEntryValues = () => {
   const end = dayjs();
   const start = end.subtract(1, "hour");
@@ -106,6 +111,12 @@ const TaskView = ({ task }) => {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(task));
+  const [estimateEditOpen, setEstimateEditOpen] = useState(false);
+  const [estimateEditValue, setEstimateEditValue] = useState(
+    task?.estimatedCompletionTime !== undefined ? String(task.estimatedCompletionTime) : "0"
+  );
+  const [estimateEditSaving, setEstimateEditSaving] = useState(false);
+  const [estimateEditError, setEstimateEditError] = useState("");
   const [timeEntryValues, setTimeEntryValues] = useState(buildDefaultTimeEntryValues);
   const [timeEntrySaving, setTimeEntrySaving] = useState(false);
   const [timeEntryError, setTimeEntryError] = useState("");
@@ -123,6 +134,11 @@ const TaskView = ({ task }) => {
   useEffect(() => {
     setCurrentTask(task);
     setFormValues(buildFormValues(task));
+    setEstimateEditOpen(false);
+    setEstimateEditValue(
+      task?.estimatedCompletionTime !== undefined ? String(task.estimatedCompletionTime) : "0"
+    );
+    setEstimateEditError("");
     setTimeEntryValues(buildDefaultTimeEntryValues());
     setTimeEntryError("");
     setTimeEntrySuccess("");
@@ -294,6 +310,57 @@ const TaskView = ({ task }) => {
     setFormValues(buildFormValues(currentTask));
     setEditOpen(false);
     setSaveError("");
+  };
+
+  const handleStartEstimateEdit = () => {
+    setEstimateEditOpen(true);
+    setEstimateEditValue(
+      currentTask?.estimatedCompletionTime !== undefined
+        ? String(currentTask.estimatedCompletionTime)
+        : "0"
+    );
+    setEstimateEditError("");
+  };
+
+  const handleCancelEstimateEdit = () => {
+    setEstimateEditOpen(false);
+    setEstimateEditValue(
+      currentTask?.estimatedCompletionTime !== undefined
+        ? String(currentTask.estimatedCompletionTime)
+        : "0"
+    );
+    setEstimateEditError("");
+  };
+
+  const handleSaveEstimate = async () => {
+    if (!currentTask) return;
+
+    const nextEstimate = parseEditableNumber(estimateEditValue);
+    if (Number.isNaN(nextEstimate) || nextEstimate < 0) {
+      setEstimateEditError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
+    setEstimateEditSaving(true);
+    setEstimateEditError("");
+    try {
+      const updatedTask = await updateTask(currentTask._id, {
+        estimatedCompletionTime: nextEstimate
+      });
+      setCurrentTask(updatedTask);
+      setFormValues(buildFormValues(updatedTask));
+      setEstimateEditValue(
+        updatedTask?.estimatedCompletionTime !== undefined
+          ? String(updatedTask.estimatedCompletionTime)
+          : "0"
+      );
+      setEstimateEditOpen(false);
+    } catch (err) {
+      console.error(err);
+      setEstimateEditError("Unable to update estimated hours right now.");
+    } finally {
+      setEstimateEditSaving(false);
+    }
   };
 
   const loggedDurationHours = useMemo(() => {
@@ -660,7 +727,47 @@ const TaskView = ({ task }) => {
                 <Typography variant="caption" color="text.secondary">
                   Estimated hours
                 </Typography>
-                <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
+                {estimateEditOpen ? (
+                  <Stack spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField
+                      value={estimateEditValue}
+                      onChange={(event) => setEstimateEditValue(event.target.value)}
+                      type="number"
+                      size="small"
+                      inputProps={{ min: 0, step: "0.25" }}
+                    />
+                    {estimateEditError && (
+                      <Typography variant="caption" color="error">
+                        {estimateEditError}
+                      </Typography>
+                    )}
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={handleSaveEstimate}
+                        disabled={estimateEditSaving}
+                      >
+                        {estimateEditSaving ? "Saving..." : "Save"}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleCancelEstimateEdit}
+                        disabled={estimateEditSaving}
+                      >
+                        Cancel
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
+                    <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
+                    <Button size="small" onClick={handleStartEstimateEdit}>
+                      Edit
+                    </Button>
+                  </Stack>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
