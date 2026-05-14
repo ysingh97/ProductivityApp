@@ -116,6 +116,15 @@ test('task update endpoint refreshes cached time left when estimate changes', as
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');
 
+  await TimeEntry.create({
+    userId: workTask.userId,
+    taskId: workTask._id,
+    category: workTask.category,
+    startedAt: new Date('2026-01-12T08:00:00.000Z'),
+    endedAt: new Date('2026-01-12T12:00:00.000Z'),
+    durationMinutes: 240
+  });
+
   await request(app)
     .put(`/api/tasks/${workTask._id}`)
     .set('Authorization', 'Bearer test:basic')
@@ -219,6 +228,15 @@ test('task update endpoint refreshes old and new goal totals when parent goal ch
     timeSpent: 3.25,
     timeLeft: 0.75,
     targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  await TimeEntry.create({
+    userId: user._id,
+    taskId: task._id,
+    category: workCategory._id,
+    startedAt: new Date('2026-01-12T08:00:00.000Z'),
+    endedAt: new Date('2026-01-12T11:15:00.000Z'),
+    durationMinutes: 195
   });
 
   await Goal.updateOne(

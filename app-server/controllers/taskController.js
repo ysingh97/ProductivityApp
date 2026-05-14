@@ -346,24 +346,21 @@ const updateTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const estimatedHours = Number(updatedTask.estimatedCompletionTime) || 0;
-    const spentHours = Number(updatedTask.timeSpent) || 0;
-    updatedTask.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - spentHours, 0));
-    await updatedTask.save();
+    const refreshedTask = await syncTaskTimeTotals(updatedTask);
 
     const parentChanged = hasParentUpdate && previousParentGoalIdString !== nextParentGoalIdString;
     if (parentChanged) {
       if (previousParentGoalIdString) {
         await Goal.updateOne(
           { _id: previousParentGoalIdString, userId: req.user.id },
-          { $pull: { subTasks: updatedTask._id } }
+          { $pull: { subTasks: refreshedTask._id } }
         );
       }
 
       if (nextParentGoalIdString) {
         await Goal.updateOne(
           { _id: nextParentGoalIdString, userId: req.user.id },
-          { $addToSet: { subTasks: updatedTask._id } }
+          { $addToSet: { subTasks: refreshedTask._id } }
         );
       }
 
@@ -373,13 +370,13 @@ const updateTask = async (req, res) => {
       });
     }
 
-    await updatedTask.populate('category', 'title');
+    await refreshedTask.populate('category', 'title');
     await enqueueGoogleSync({
       userId: req.user.id,
       sourceType: 'task',
-      sourceId: updatedTask._id
+      sourceId: refreshedTask._id
     });
-    res.status(200).json(updatedTask);
+    res.status(200).json(refreshedTask);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
