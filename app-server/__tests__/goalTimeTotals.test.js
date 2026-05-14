@@ -141,3 +141,95 @@ test('goal read endpoints refresh stale cached time totals from descendant tasks
   expect(persistedChildGoal.timeSpent).toBe(20.07);
   expect(persistedChildGoal.timeLeft).toBe(0);
 });
+
+test('goal update endpoint refreshes old and new ancestor totals when parent changes', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+  const healthCategory = categories.find((category) => category.title === 'Health');
+
+  const sourceRootGoal = await Goal.create({
+    title: 'Source root',
+    description: 'Old parent tree',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 20,
+    timeSpent: 4.5,
+    timeLeft: 15.5
+  });
+
+  const targetRootGoal = await Goal.create({
+    title: 'Target root',
+    description: 'New parent tree',
+    userId: user._id,
+    category: healthCategory._id,
+    estimatedHours: 20,
+    timeSpent: 0,
+    timeLeft: 20
+  });
+
+  const movedGoal = await Goal.create({
+    title: 'Moved child goal',
+    description: 'Goal with timed task',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: sourceRootGoal._id,
+    estimatedHours: 10,
+    timeSpent: 4.5,
+    timeLeft: 5.5
+  });
+
+  await Goal.updateOne(
+    { _id: sourceRootGoal._id },
+    { $addToSet: { subGoals: movedGoal._id } }
+  );
+
+  const movedTask = await Task.create({
+    title: 'Timed child task',
+    description: 'Task under moved goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: movedGoal._id,
+    estimatedCompletionTime: 5,
+    timeSpent: 4.5,
+    timeLeft: 0.5,
+    targetCompletionDate: new Date('2026-05-18T18:00:00.000Z')
+  });
+
+  await Goal.updateOne(
+    { _id: movedGoal._id },
+    { $addToSet: { subTasks: movedTask._id } }
+  );
+
+  await request(app)
+    .put(`/api/goals/${movedGoal._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      parentGoalId: String(targetRootGoal._id)
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(movedGoal._id),
+        parentGoalId: String(targetRootGoal._id)
+      });
+      expect(body.category._id).toBe(String(healthCategory._id));
+    });
+
+  const refreshedSourceRoot = await Goal.findById(sourceRootGoal._id).lean();
+  const refreshedTargetRoot = await Goal.findById(targetRootGoal._id).lean();
+  const refreshedMovedGoal = await Goal.findById(movedGoal._id).lean();
+  const refreshedMovedTask = await Task.findById(movedTask._id).lean();
+
+  expect(refreshedSourceRoot.subGoals.map(String)).not.toContain(String(movedGoal._id));
+  expect(refreshedSourceRoot.timeSpent).toBe(0);
+  expect(refreshedSourceRoot.timeLeft).toBe(20);
+
+  expect(refreshedTargetRoot.subGoals.map(String)).toContain(String(movedGoal._id));
+  expect(refreshedTargetRoot.timeSpent).toBe(4.5);
+  expect(refreshedTargetRoot.timeLeft).toBe(15.5);
+
+  expect(refreshedMovedGoal.timeSpent).toBe(4.5);
+  expect(refreshedMovedGoal.timeLeft).toBe(5.5);
+  expect(String(refreshedMovedGoal.category)).toBe(String(healthCategory._id));
+  expect(String(refreshedMovedTask.category)).toBe(String(healthCategory._id));
+});

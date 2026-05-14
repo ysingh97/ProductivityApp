@@ -74,6 +74,33 @@ const collectDescendantGoalIds = async (rootId, userId) => {
     return descendantIds;
 };
 
+const collectAncestorGoalIds = async (goalId, userId) => {
+    const ancestorGoalIds = [];
+    let currentGoal = await Goal.findOne({ _id: goalId, userId }, { _id: 1, parentGoalId: 1 });
+    const seen = new Set();
+
+    while (currentGoal) {
+        const currentId = String(currentGoal._id);
+        if (seen.has(currentId)) {
+            break;
+        }
+
+        seen.add(currentId);
+        ancestorGoalIds.push(currentGoal._id);
+
+        if (!currentGoal.parentGoalId) {
+            break;
+        }
+
+        currentGoal = await Goal.findOne(
+            { _id: currentGoal.parentGoalId, userId },
+            { _id: 1, parentGoalId: 1 }
+        );
+    }
+
+    return ancestorGoalIds;
+};
+
 const syncGoalTimeTotals = async (goalId, userId) => {
     const goal = await Goal.findOne({ _id: goalId, userId });
     if (!goal) {
@@ -110,6 +137,25 @@ const syncAllGoalTimeTotals = async (userId) => {
     const goals = await Goal.find({ userId }, { _id: 1 });
     for (const goal of goals) {
         await syncGoalTimeTotals(goal._id, userId);
+    }
+};
+
+const syncGoalTimeTotalsForIds = async ({ userId, goalIds }) => {
+    const goalIdsToSync = new Map();
+
+    for (const goalId of goalIds) {
+        if (!goalId) {
+            continue;
+        }
+
+        const ancestorGoalIds = await collectAncestorGoalIds(goalId, userId);
+        for (const ancestorGoalId of ancestorGoalIds) {
+            goalIdsToSync.set(String(ancestorGoalId), ancestorGoalId);
+        }
+    }
+
+    for (const goalId of goalIdsToSync.values()) {
+        await syncGoalTimeTotals(goalId, userId);
     }
 };
 
@@ -298,6 +344,13 @@ const updateGoal = async (req, res) => {
                 nextCategoryId,
                 previousCategoryId
             );
+        }
+
+        if (parentChanged) {
+            await syncGoalTimeTotalsForIds({
+                userId: req.user.id,
+                goalIds: [previousParentId, nextParentId]
+            });
         }
 
         await updatedGoal.populate('category', 'title');
