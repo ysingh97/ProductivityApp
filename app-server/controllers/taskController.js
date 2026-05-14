@@ -536,6 +536,30 @@ const deleteTask = async (req, res) => {
         return res.status(404).json({ message: "Task not found" });
       }
 
+      const deletedTimeEntries = await TimeEntry.deleteMany({
+        taskId: deletedTask._id,
+        userId: req.user.id
+      });
+
+      if (deletedTask.parentGoalId) {
+        await Goal.updateOne(
+          { _id: deletedTask.parentGoalId, userId: req.user.id },
+          { $pull: { subTasks: deletedTask._id } }
+        );
+
+        await syncParentGoalTimeTotalsForIds({
+          userId: req.user.id,
+          parentGoalIds: [deletedTask.parentGoalId]
+        });
+      }
+
+      if (deletedTask.listId) {
+        await List.updateOne(
+          { _id: deletedTask.listId, userId: req.user.id },
+          { $pull: { tasks: deletedTask._id } }
+        );
+      }
+
       await enqueueGoogleSync({
         userId: req.user.id,
         sourceType: 'task',
@@ -544,7 +568,8 @@ const deleteTask = async (req, res) => {
   
       res.json({
         message: "Task deleted successfully",
-        deletedTask
+        deletedTask,
+        deletedTimeEntryCount: deletedTimeEntries.deletedCount || 0
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

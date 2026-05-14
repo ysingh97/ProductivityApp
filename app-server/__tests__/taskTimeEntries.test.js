@@ -5,6 +5,7 @@ const request = require('supertest');
 const createApp = require('../app');
 const Category = require('../models/category');
 const Goal = require('../models/goal');
+const List = require('../models/list');
 const Task = require('../models/task');
 const TimeEntry = require('../models/timeEntry');
 const User = require('../models/user');
@@ -28,6 +29,7 @@ beforeAll(async () => {
 afterEach(async () => {
   await TimeEntry.deleteMany({});
   await Task.deleteMany({});
+  await List.deleteMany({});
   await Goal.deleteMany({});
   await Category.deleteMany({});
   await User.deleteMany({});
@@ -219,6 +221,97 @@ test('task update endpoint refreshes old and new goal totals when parent goal ch
   expect(refreshedTargetChild.timeSpent).toBe(3.25);
   expect(refreshedTargetChild.timeLeft).toBe(1.75);
   expect(refreshedTargetChild.subTasks.map(String)).toContain(String(task._id));
+});
+
+test('task delete endpoint removes time entries and refreshes parent goal totals', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const rootGoal = await Goal.create({
+    title: 'Root goal',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 10,
+    timeSpent: 3.25,
+    timeLeft: 6.75
+  });
+
+  const childGoal = await Goal.create({
+    title: 'Child goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: rootGoal._id,
+    estimatedHours: 5,
+    timeSpent: 3.25,
+    timeLeft: 1.75
+  });
+
+  const list = await List.create({
+    title: 'Implementation list',
+    userId: user._id,
+    tasks: []
+  });
+
+  const task = await Task.create({
+    title: 'Delete me',
+    description: 'Task with logged time',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: childGoal._id,
+    listId: list._id,
+    estimatedCompletionTime: 4,
+    timeSpent: 3.25,
+    timeLeft: 0.75,
+    targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  await Goal.updateOne(
+    { _id: rootGoal._id },
+    { $addToSet: { subGoals: childGoal._id } }
+  );
+  await Goal.updateOne(
+    { _id: childGoal._id },
+    { $addToSet: { subTasks: task._id } }
+  );
+  await List.updateOne(
+    { _id: list._id },
+    { $addToSet: { tasks: task._id } }
+  );
+  await TimeEntry.create({
+    userId: user._id,
+    taskId: task._id,
+    category: workCategory._id,
+    startedAt: new Date('2026-01-12T08:00:00.000Z'),
+    endedAt: new Date('2026-01-12T11:15:00.000Z'),
+    durationMinutes: 195
+  });
+
+  await request(app)
+    .delete(`/api/tasks/${task._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        message: 'Task deleted successfully',
+        deletedTimeEntryCount: 1
+      });
+      expect(body.deletedTask._id).toBe(String(task._id));
+    });
+
+  const persistedTask = await Task.findById(task._id).lean();
+  const persistedTimeEntries = await TimeEntry.find({ taskId: task._id }).lean();
+  const refreshedRootGoal = await Goal.findById(rootGoal._id).lean();
+  const refreshedChildGoal = await Goal.findById(childGoal._id).lean();
+  const refreshedList = await List.findById(list._id).lean();
+
+  expect(persistedTask).toBeNull();
+  expect(persistedTimeEntries).toHaveLength(0);
+  expect(refreshedRootGoal.timeSpent).toBe(0);
+  expect(refreshedRootGoal.timeLeft).toBe(10);
+  expect(refreshedChildGoal.timeSpent).toBe(0);
+  expect(refreshedChildGoal.timeLeft).toBe(5);
+  expect(refreshedChildGoal.subTasks.map(String)).not.toContain(String(task._id));
+  expect(refreshedList.tasks.map(String)).not.toContain(String(task._id));
 });
 
 test('task time-entry endpoint lists time entries newest first for the task owner', async () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Box,
@@ -26,6 +26,7 @@ import { fetchLists } from "../lists/listService";
 import { fetchCategories } from "../categories/categoryService";
 import {
   createTaskTimeEntry,
+  deleteTask,
   deleteTaskTimeEntry,
   fetchTaskTimeEntries,
   updateTaskTimeEntry,
@@ -102,6 +103,7 @@ const formatDurationLabel = (durationMinutes) => {
 };
 
 const TaskView = ({ task }) => {
+  const navigate = useNavigate();
   const [currentTask, setCurrentTask] = useState(task);
   const [parentGoals, setParentGoals] = useState([]);
   const [lists, setLists] = useState([]);
@@ -110,6 +112,9 @@ const TaskView = ({ task }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingTask, setDeletingTask] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(task));
   const [estimateEditOpen, setEstimateEditOpen] = useState(false);
   const [estimateEditValue, setEstimateEditValue] = useState(
@@ -149,6 +154,9 @@ const TaskView = ({ task }) => {
     setEditingTimeEntryValues(null);
     setEditingTimeEntryError("");
     setSaveError("");
+    setDeleteConfirmOpen(false);
+    setDeletingTask(false);
+    setDeleteError("");
     setEditOpen(false);
   }, [task]);
 
@@ -360,6 +368,24 @@ const TaskView = ({ task }) => {
       setEstimateEditError("Unable to update estimated hours right now.");
     } finally {
       setEstimateEditSaving(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!currentTask?._id) return;
+
+    setDeletingTask(true);
+    setDeleteError("");
+    try {
+      await deleteTask(currentTask._id);
+      navigate("/board");
+    } catch (err) {
+      console.error(err);
+      setDeleteError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to delete task right now."
+      );
+    } finally {
+      setDeletingTask(false);
     }
   };
 
@@ -926,6 +952,33 @@ const TaskView = ({ task }) => {
                 <Button variant="outlined" component={Link} to={`/goals/${parentGoal._id}`}>
                   Open parent goal
                 </Button>
+              )}
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  setDeleteConfirmOpen((prev) => !prev);
+                  setDeleteError("");
+                }}
+                disabled={deletingTask}
+              >
+                {deleteConfirmOpen ? "Cancel delete" : "Delete task"}
+              </Button>
+              {deleteConfirmOpen && (
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    This will delete the task and its logged time entries.
+                  </Typography>
+                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleDeleteTask}
+                    disabled={deletingTask}
+                  >
+                    {deletingTask ? "Deleting..." : "Confirm delete"}
+                  </Button>
+                </Stack>
               )}
             </Stack>
           </Paper>
