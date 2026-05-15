@@ -172,6 +172,60 @@ test('goal read endpoints refresh stale cached time totals from descendant tasks
   expect(persistedChildGoal.timeLeft).toBe(0);
 });
 
+test('goal read endpoint derives totals from time entries instead of stale task cache', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const goal = await Goal.create({
+    title: 'Time-entry backed goal',
+    description: 'Goal with stale task cache',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 5,
+    timeSpent: 99,
+    timeLeft: 0
+  });
+
+  const task = await Task.create({
+    title: 'Task with stale cache',
+    description: 'Task cache should not drive goal totals',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: goal._id,
+    estimatedCompletionTime: 5,
+    timeSpent: 99,
+    timeLeft: 0,
+    targetCompletionDate: new Date('2026-05-16T18:00:00.000Z')
+  });
+
+  await createTimeEntryForTask({
+    user,
+    task,
+    category: workCategory,
+    startedAt: '2026-05-16T08:00:00.000Z',
+    hours: 1.25
+  });
+  await Goal.updateOne({ _id: goal._id }, { $addToSet: { subTasks: task._id } });
+
+  await request(app)
+    .get(`/api/goals/${goal._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(goal._id),
+        timeSpent: 1.25,
+        timeLeft: 3.75,
+        estimatedHours: 5
+      });
+    });
+
+  const persistedGoal = await Goal.findById(goal._id).lean();
+
+  expect(persistedGoal.timeSpent).toBe(1.25);
+  expect(persistedGoal.timeLeft).toBe(3.75);
+});
+
 test('goal create endpoint ignores client supplied derived time totals', async () => {
   const { categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');
