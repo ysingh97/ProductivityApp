@@ -1,4 +1,5 @@
 const Task = require('../models/task');
+const TimeEntry = require('../models/timeEntry');
 const { seedMockCategories } = require('./mockCategories');
 
 const fixedDate = (value) => new Date(value);
@@ -104,7 +105,8 @@ const mockTaskFixtures = {
   ]
 };
 
-const seedMockTasks = async (persona) => {
+const seedMockTasks = async (persona, options = {}) => {
+  const { includeTimeEntries = false } = options;
   const { user, categories } = await seedMockCategories(persona);
   const categoryByTitle = new Map(
     categories.map((category) => [category.title, category])
@@ -116,6 +118,9 @@ const seedMockTasks = async (persona) => {
   }
 
   await Task.deleteMany({ userId: user._id });
+  if (includeTimeEntries) {
+    await TimeEntry.deleteMany({ userId: user._id });
+  }
 
   const tasks = [];
   for (const taskFixture of taskFixtures) {
@@ -129,7 +134,7 @@ const seedMockTasks = async (persona) => {
       );
     }
 
-    tasks.push(await Task.create({
+    const task = await Task.create({
       title: taskFixture.title,
       description: 'Seeded mock task data',
       isComplete: false,
@@ -140,7 +145,24 @@ const seedMockTasks = async (persona) => {
       category: category ? category._id : null,
       targetCompletionDate: taskFixture.targetCompletionDate,
       createdAt: taskFixture.targetCompletionDate
-    }));
+    });
+
+    if (includeTimeEntries && taskFixture.timeSpent > 0) {
+      const durationMinutes = taskFixture.timeSpent * 60;
+      const endedAt = taskFixture.targetCompletionDate;
+      const startedAt = new Date(endedAt.getTime() - durationMinutes * 60000);
+
+      await TimeEntry.create({
+        userId: user._id,
+        taskId: task._id,
+        category: category ? category._id : null,
+        startedAt,
+        endedAt,
+        durationMinutes
+      });
+    }
+
+    tasks.push(task);
   }
 
   return {

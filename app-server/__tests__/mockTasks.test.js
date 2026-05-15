@@ -4,6 +4,7 @@ const request = require('supertest');
 const createApp = require('../app');
 const Category = require('../models/category');
 const Task = require('../models/task');
+const TimeEntry = require('../models/timeEntry');
 const User = require('../models/user');
 const { seedMockTasks } = require('../test-data/mockTasks');
 
@@ -22,6 +23,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await TimeEntry.deleteMany({});
   await Task.deleteMany({});
   await Category.deleteMany({});
   await User.deleteMany({});
@@ -52,7 +54,7 @@ test('seedMockTasks creates deterministic task totals for a mock account', async
 });
 
 test('mock task data is visible through protected routes for the matching persona', async () => {
-  await seedMockTasks('basic');
+  await seedMockTasks('basic', { includeTimeEntries: true });
 
   await request(app)
     .get('/api/tasks')

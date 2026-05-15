@@ -112,6 +112,70 @@ test('task create endpoint ignores client supplied derived time totals', async (
   expect(persistedTask.timeLeft).toBe(3.5);
 });
 
+test('task read endpoints refresh stale cached totals from time entries', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+  const list = await List.create({
+    title: 'Implementation list',
+    userId: user._id,
+    tasks: []
+  });
+
+  const task = await Task.create({
+    title: 'Read repair task',
+    description: 'Task with stale cached time',
+    userId: user._id,
+    category: workCategory._id,
+    listId: list._id,
+    estimatedCompletionTime: 5,
+    timeSpent: 99,
+    timeLeft: 0,
+    targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  await List.updateOne({ _id: list._id }, { $addToSet: { tasks: task._id } });
+  await TimeEntry.create({
+    userId: user._id,
+    taskId: task._id,
+    category: workCategory._id,
+    startedAt: new Date('2026-01-12T08:00:00.000Z'),
+    endedAt: new Date('2026-01-12T10:15:00.000Z'),
+    durationMinutes: 135
+  });
+
+  await request(app)
+    .get(`/api/tasks/${task._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(task._id),
+        timeSpent: 2.25,
+        timeLeft: 2.75
+      });
+    });
+
+  await Task.updateOne({ _id: task._id }, { timeSpent: 99, timeLeft: 0 });
+
+  await request(app)
+    .get(`/api/tasks/list/${list._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toHaveLength(1);
+      expect(body[0]).toMatchObject({
+        _id: String(task._id),
+        timeSpent: 2.25,
+        timeLeft: 2.75
+      });
+    });
+
+  const persistedTask = await Task.findById(task._id).lean();
+
+  expect(persistedTask.timeSpent).toBe(2.25);
+  expect(persistedTask.timeLeft).toBe(2.75);
+});
+
 test('task update endpoint refreshes cached time left when estimate changes', async () => {
   const { tasks } = await seedMockTasks('basic');
   const workTask = tasks.find((task) => task.title === 'Project planning');

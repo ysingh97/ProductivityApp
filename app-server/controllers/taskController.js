@@ -240,8 +240,16 @@ const findExactDuplicateTimeEntry = async ({
 
 const getTasks = async(req, res) => {
     try {
-        const tasks = await Task.find({ userId: req.user.id }).populate('category', 'title');
-        res.status(200).json(tasks);
+        const tasks = await Task.find({ userId: req.user.id });
+        const refreshedTasks = [];
+
+        for (const task of tasks) {
+          const refreshedTask = await syncTaskTimeTotals(task);
+          refreshedTasks.push(refreshedTask);
+        }
+
+        await Task.populate(refreshedTasks, { path: 'category', select: 'title' });
+        res.status(200).json(refreshedTasks);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -583,13 +591,14 @@ const deleteTask = async (req, res) => {
 
 const getTaskById = async (req, res) => {
   try {
-    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id })
-      .populate('category', 'title');
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    res.status(200).json(task);
+    const refreshedTask = await syncTaskTimeTotals(task);
+    await refreshedTask.populate('category', 'title');
+    res.status(200).json(refreshedTask);
   }
   catch (err) {
     res.status(500).json({ error: err.message });
@@ -621,10 +630,17 @@ const getTaskTimeEntries = async (req, res) => {
 const getTasksByListId = async (req, res) => {
   try {
     const listId = req.params.listId;
-    const tasks = await Task.find({ listId, userId: req.user.id })
-      .populate('category', 'title');
+    const tasks = await Task.find({ listId, userId: req.user.id });
+    const refreshedTasks = [];
 
-    res.status(200).json(tasks);
+    for (const task of tasks) {
+      const refreshedTask = await syncTaskTimeTotals(task);
+      refreshedTasks.push(refreshedTask);
+    }
+
+    await Task.populate(refreshedTasks, { path: 'category', select: 'title' });
+
+    res.status(200).json(refreshedTasks);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
