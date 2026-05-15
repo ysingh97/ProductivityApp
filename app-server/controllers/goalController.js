@@ -1,6 +1,7 @@
 const Goal = require('../models/goal'); // Import the Goal model
 const Task = require('../models/task');
 const Category = require('../models/category');
+const TimeEntry = require('../models/timeEntry');
 const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -108,22 +109,27 @@ const syncGoalTimeTotals = async (goalId, userId) => {
     }
 
     const descendantIds = await collectDescendantGoalIds(goal._id, userId);
-    const aggregate = await Task.aggregate([
+    const taskIds = await Task.distinct('_id', {
+        userId: goal.userId,
+        parentGoalId: { $in: [goal._id, ...descendantIds] }
+    });
+
+    const aggregate = await TimeEntry.aggregate([
         {
             $match: {
                 userId: goal.userId,
-                parentGoalId: { $in: [goal._id, ...descendantIds] }
+                taskId: { $in: taskIds }
             }
         },
         {
             $group: {
                 _id: null,
-                totalHours: { $sum: '$timeSpent' }
+                totalMinutes: { $sum: '$durationMinutes' }
             }
         }
     ]);
 
-    const totalHours = roundToTwoDecimals(aggregate[0]?.totalHours || 0);
+    const totalHours = roundToTwoDecimals((aggregate[0]?.totalMinutes || 0) / 60);
     const estimatedHours = Number(goal.estimatedHours) || 0;
 
     goal.timeSpent = totalHours;

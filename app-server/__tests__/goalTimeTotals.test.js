@@ -43,6 +43,21 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
+const createTimeEntryForTask = ({ user, task, category, startedAt, hours }) => {
+  const startDate = new Date(startedAt);
+  const durationMinutes = hours * 60;
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+
+  return TimeEntry.create({
+    userId: user._id,
+    taskId: task._id,
+    category: category._id,
+    startedAt: startDate,
+    endedAt: endDate,
+    durationMinutes
+  });
+};
+
 test('goal read endpoints refresh stale cached time totals from descendant tasks', async () => {
   const { user, categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');
@@ -92,6 +107,21 @@ test('goal read endpoints refresh stale cached time totals from descendant tasks
     timeSpent: 20.07,
     timeLeft: 0,
     targetCompletionDate: new Date('2026-05-16T18:00:00.000Z')
+  });
+
+  await createTimeEntryForTask({
+    user,
+    task: directTask,
+    category: workCategory,
+    startedAt: '2026-05-12T08:00:00.000Z',
+    hours: 2.5
+  });
+  await createTimeEntryForTask({
+    user,
+    task: nestedTask,
+    category: workCategory,
+    startedAt: '2026-05-16T08:00:00.000Z',
+    hours: 20.07
   });
 
   await Goal.updateOne({ _id: rootGoal._id }, { $addToSet: { subTasks: directTask._id } });
@@ -200,6 +230,14 @@ test('goal update endpoint returns refreshed time totals when estimate changes',
     targetCompletionDate: new Date('2026-05-16T18:00:00.000Z')
   });
 
+  await createTimeEntryForTask({
+    user,
+    task,
+    category: workCategory,
+    startedAt: '2026-05-16T08:00:00.000Z',
+    hours: 3.25
+  });
+
   await Goal.updateOne({ _id: goal._id }, { $addToSet: { subTasks: task._id } });
 
   await request(app)
@@ -278,6 +316,14 @@ test('goal update endpoint refreshes old and new ancestor totals when parent cha
     timeSpent: 4.5,
     timeLeft: 0.5,
     targetCompletionDate: new Date('2026-05-18T18:00:00.000Z')
+  });
+
+  await createTimeEntryForTask({
+    user,
+    task: movedTask,
+    category: workCategory,
+    startedAt: '2026-05-18T08:00:00.000Z',
+    hours: 4.5
   });
 
   await Goal.updateOne(
