@@ -7,6 +7,7 @@ const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
 const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
+const toIdString = (value) => (value ? String(value) : null);
 
 const resolveCategory = async (input, userId) => {
   const title = normalizeCategoryTitle(
@@ -336,7 +337,8 @@ const updateTask = async (req, res) => {
       }
     }
 
-    let nextCategoryId = existingTask.category || null;
+    const previousCategoryId = existingTask.category || null;
+    let nextCategoryId = previousCategoryId;
     if (nextParentGoalId) {
       const topLevelGoal = await getTopLevelGoal(nextParentGoalId, req.user.id);
       if (!topLevelGoal) {
@@ -357,6 +359,14 @@ const updateTask = async (req, res) => {
 
     if (!updatedTask) {
       return res.status(404).json({ message: "Task not found" });
+    }
+
+    const categoryChanged = toIdString(previousCategoryId) !== toIdString(nextCategoryId);
+    if (categoryChanged) {
+      await TimeEntry.updateMany(
+        { taskId: updatedTask._id, userId: req.user.id },
+        { $set: { category: nextCategoryId } }
+      );
     }
 
     const refreshedTask = await syncTaskTimeTotals(updatedTask);
