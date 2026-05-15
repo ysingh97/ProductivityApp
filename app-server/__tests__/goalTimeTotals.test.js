@@ -319,6 +319,77 @@ test('goal update endpoint returns refreshed time totals when estimate changes',
   expect(persistedGoal.timeLeft).toBe(6.75);
 });
 
+test('goal update endpoint syncs descendant time-entry categories when category changes', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+  const healthCategory = categories.find((category) => category.title === 'Health');
+
+  const rootGoal = await Goal.create({
+    title: 'Root category goal',
+    description: 'Top-level goal',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 10,
+    timeSpent: 1.5,
+    timeLeft: 8.5
+  });
+
+  const childGoal = await Goal.create({
+    title: 'Child category goal',
+    description: 'Nested goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: rootGoal._id,
+    estimatedHours: 5,
+    timeSpent: 1.5,
+    timeLeft: 3.5
+  });
+
+  const task = await Task.create({
+    title: 'Descendant task',
+    description: 'Task under child goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: childGoal._id,
+    estimatedCompletionTime: 3,
+    timeSpent: 1.5,
+    timeLeft: 1.5,
+    targetCompletionDate: new Date('2026-05-16T18:00:00.000Z')
+  });
+
+  const timeEntry = await createTimeEntryForTask({
+    user,
+    task,
+    category: workCategory,
+    startedAt: '2026-05-16T08:00:00.000Z',
+    hours: 1.5
+  });
+
+  await Goal.updateOne({ _id: rootGoal._id }, { $addToSet: { subGoals: childGoal._id } });
+  await Goal.updateOne({ _id: childGoal._id }, { $addToSet: { subTasks: task._id } });
+
+  await request(app)
+    .put(`/api/goals/${rootGoal._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      category: healthCategory.title
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.category._id).toBe(String(healthCategory._id));
+      expect(body.timeSpent).toBe(1.5);
+      expect(body.timeLeft).toBe(8.5);
+    });
+
+  const refreshedChildGoal = await Goal.findById(childGoal._id).lean();
+  const refreshedTask = await Task.findById(task._id).lean();
+  const refreshedTimeEntry = await TimeEntry.findById(timeEntry._id).lean();
+
+  expect(String(refreshedChildGoal.category)).toBe(String(healthCategory._id));
+  expect(String(refreshedTask.category)).toBe(String(healthCategory._id));
+  expect(String(refreshedTimeEntry.category)).toBe(String(healthCategory._id));
+});
+
 test('goal update endpoint refreshes old and new ancestor totals when parent changes', async () => {
   const { user, categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');
@@ -404,6 +475,7 @@ test('goal update endpoint refreshes old and new ancestor totals when parent cha
   const refreshedTargetRoot = await Goal.findById(targetRootGoal._id).lean();
   const refreshedMovedGoal = await Goal.findById(movedGoal._id).lean();
   const refreshedMovedTask = await Task.findById(movedTask._id).lean();
+  const refreshedMovedTimeEntry = await TimeEntry.findOne({ taskId: movedTask._id }).lean();
 
   expect(refreshedSourceRoot.subGoals.map(String)).not.toContain(String(movedGoal._id));
   expect(refreshedSourceRoot.timeSpent).toBe(0);
@@ -417,4 +489,5 @@ test('goal update endpoint refreshes old and new ancestor totals when parent cha
   expect(refreshedMovedGoal.timeLeft).toBe(5.5);
   expect(String(refreshedMovedGoal.category)).toBe(String(healthCategory._id));
   expect(String(refreshedMovedTask.category)).toBe(String(healthCategory._id));
+  expect(String(refreshedMovedTimeEntry.category)).toBe(String(healthCategory._id));
 });

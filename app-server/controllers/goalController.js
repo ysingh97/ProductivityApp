@@ -168,12 +168,21 @@ const syncGoalTimeTotalsForIds = async ({ userId, goalIds }) => {
 const applyCategoryToGoalTree = async (rootId, userId, nextCategoryId, previousCategoryId) => {
     const descendantIds = await collectDescendantGoalIds(rootId, userId);
     const goalIds = [rootId, ...descendantIds];
+    const taskIds = await Task.distinct('_id', {
+        parentGoalId: { $in: goalIds },
+        userId
+    });
+
     await Goal.updateMany(
         { _id: { $in: goalIds }, userId },
         { $set: { category: nextCategoryId } }
     );
     await Task.updateMany(
         { parentGoalId: { $in: goalIds }, userId },
+        { $set: { category: nextCategoryId } }
+    );
+    await TimeEntry.updateMany(
+        { taskId: { $in: taskIds }, userId },
         { $set: { category: nextCategoryId } }
     );
 
