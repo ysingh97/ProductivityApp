@@ -413,7 +413,19 @@ const deleteGoal = async (req, res) => {
             { $set: { parentGoalId: null } }
         );
 
+        await Task.updateMany(
+            { parentGoalId: goalToDelete._id, userId: req.user.id },
+            { $set: { parentGoalId: null } }
+        );
+
         await Goal.deleteOne({ _id: goalToDelete._id, userId: req.user.id });
+        if (goalToDelete.parentGoalId) {
+            await syncGoalTimeTotalsForIds({
+                userId: req.user.id,
+                goalIds: [goalToDelete.parentGoalId]
+            });
+        }
+
         await enqueueGoogleSync({
             userId: req.user.id,
             sourceType: 'goal',

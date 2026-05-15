@@ -491,3 +491,117 @@ test('goal update endpoint refreshes old and new ancestor totals when parent cha
   expect(String(refreshedMovedTask.category)).toBe(String(healthCategory._id));
   expect(String(refreshedMovedTimeEntry.category)).toBe(String(healthCategory._id));
 });
+
+test('goal delete endpoint detaches direct child tasks and refreshes old parent totals', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const rootGoal = await Goal.create({
+    title: 'Root goal',
+    description: 'Top-level parent',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 10,
+    timeSpent: 3.5,
+    timeLeft: 6.5
+  });
+
+  const goalToDelete = await Goal.create({
+    title: 'Delete this goal',
+    description: 'Child being deleted',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: rootGoal._id,
+    estimatedHours: 5,
+    timeSpent: 3.5,
+    timeLeft: 1.5
+  });
+
+  const detachedChildGoal = await Goal.create({
+    title: 'Detach this child',
+    description: 'Nested child should survive',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: goalToDelete._id,
+    estimatedHours: 2,
+    timeSpent: 2,
+    timeLeft: 0
+  });
+
+  const directTask = await Task.create({
+    title: 'Direct task',
+    description: 'Task directly under deleted goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: goalToDelete._id,
+    estimatedCompletionTime: 3,
+    timeSpent: 1.5,
+    timeLeft: 1.5,
+    targetCompletionDate: new Date('2026-05-18T18:00:00.000Z')
+  });
+
+  const nestedTask = await Task.create({
+    title: 'Nested surviving task',
+    description: 'Task under surviving child goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: detachedChildGoal._id,
+    estimatedCompletionTime: 2,
+    timeSpent: 2,
+    timeLeft: 0,
+    targetCompletionDate: new Date('2026-05-18T18:00:00.000Z')
+  });
+
+  await createTimeEntryForTask({
+    user,
+    task: directTask,
+    category: workCategory,
+    startedAt: '2026-05-18T08:00:00.000Z',
+    hours: 1.5
+  });
+  await createTimeEntryForTask({
+    user,
+    task: nestedTask,
+    category: workCategory,
+    startedAt: '2026-05-18T10:00:00.000Z',
+    hours: 2
+  });
+
+  await Goal.updateOne({ _id: rootGoal._id }, { $addToSet: { subGoals: goalToDelete._id } });
+  await Goal.updateOne(
+    { _id: goalToDelete._id },
+    {
+      $addToSet: {
+        subGoals: detachedChildGoal._id,
+        subTasks: directTask._id
+      }
+    }
+  );
+  await Goal.updateOne(
+    { _id: detachedChildGoal._id },
+    { $addToSet: { subTasks: nestedTask._id } }
+  );
+
+  await request(app)
+    .delete(`/api/goals/${goalToDelete._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body.message).toBe('Goal deleted');
+      expect(body.deletedTask._id).toBe(String(goalToDelete._id));
+    });
+
+  const deletedGoal = await Goal.findById(goalToDelete._id).lean();
+  const refreshedRootGoal = await Goal.findById(rootGoal._id).lean();
+  const refreshedDetachedChildGoal = await Goal.findById(detachedChildGoal._id).lean();
+  const refreshedDirectTask = await Task.findById(directTask._id).lean();
+  const refreshedNestedTask = await Task.findById(nestedTask._id).lean();
+
+  expect(deletedGoal).toBeNull();
+  expect(refreshedRootGoal.subGoals.map(String)).not.toContain(String(goalToDelete._id));
+  expect(refreshedRootGoal.timeSpent).toBe(0);
+  expect(refreshedRootGoal.timeLeft).toBe(10);
+  expect(refreshedDetachedChildGoal.parentGoalId).toBeNull();
+  expect(refreshedDirectTask.parentGoalId).toBeNull();
+  expect(String(refreshedNestedTask.parentGoalId)).toBe(String(detachedChildGoal._id));
+});
