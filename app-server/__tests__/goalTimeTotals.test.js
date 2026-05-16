@@ -588,7 +588,7 @@ test('goal delete endpoint detaches direct child tasks and refreshes old parent 
     .expect(200)
     .expect(({ body }) => {
       expect(body.message).toBe('Goal deleted');
-      expect(body.deletedTask._id).toBe(String(goalToDelete._id));
+      expect(body.deletedGoal._id).toBe(String(goalToDelete._id));
     });
 
   const deletedGoal = await Goal.findById(goalToDelete._id).lean();

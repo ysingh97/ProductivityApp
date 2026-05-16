@@ -434,7 +434,7 @@ const deleteGoal = async (req, res) => {
         
         res.json({
             message: 'Goal deleted',
-            deletedTask: goalToDelete
+            deletedGoal: goalToDelete
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
