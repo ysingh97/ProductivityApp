@@ -22,6 +22,7 @@ import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined";
 import Brightness4OutlinedIcon from "@mui/icons-material/Brightness4Outlined";
 import Brightness7OutlinedIcon from "@mui/icons-material/Brightness7Outlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -51,6 +52,12 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
         icon: <CalendarMonthOutlinedIcon />
       },
       {
+        label: "Lists",
+        to: "/lists",
+        description: "Grouped task collections",
+        icon: <ViewListOutlinedIcon />
+      },
+      {
         label: "Data visualizations",
         to: "/visualizations",
         description: "Time spent and progress charts",
@@ -64,7 +71,7 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
     () => [
       { label: "New Task", to: "/task/new", variant: "contained" },
       { label: "New Goal", to: "/goal/new", variant: "contained" },
-      { label: "New List", to: "/createListPage", variant: "outlined" }
+      { label: "New List", to: "/lists/new", variant: "outlined" }
     ],
     []
   );

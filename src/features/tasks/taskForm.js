@@ -28,7 +28,7 @@ const getCategoryTitle = (value) => {
   return value.title || "";
 };
 
-const TaskForm = ({ task, onSubmit, isEditing = false }) => {
+const TaskForm = ({ task, onSubmit, isEditing = false, isListFixed = false }) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -157,7 +157,9 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
       setDescription("");
       setCategory("");
       setEstimatedCompletionTime(0);
-      setSelectedList(null);
+      if (!isListFixed) {
+        setSelectedList(null);
+      }
       setSelectedParentGoal(null);
       setTargetCompletionDate(null);
     }
@@ -262,12 +264,17 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
                 onChange={(_event, nextValue) => setSelectedList(nextValue)}
                 isOptionEqualToValue={(option, value) => option.value === value?.value}
                 loading={loading}
+                disabled={isListFixed || loading}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="List"
                     size="small"
-                    helperText="Optional. Add this task to a list."
+                    helperText={
+                      isListFixed
+                        ? "Locked because you opened this from a list."
+                        : "Optional. Add this task to a list."
+                    }
                   />
                 )}
               />

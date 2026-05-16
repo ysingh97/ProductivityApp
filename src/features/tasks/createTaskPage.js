@@ -11,6 +11,7 @@ const CreateTaskPage = () => {
     const { taskId } = useParams(); // task id if editing
     const [searchParams] = useSearchParams();
     const goalId = searchParams.get("goalId"); // optional parent goal for new task
+    const listId = searchParams.get("listId"); // optional fixed list for new task
 
     const [task, setTask] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -30,14 +31,17 @@ const CreateTaskPage = () => {
             } finally { setLoading(false); }
           };
           loadTask();
-        } else if (goalId) {
-          // Creating new task with parent goal
-          setTask({ parentGoalId: goalId });
+        } else if (goalId || listId) {
+          // Creating new task with optional parent goal or fixed list
+          setTask({
+            ...(goalId ? { parentGoalId: goalId } : {}),
+            ...(listId ? { listId } : {})
+          });
         } else {
           // Creating new task without parent goal
           setTask(null);
         }
-    }, [taskId, goalId, isEditing]);
+    }, [taskId, goalId, listId, isEditing]);
     // const location = useLocation();
     // const task = location.state?.task || null;
     // console.log("CreateTaskPage - task: ", task);
@@ -118,7 +122,12 @@ const CreateTaskPage = () => {
                   </Stack>
                 </Paper>
               ) : (
-                <TaskForm task={task} onSubmit={handleTaskSubmit} isEditing={isEditing} />
+                <TaskForm
+                  task={task}
+                  onSubmit={handleTaskSubmit}
+                  isEditing={isEditing}
+                  isListFixed={Boolean(!isEditing && listId)}
+                />
               )}
             </Stack>
           </Box>
