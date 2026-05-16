@@ -12,15 +12,18 @@ const getLists = async (req, res) => {
 
 const createList = async (req, res) => {
     try {
-        if (req.body.goalId) {
-            const goal = await Goal.findOne({ _id: req.body.goalId, userId: req.user.id });
+        const { userId, tasks, ...listBody } = req.body;
+
+        if (listBody.goalId) {
+            const goal = await Goal.findOne({ _id: listBody.goalId, userId: req.user.id });
             if (!goal) {
                 return res.status(400).json({ message: "Invalid goal for this user" });
             }
         }
 
         const newList = new List({
-            ...req.body,
+            ...listBody,
+            tasks: [],
             userId: req.user.id
         });
         const savedList = await newList.save();
