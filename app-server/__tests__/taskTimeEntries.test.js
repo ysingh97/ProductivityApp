@@ -112,6 +112,39 @@ test('task create endpoint ignores client supplied derived time totals', async (
   expect(persistedTask.timeLeft).toBe(3.5);
 });
 
+test('task create endpoint adds new task to the selected list', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+  const list = await List.create({
+    title: 'Implementation list',
+    userId: user._id,
+    tasks: []
+  });
+
+  const response = await request(app)
+    .post('/api/tasks')
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      title: 'List-linked task',
+      description: 'Task created into a list',
+      category: workCategory.title,
+      listId: String(list._id),
+      estimatedCompletionTime: 2,
+      targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+    })
+    .expect(201)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        title: 'List-linked task',
+        listId: String(list._id)
+      });
+    });
+
+  const refreshedList = await List.findById(list._id).lean();
+
+  expect(refreshedList.tasks.map(String)).toContain(response.body._id);
+});
+
 test('task read endpoints refresh stale cached totals from time entries', async () => {
   const { user, categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');

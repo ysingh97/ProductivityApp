@@ -261,9 +261,10 @@ const createTask = async (req, res) => {
       const { userId, timeSpent, timeLeft, ...taskBody } = req.body;
       const { listId } = taskBody;
       const parentGoalId = taskBody.parentGoalId || null;
+      let list = null;
 
       if (listId) {
-        const list = await List.findOne({ _id: listId, userId: req.user.id });
+        list = await List.findOne({ _id: listId, userId: req.user.id });
         if (!list) {
           return res.status(400).json({ message: "Invalid list for this user" });
         }
@@ -295,6 +296,13 @@ const createTask = async (req, res) => {
       if (parentGoal) {
         parentGoal.subTasks.push(savedTask._id);
         await parentGoal.save();
+      }
+
+      if (list) {
+        await List.updateOne(
+          { _id: list._id, userId: req.user.id },
+          { $addToSet: { tasks: savedTask._id } }
+        );
       }
 
       await enqueueGoogleSync({
