@@ -328,6 +328,23 @@ const updateTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
+    const hasListUpdate = Object.prototype.hasOwnProperty.call(updates, 'listId');
+    if (hasListUpdate && updates.listId === '') {
+      updates.listId = null;
+    }
+
+    const previousListId = existingTask.listId || null;
+    const nextListId = hasListUpdate ? updates.listId : existingTask.listId;
+    const previousListIdString = previousListId ? String(previousListId) : null;
+    const nextListIdString = nextListId ? String(nextListId) : null;
+
+    if (hasListUpdate && nextListId) {
+      const list = await List.findOne({ _id: nextListId, userId: req.user.id });
+      if (!list) {
+        return res.status(400).json({ message: "Invalid list for this user" });
+      }
+    }
+
     const hasParentUpdate = Object.prototype.hasOwnProperty.call(updates, 'parentGoalId');
     if (hasParentUpdate && updates.parentGoalId === '') {
       updates.parentGoalId = null;
@@ -378,6 +395,23 @@ const updateTask = async (req, res) => {
     }
 
     const refreshedTask = await syncTaskTimeTotals(updatedTask);
+
+    const listChanged = hasListUpdate && previousListIdString !== nextListIdString;
+    if (listChanged) {
+      if (previousListIdString) {
+        await List.updateOne(
+          { _id: previousListIdString, userId: req.user.id },
+          { $pull: { tasks: refreshedTask._id } }
+        );
+      }
+
+      if (nextListIdString) {
+        await List.updateOne(
+          { _id: nextListIdString, userId: req.user.id },
+          { $addToSet: { tasks: refreshedTask._id } }
+        );
+      }
+    }
 
     const parentChanged = hasParentUpdate && previousParentGoalIdString !== nextParentGoalIdString;
     if (parentChanged) {

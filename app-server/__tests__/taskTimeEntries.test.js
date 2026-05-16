@@ -263,6 +263,55 @@ test('task update endpoint refreshes cached time left when estimate changes', as
   expect(persistedTask.timeLeft).toBe(0);
 });
 
+test('task update endpoint moves task between list membership arrays', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+  const sourceList = await List.create({
+    title: 'Source list',
+    userId: user._id,
+    tasks: []
+  });
+  const targetList = await List.create({
+    title: 'Target list',
+    userId: user._id,
+    tasks: []
+  });
+
+  const task = await Task.create({
+    title: 'Movable list task',
+    description: 'Task moving between lists',
+    userId: user._id,
+    category: workCategory._id,
+    listId: sourceList._id,
+    estimatedCompletionTime: 3,
+    timeSpent: 0,
+    timeLeft: 3,
+    targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  await List.updateOne({ _id: sourceList._id }, { $addToSet: { tasks: task._id } });
+
+  await request(app)
+    .put(`/api/tasks/${task._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      listId: String(targetList._id)
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(task._id),
+        listId: String(targetList._id)
+      });
+    });
+
+  const refreshedSourceList = await List.findById(sourceList._id).lean();
+  const refreshedTargetList = await List.findById(targetList._id).lean();
+
+  expect(refreshedSourceList.tasks.map(String)).not.toContain(String(task._id));
+  expect(refreshedTargetList.tasks.map(String)).toContain(String(task._id));
+});
+
 test('task update endpoint syncs existing time-entry categories when category changes', async () => {
   const { user, categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');
