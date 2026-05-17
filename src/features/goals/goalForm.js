@@ -32,7 +32,7 @@ const parseNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : NaN;
 };
 
-const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
+const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false }) => {
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
   const isEditing = Boolean(isEditingProp || goal);
@@ -56,7 +56,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     const parsedEstimatedHours = parseNumber(estimatedHours);
@@ -91,13 +91,17 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
     if (!selectedParentGoal?.value) {
       goalData.category = category;
     }
-    onSubmit(goalData);
-    if (!isEditing) {
-      setTitle("");
-      setDescription("");
-      setCategory("");
-      setEstimatedHours("0");
-      setTargetCompletionDate(null);
+    try {
+      await onSubmit(goalData);
+      if (!isEditing) {
+        setTitle("");
+        setDescription("");
+        setCategory("");
+        setEstimatedHours("0");
+        setTargetCompletionDate(null);
+      }
+    } catch {
+      // The page wrapper displays API errors; the form keeps local validation errors only.
     }
   };
 
@@ -357,8 +361,8 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp }) => {
                   "No parent selected means this will be a top-level goal."
                 )}
               </Typography>
-              <Button type="submit" variant="contained" size="large" disabled={loading}>
-                {isEditing ? "Update goal" : "Create goal"}
+              <Button type="submit" variant="contained" size="large" disabled={loading || submitting}>
+                {submitting ? "Saving..." : isEditing ? "Update goal" : "Create goal"}
               </Button>
             </Box>
           </Stack>
