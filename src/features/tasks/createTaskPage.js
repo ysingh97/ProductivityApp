@@ -10,6 +10,7 @@ import {
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import TaskForm from "./taskForm";
@@ -28,6 +29,13 @@ const CreateTaskPage = () => {
     const [loading, setLoading] = useState(false);
 
     const isEditing = Boolean(taskId);
+    const sourceLink = isEditing && task?._id
+      ? { to: `/tasks/${task._id}`, label: "Back to task" }
+      : listId
+        ? { to: `/lists/${listId}`, label: "Back to source list" }
+        : goalId
+          ? { to: `/goals/${goalId}`, label: "Back to parent goal" }
+          : null;
 
     useEffect(() => {
         if (isEditing) {
@@ -116,6 +124,16 @@ const CreateTaskPage = () => {
                 <Typography variant="body2" color="text.secondary">
                   Build the task in a focused form, then refine progress and details from the task view.
                 </Typography>
+                {sourceLink && (
+                  <Button
+                    component={Link}
+                    to={sourceLink.to}
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    {sourceLink.label}
+                  </Button>
+                )}
               </Stack>
             </Paper>
 

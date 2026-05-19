@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -11,6 +11,7 @@ import {
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import GoalForm from "./goalForm";
 import { createGoal, fetchGoalById, updateGoal } from "./goalService";
@@ -19,10 +20,17 @@ const CreateGoalPage = () => {
     const [error, setError] = useState(null);
     const [savedGoal, setSavedGoal] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const location = useLocation();
     const { goalId } = useParams();
     const [goal, setGoal] = useState(null);
     const [loading, setLoading] = useState(false);
     const isEditing = Boolean(goalId);
+    const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
+    const sourceLink = isEditing && goal?._id
+      ? { to: `/goals/${goal._id}`, label: "Back to goal" }
+      : parentGoal?._id
+        ? { to: `/goals/${parentGoal._id}`, label: "Back to parent goal" }
+        : null;
 
     useEffect(() => {
         if (!isEditing) {
@@ -106,6 +114,16 @@ const CreateGoalPage = () => {
                 <Typography variant="body2" color="text.secondary">
                   Set the core details here, then expand the hierarchy and tracking from the goal view.
                 </Typography>
+                {sourceLink && (
+                  <Button
+                    component={Link}
+                    to={sourceLink.to}
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    {sourceLink.label}
+                  </Button>
+                )}
               </Stack>
             </Paper>
 
