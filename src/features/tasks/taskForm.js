@@ -28,7 +28,13 @@ const getCategoryTitle = (value) => {
   return value.title || "";
 };
 
-const TaskForm = ({ task, onSubmit, isEditing = false }) => {
+const TaskForm = ({
+  task,
+  onSubmit,
+  isEditing = false,
+  isListFixed = false,
+  submitting = false
+}) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -121,7 +127,7 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
     }
   }, [selectedParentGoal]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
@@ -150,16 +156,22 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
     if (!selectedParentGoal?.value) {
       taskData.category = category;
     }
-    onSubmit(taskData);
+    try {
+      await onSubmit(taskData);
 
-    if (!isEditing) {
-      setTitle("");
-      setDescription("");
-      setCategory("");
-      setEstimatedCompletionTime(0);
-      setSelectedList(null);
-      setSelectedParentGoal(null);
-      setTargetCompletionDate(null);
+      if (!isEditing) {
+        setTitle("");
+        setDescription("");
+        setCategory("");
+        setEstimatedCompletionTime(0);
+        if (!isListFixed) {
+          setSelectedList(null);
+        }
+        setSelectedParentGoal(null);
+        setTargetCompletionDate(null);
+      }
+    } catch {
+      // The page wrapper displays API errors; the form keeps local validation errors only.
     }
   };
 
@@ -262,12 +274,17 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
                 onChange={(_event, nextValue) => setSelectedList(nextValue)}
                 isOptionEqualToValue={(option, value) => option.value === value?.value}
                 loading={loading}
+                disabled={isListFixed || loading}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="List"
                     size="small"
-                    helperText="Optional. Add this task to a list."
+                    helperText={
+                      isListFixed
+                        ? "Locked because you opened this from a list."
+                        : "Optional. Add this task to a list."
+                    }
                   />
                 )}
               />
@@ -354,8 +371,8 @@ const TaskForm = ({ task, onSubmit, isEditing = false }) => {
                   "Standalone tasks can keep their own category."
                 )}
               </Typography>
-              <Button type="submit" variant="contained" size="large" disabled={loading}>
-                {isEditing ? "Update task" : "Create task"}
+              <Button type="submit" variant="contained" size="large" disabled={loading || submitting}>
+                {submitting ? "Saving..." : isEditing ? "Update task" : "Create task"}
               </Button>
             </Box>
           </Stack>

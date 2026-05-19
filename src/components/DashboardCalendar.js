@@ -31,6 +31,12 @@ const baseColors = [
 
 const formatDayKey = (value) => dayjs(value).format("YYYY-MM-DD");
 
+const getTopLevelId = (goalId, topLevelByGoalId) => {
+  if (!goalId) return null;
+  const id = String(goalId);
+  return topLevelByGoalId.get(id) || id;
+};
+
 const DashboardCalendar = ({ goals, tasks }) => {
   const [activeDate, setActiveDate] = useState(dayjs());
   const [selectedGoalIds, setSelectedGoalIds] = useState(new Set());
@@ -92,16 +98,10 @@ const DashboardCalendar = ({ goals, tasks }) => {
     return map;
   }, [goalsById]);
 
-  const getTopLevelId = (goalId) => {
-    if (!goalId) return null;
-    const id = String(goalId);
-    return topLevelByGoalId.get(id) || id;
-  };
-
   const topLevelIds = useMemo(() => {
     const ids = new Set();
     goalsById.forEach((_goal, id) => {
-      ids.add(getTopLevelId(id) || id);
+      ids.add(getTopLevelId(id, topLevelByGoalId) || id);
     });
     return Array.from(ids);
   }, [goalsById, topLevelByGoalId]);
@@ -147,7 +147,7 @@ const DashboardCalendar = ({ goals, tasks }) => {
         type: "goal",
         id: String(goal._id),
         title: goal.title,
-        topLevelId: getTopLevelId(goal._id),
+        topLevelId: getTopLevelId(goal._id, topLevelByGoalId),
         date: goal.targetCompletionDate
       })),
     [goalsInRange, topLevelByGoalId]
@@ -160,7 +160,7 @@ const DashboardCalendar = ({ goals, tasks }) => {
         id: String(task._id),
         title: task.title,
         topLevelId: task.parentGoalId
-          ? getTopLevelId(task.parentGoalId)
+          ? getTopLevelId(task.parentGoalId, topLevelByGoalId)
           : UNASSIGNED_ID,
         date: task.targetCompletionDate
       })),
@@ -219,7 +219,7 @@ const DashboardCalendar = ({ goals, tasks }) => {
       });
       return next;
     });
-  }, [availableGoalIds.join("|"), hasUserFiltered]);
+  }, [availableGoalIds, hasUserFiltered]);
 
   const itemsByDayKey = useMemo(() => {
     const map = new Map();

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Box,
@@ -11,6 +11,7 @@ import {
   FormControl,
   FormControlLabel,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -20,7 +21,7 @@ import {
   Typography
 } from "@mui/material";
 import DateTimePicker from "../../components/DateTimePicker";
-import { fetchGoals, updateGoal } from "./goalService";
+import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
 import { fetchCategories } from "../categories/categoryService";
 
 const getCategoryValue = (value) => {
@@ -39,6 +40,8 @@ const buildFormValues = (goalData) => ({
   title: goalData?.title || "",
   description: goalData?.description || "",
   category: getCategoryValue(goalData?.category),
+  estimatedHours:
+    goalData?.estimatedHours !== undefined ? String(goalData.estimatedHours) : "0",
   parentGoalId: goalData?.parentGoalId ? String(goalData.parentGoalId) : "",
   targetCompletionDate: goalData?.targetCompletionDate
     ? dayjs(goalData.targetCompletionDate)
@@ -46,7 +49,18 @@ const buildFormValues = (goalData) => ({
   isComplete: Boolean(goalData?.isComplete)
 });
 
+const parseNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const formatHours = (value) => {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+};
+
 const GoalView = ({ goal }) => {
+  const navigate = useNavigate();
   const [currentGoal, setCurrentGoal] = useState(goal);
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -54,12 +68,27 @@ const GoalView = ({ goal }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingGoal, setDeletingGoal] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(goal));
+  const [estimatedHoursEditOpen, setEstimatedHoursEditOpen] = useState(false);
+  const [estimatedHoursEditValue, setEstimatedHoursEditValue] = useState(
+    goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0"
+  );
+  const [estimatedHoursEditSaving, setEstimatedHoursEditSaving] = useState(false);
+  const [estimatedHoursEditError, setEstimatedHoursEditError] = useState("");
 
   useEffect(() => {
     setCurrentGoal(goal);
     setFormValues(buildFormValues(goal));
+    setEstimatedHoursEditOpen(false);
+    setEstimatedHoursEditValue(goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0");
+    setEstimatedHoursEditError("");
     setSaveError("");
+    setDeleteConfirmOpen(false);
+    setDeletingGoal(false);
+    setDeleteError("");
     setEditOpen(false);
   }, [goal]);
 
@@ -127,6 +156,7 @@ const GoalView = ({ goal }) => {
     if (!currentGoal) return;
 
     const now = dayjs();
+    const estimatedHours = parseNumber(formValues.estimatedHours);
     const selectedParentGoal = formValues.parentGoalId
       ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
       : null;
@@ -148,12 +178,18 @@ const GoalView = ({ goal }) => {
       return;
     }
 
+    if (Number.isNaN(estimatedHours) || estimatedHours < 0) {
+      setSaveError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
     try {
       const updates = {
         title: formValues.title.trim(),
         description: formValues.description,
+        estimatedHours,
         parentGoalId: formValues.parentGoalId || null,
         targetCompletionDate: formValues.targetCompletionDate
           ? formValues.targetCompletionDate.toDate()
@@ -179,6 +215,69 @@ const GoalView = ({ goal }) => {
     setFormValues(buildFormValues(currentGoal));
     setEditOpen(false);
     setSaveError("");
+  };
+
+  const handleStartEstimatedHoursEdit = () => {
+    setEstimatedHoursEditOpen(true);
+    setEstimatedHoursEditValue(
+      currentGoal?.estimatedHours !== undefined ? String(currentGoal.estimatedHours) : "0"
+    );
+    setEstimatedHoursEditError("");
+  };
+
+  const handleCancelEstimatedHoursEdit = () => {
+    setEstimatedHoursEditOpen(false);
+    setEstimatedHoursEditValue(
+      currentGoal?.estimatedHours !== undefined ? String(currentGoal.estimatedHours) : "0"
+    );
+    setEstimatedHoursEditError("");
+  };
+
+  const handleSaveEstimatedHours = async () => {
+    if (!currentGoal) return;
+
+    const nextEstimatedHours = parseNumber(estimatedHoursEditValue);
+    if (Number.isNaN(nextEstimatedHours) || nextEstimatedHours < 0) {
+      setEstimatedHoursEditError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
+    setEstimatedHoursEditSaving(true);
+    setEstimatedHoursEditError("");
+    try {
+      const updatedGoal = await updateGoal(currentGoal._id, {
+        estimatedHours: nextEstimatedHours
+      });
+      setCurrentGoal(updatedGoal);
+      setFormValues(buildFormValues(updatedGoal));
+      setEstimatedHoursEditValue(
+        updatedGoal?.estimatedHours !== undefined ? String(updatedGoal.estimatedHours) : "0"
+      );
+      setEstimatedHoursEditOpen(false);
+    } catch (err) {
+      console.error(err);
+      setEstimatedHoursEditError("Unable to update estimated hours right now.");
+    } finally {
+      setEstimatedHoursEditSaving(false);
+    }
+  };
+
+  const handleDeleteGoal = async () => {
+    if (!currentGoal?._id) return;
+
+    setDeletingGoal(true);
+    setDeleteError("");
+    try {
+      await deleteGoal(currentGoal._id);
+      navigate("/goals/overview");
+    } catch (err) {
+      console.error(err);
+      setDeleteError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to delete goal right now."
+      );
+    } finally {
+      setDeletingGoal(false);
+    }
   };
 
   if (!currentGoal) {
@@ -209,6 +308,11 @@ const GoalView = ({ goal }) => {
   const parentDeadlineForEdit = selectedParentGoalForEdit?.targetCompletionDate
     ? dayjs(selectedParentGoalForEdit.targetCompletionDate)
     : null;
+  const estimatedHours = Number(currentGoal.estimatedHours) || 0;
+  const timeSpent = Number(currentGoal.timeSpent) || 0;
+  const timeLeft = Number(currentGoal.timeLeft) || 0;
+  const progressValue =
+    estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
@@ -258,6 +362,98 @@ const GoalView = ({ goal }) => {
             <Typography variant="h6" fontWeight={700} gutterBottom>
               Goal details
             </Typography>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="caption" color="text.secondary">
+                Goal progress
+              </Typography>
+              {estimatedHours > 0 ? (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatHours(timeSpent)} / {formatHours(estimatedHours)} hrs
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={progressValue}
+                    sx={{ height: 8, borderRadius: 999 }}
+                  />
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add an estimate to track remaining time for this goal.
+                </Typography>
+              )}
+            </Box>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                Time tracking
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                  gap: 2
+                }}
+              >
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Estimated hours
+                  </Typography>
+                  {estimatedHoursEditOpen ? (
+                    <Stack spacing={1} sx={{ mt: 0.5 }}>
+                      <TextField
+                        value={estimatedHoursEditValue}
+                        onChange={(event) => setEstimatedHoursEditValue(event.target.value)}
+                        type="number"
+                        size="small"
+                        inputProps={{ min: 0, step: "0.25" }}
+                      />
+                      {estimatedHoursEditError && (
+                        <Typography variant="caption" color="error">
+                          {estimatedHoursEditError}
+                        </Typography>
+                      )}
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={handleSaveEstimatedHours}
+                          disabled={estimatedHoursEditSaving}
+                        >
+                          {estimatedHoursEditSaving ? "Saving..." : "Save"}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={handleCancelEstimatedHoursEdit}
+                          disabled={estimatedHoursEditSaving}
+                        >
+                          Cancel
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  ) : (
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
+                      <Typography>{formatHours(estimatedHours)}</Typography>
+                      <Button size="small" onClick={handleStartEstimatedHoursEdit}>
+                        Edit
+                      </Button>
+                    </Stack>
+                  )}
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Time spent
+                  </Typography>
+                  <Typography>{formatHours(timeSpent)}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Time left
+                  </Typography>
+                  <Typography>{formatHours(timeLeft)}</Typography>
+                </Box>
+              </Box>
+            </Box>
             <Box
               sx={{
                 display: "grid",
@@ -339,6 +535,33 @@ const GoalView = ({ goal }) => {
               >
                 Create sub-task
               </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  setDeleteConfirmOpen((prev) => !prev);
+                  setDeleteError("");
+                }}
+                disabled={deletingGoal}
+              >
+                {deleteConfirmOpen ? "Cancel delete" : "Delete goal"}
+              </Button>
+              {deleteConfirmOpen && (
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    This deletes this goal. Existing child goals are detached by the current backend behavior.
+                  </Typography>
+                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleDeleteGoal}
+                    disabled={deletingGoal}
+                  >
+                    {deletingGoal ? "Deleting..." : "Confirm delete"}
+                  </Button>
+                </Stack>
+              )}
             </Stack>
           </Paper>
 
@@ -392,6 +615,21 @@ const GoalView = ({ goal }) => {
                       ? "Category is inherited from the parent goal."
                       : "Select or type a category."
                   }
+                  fullWidth
+                />
+                <TextField
+                  label="Estimated hours"
+                  value={formValues.estimatedHours}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      estimatedHours: event.target.value
+                    }))
+                  }
+                  type="number"
+                  size="small"
+                  inputProps={{ min: 0, step: "0.25" }}
+                  helperText="Used to track time spent and remaining time."
                   fullWidth
                 />
                 <datalist id="goal-category-options">

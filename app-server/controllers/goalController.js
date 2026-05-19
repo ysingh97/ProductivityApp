@@ -1,9 +1,11 @@
 const Goal = require('../models/goal'); // Import the Goal model
 const Task = require('../models/task');
 const Category = require('../models/category');
+const TimeEntry = require('../models/timeEntry');
 const { enqueueGoogleSync } = require('../services/calendarSyncService');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
+const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
 
 const resolveCategory = async (input, userId) => {
     const title = normalizeCategoryTitle(
@@ -73,15 +75,114 @@ const collectDescendantGoalIds = async (rootId, userId) => {
     return descendantIds;
 };
 
+const collectAncestorGoalIds = async (goalId, userId) => {
+    const ancestorGoalIds = [];
+    let currentGoal = await Goal.findOne({ _id: goalId, userId }, { _id: 1, parentGoalId: 1 });
+    const seen = new Set();
+
+    while (currentGoal) {
+        const currentId = String(currentGoal._id);
+        if (seen.has(currentId)) {
+            break;
+        }
+
+        seen.add(currentId);
+        ancestorGoalIds.push(currentGoal._id);
+
+        if (!currentGoal.parentGoalId) {
+            break;
+        }
+
+        currentGoal = await Goal.findOne(
+            { _id: currentGoal.parentGoalId, userId },
+            { _id: 1, parentGoalId: 1 }
+        );
+    }
+
+    return ancestorGoalIds;
+};
+
+const syncGoalTimeTotals = async (goalId, userId) => {
+    const goal = await Goal.findOne({ _id: goalId, userId });
+    if (!goal) {
+        return null;
+    }
+
+    const descendantIds = await collectDescendantGoalIds(goal._id, userId);
+    const taskIds = await Task.distinct('_id', {
+        userId: goal.userId,
+        parentGoalId: { $in: [goal._id, ...descendantIds] }
+    });
+
+    const aggregate = await TimeEntry.aggregate([
+        {
+            $match: {
+                userId: goal.userId,
+                taskId: { $in: taskIds }
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalMinutes: { $sum: '$durationMinutes' }
+            }
+        }
+    ]);
+
+    const totalHours = roundToTwoDecimals((aggregate[0]?.totalMinutes || 0) / 60);
+    const estimatedHours = Number(goal.estimatedHours) || 0;
+
+    goal.timeSpent = totalHours;
+    goal.timeLeft = roundToTwoDecimals(Math.max(estimatedHours - totalHours, 0));
+    await goal.save();
+
+    return goal;
+};
+
+const syncAllGoalTimeTotals = async (userId) => {
+    const goals = await Goal.find({ userId }, { _id: 1 });
+    for (const goal of goals) {
+        await syncGoalTimeTotals(goal._id, userId);
+    }
+};
+
+const syncGoalTimeTotalsForIds = async ({ userId, goalIds }) => {
+    const goalIdsToSync = new Map();
+
+    for (const goalId of goalIds) {
+        if (!goalId) {
+            continue;
+        }
+
+        const ancestorGoalIds = await collectAncestorGoalIds(goalId, userId);
+        for (const ancestorGoalId of ancestorGoalIds) {
+            goalIdsToSync.set(String(ancestorGoalId), ancestorGoalId);
+        }
+    }
+
+    for (const goalId of goalIdsToSync.values()) {
+        await syncGoalTimeTotals(goalId, userId);
+    }
+};
+
 const applyCategoryToGoalTree = async (rootId, userId, nextCategoryId, previousCategoryId) => {
     const descendantIds = await collectDescendantGoalIds(rootId, userId);
     const goalIds = [rootId, ...descendantIds];
+    const taskIds = await Task.distinct('_id', {
+        parentGoalId: { $in: goalIds },
+        userId
+    });
+
     await Goal.updateMany(
         { _id: { $in: goalIds }, userId },
         { $set: { category: nextCategoryId } }
     );
     await Task.updateMany(
         { parentGoalId: { $in: goalIds }, userId },
+        { $set: { category: nextCategoryId } }
+    );
+    await TimeEntry.updateMany(
+        { taskId: { $in: taskIds }, userId },
         { $set: { category: nextCategoryId } }
     );
 
@@ -106,6 +207,7 @@ const applyCategoryToGoalTree = async (rootId, userId, nextCategoryId, previousC
 // Get all goals
 const getGoals = async (req, res) => {
     try {
+        await syncAllGoalTimeTotals(req.user.id);
         const goals = await Goal.find({ userId: req.user.id }).populate('category', 'title');
         res.status(200).json(goals);
     } catch (err) {
@@ -115,6 +217,7 @@ const getGoals = async (req, res) => {
 
 const getGoalById = async (req, res) => {
     try {
+        await syncGoalTimeTotals(req.params.id, req.user.id);
         const goal = await Goal.findOne({ _id: req.params.id, userId: req.user.id })
             .populate('category', 'title');
         if (!goal) {
@@ -128,8 +231,9 @@ const getGoalById = async (req, res) => {
 
 const createGoal = async (req, res) => {
     try {
+        const { userId, timeSpent, timeLeft, ...goalBody } = req.body;
         let parentGoal = null;
-        const parentGoalId = req.body.parentGoalId || null;
+        const parentGoalId = goalBody.parentGoalId || null;
         if (parentGoalId) {
             parentGoal = await Goal.findOne({ _id: parentGoalId, userId: req.user.id });
             if (!parentGoal) {
@@ -142,12 +246,12 @@ const createGoal = async (req, res) => {
             const topLevelGoal = await getTopLevelGoal(parentGoal._id, req.user.id);
             categoryId = topLevelGoal ? topLevelGoal.category || null : null;
         } else {
-            const category = await resolveCategory(req.body.category, req.user.id);
+            const category = await resolveCategory(goalBody.category, req.user.id);
             categoryId = category ? category._id : null;
         }
 
         const newGoal = new Goal({
-            ...req.body,
+            ...goalBody,
             category: categoryId,
             userId: req.user.id
         });
@@ -164,14 +268,16 @@ const createGoal = async (req, res) => {
             await parentGoal.save();
         }
 
+        const responseGoal = await syncGoalTimeTotals(savedGoal._id, req.user.id) || savedGoal;
+
         await enqueueGoogleSync({
             userId: req.user.id,
             sourceType: 'goal',
             sourceId: savedGoal._id
         });
 
-        await savedGoal.populate('category', 'title');
-        res.status(201).json(savedGoal);
+        await responseGoal.populate('category', 'title');
+        res.status(201).json(responseGoal);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -180,7 +286,7 @@ const createGoal = async (req, res) => {
 const updateGoal = async (req, res) => {
     try {
         const { id } = req.params;
-        const { userId, ...updates } = req.body;
+        const { userId, timeSpent, timeLeft, ...updates } = req.body;
 
         const existingGoal = await Goal.findOne({ _id: id, userId: req.user.id });
         if (!existingGoal) {
@@ -258,13 +364,23 @@ const updateGoal = async (req, res) => {
             );
         }
 
-        await updatedGoal.populate('category', 'title');
+        if (parentChanged) {
+            await syncGoalTimeTotalsForIds({
+                userId: req.user.id,
+                goalIds: [previousParentId, nextParentId]
+            });
+        }
+
+        const refreshedUpdatedGoal = await syncGoalTimeTotals(updatedGoal._id, req.user.id);
+        const responseGoal = refreshedUpdatedGoal || updatedGoal;
+
+        await responseGoal.populate('category', 'title');
         await enqueueGoogleSync({
             userId: req.user.id,
             sourceType: 'goal',
-            sourceId: updatedGoal._id
+            sourceId: responseGoal._id
         });
-        res.status(200).json(updatedGoal);
+        res.status(200).json(responseGoal);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -297,7 +413,19 @@ const deleteGoal = async (req, res) => {
             { $set: { parentGoalId: null } }
         );
 
+        await Task.updateMany(
+            { parentGoalId: goalToDelete._id, userId: req.user.id },
+            { $set: { parentGoalId: null } }
+        );
+
         await Goal.deleteOne({ _id: goalToDelete._id, userId: req.user.id });
+        if (goalToDelete.parentGoalId) {
+            await syncGoalTimeTotalsForIds({
+                userId: req.user.id,
+                goalIds: [goalToDelete.parentGoalId]
+            });
+        }
+
         await enqueueGoogleSync({
             userId: req.user.id,
             sourceType: 'goal',
@@ -306,7 +434,7 @@ const deleteGoal = async (req, res) => {
         
         res.json({
             message: 'Goal deleted',
-            deletedTask: goalToDelete
+            deletedGoal: goalToDelete
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

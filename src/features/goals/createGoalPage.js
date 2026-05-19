@@ -1,17 +1,36 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Box, CircularProgress, Container, Paper, Stack, Typography } from "@mui/material";
+import { Link, useLocation, useParams } from "react-router-dom";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Paper,
+  Stack,
+  Typography
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { useParams } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import GoalForm from "./goalForm";
 import { createGoal, fetchGoalById, updateGoal } from "./goalService";
 
 const CreateGoalPage = () => {
-    const [goals, setGoals] = useState([]);
     const [error, setError] = useState(null);
+    const [savedGoal, setSavedGoal] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
+    const location = useLocation();
     const { goalId } = useParams();
     const [goal, setGoal] = useState(null);
     const [loading, setLoading] = useState(false);
     const isEditing = Boolean(goalId);
+    const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
+    const sourceLink = isEditing && goal?._id
+      ? { to: `/goals/${goal._id}`, label: "Back to goal" }
+      : parentGoal?._id
+        ? { to: `/goals/${parentGoal._id}`, label: "Back to parent goal" }
+        : null;
 
     useEffect(() => {
         if (!isEditing) {
@@ -35,21 +54,27 @@ const CreateGoalPage = () => {
     }, [goalId, isEditing]);
 
     const handleGoalSubmit = async (goalData) => {
-        setError(null);
-    
-        try {
-          if (isEditing && goal) {
-            const updatedGoal = await updateGoal(goal._id, goalData);
-            setGoals((prevGoals) =>
-              prevGoals.map((g) => (g._id === updatedGoal._id ? updatedGoal : g))
-            );
-          } else {
-            const newGoal = await createGoal(goalData);
-            setGoals((prevGoals) => [...prevGoals, newGoal]);
-          }
-        } catch (err) {
-          setError(err.message);
+      setError(null);
+      setSavedGoal(null);
+      setSubmitting(true);
+
+      try {
+        const nextGoal = isEditing && goal
+          ? await updateGoal(goal._id, goalData)
+          : await createGoal(goalData);
+
+        if (isEditing) {
+          setGoal(nextGoal);
         }
+        setSavedGoal(nextGoal);
+        return nextGoal;
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || "Failed to save goal.";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setSubmitting(false);
+      }
     };
 
 
@@ -89,11 +114,39 @@ const CreateGoalPage = () => {
                 <Typography variant="body2" color="text.secondary">
                   Set the core details here, then expand the hierarchy and tracking from the goal view.
                 </Typography>
+                {sourceLink && (
+                  <Button
+                    component={Link}
+                    to={sourceLink.to}
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    {sourceLink.label}
+                  </Button>
+                )}
               </Stack>
             </Paper>
 
             <Stack spacing={2}>
               {error && <Alert severity="error">{error}</Alert>}
+              {savedGoal && (
+                <Alert
+                  severity="success"
+                  action={
+                    <Button
+                      component={Link}
+                      to={`/goals/${savedGoal._id}`}
+                      color="inherit"
+                      size="small"
+                      endIcon={<ArrowForwardIcon />}
+                    >
+                      Open
+                    </Button>
+                  }
+                >
+                  {isEditing ? "Updated" : "Created"} "{savedGoal.title}".
+                </Alert>
+              )}
               {loading ? (
                 <Paper
                   variant="outlined"
@@ -113,7 +166,12 @@ const CreateGoalPage = () => {
                   </Stack>
                 </Paper>
               ) : (
-                <GoalForm goal={goal} isEditing={isEditing} onSubmit={handleGoalSubmit} />
+                <GoalForm
+                  goal={goal}
+                  isEditing={isEditing}
+                  onSubmit={handleGoalSubmit}
+                  submitting={submitting}
+                />
               )}
             </Stack>
           </Box>

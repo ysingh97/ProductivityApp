@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Box,
@@ -24,7 +24,14 @@ import TaskCompletionBar from "./taskCompletionBar";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
 import { fetchCategories } from "../categories/categoryService";
-import { updateTask } from "./taskService";
+import {
+  createTaskTimeEntry,
+  deleteTask,
+  deleteTaskTimeEntry,
+  fetchTaskTimeEntries,
+  updateTaskTimeEntry,
+  updateTask
+} from "./taskService";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -59,7 +66,44 @@ const parseNumber = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+const parseEditableNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const buildDefaultTimeEntryValues = () => {
+  const end = dayjs();
+  const start = end.subtract(1, "hour");
+
+  return {
+    startedAt: start,
+    endedAt: end
+  };
+};
+
+const buildEditTimeEntryValues = (entry) => ({
+  startedAt: dayjs(entry.startedAt),
+  endedAt: dayjs(entry.endedAt)
+});
+
+const formatDurationLabel = (durationMinutes) => {
+  const totalMinutes = Math.round(durationMinutes || 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
+};
+
 const TaskView = ({ task }) => {
+  const navigate = useNavigate();
   const [currentTask, setCurrentTask] = useState(task);
   const [parentGoals, setParentGoals] = useState([]);
   const [lists, setLists] = useState([]);
@@ -68,14 +112,91 @@ const TaskView = ({ task }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingTask, setDeletingTask] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(task));
+  const [estimateEditOpen, setEstimateEditOpen] = useState(false);
+  const [estimateEditValue, setEstimateEditValue] = useState(
+    task?.estimatedCompletionTime !== undefined ? String(task.estimatedCompletionTime) : "0"
+  );
+  const [estimateEditSaving, setEstimateEditSaving] = useState(false);
+  const [estimateEditError, setEstimateEditError] = useState("");
+  const [timeEntryValues, setTimeEntryValues] = useState(buildDefaultTimeEntryValues);
+  const [timeEntrySaving, setTimeEntrySaving] = useState(false);
+  const [timeEntryError, setTimeEntryError] = useState("");
+  const [timeEntrySuccess, setTimeEntrySuccess] = useState("");
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [timeEntriesLoading, setTimeEntriesLoading] = useState(false);
+  const [timeEntriesError, setTimeEntriesError] = useState("");
+  const [deletingTimeEntryId, setDeletingTimeEntryId] = useState("");
+  const [editingTimeEntryId, setEditingTimeEntryId] = useState("");
+  const [editingTimeEntryValues, setEditingTimeEntryValues] = useState(null);
+  const [editingTimeEntryError, setEditingTimeEntryError] = useState("");
+  const [editingTimeEntrySaving, setEditingTimeEntrySaving] = useState(false);
+  const timeEntryRequestInFlightRef = useRef(false);
 
   useEffect(() => {
     setCurrentTask(task);
     setFormValues(buildFormValues(task));
+    setEstimateEditOpen(false);
+    setEstimateEditValue(
+      task?.estimatedCompletionTime !== undefined ? String(task.estimatedCompletionTime) : "0"
+    );
+    setEstimateEditError("");
+    setTimeEntryValues(buildDefaultTimeEntryValues());
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    setTimeEntries([]);
+    setTimeEntriesError("");
+    setDeletingTimeEntryId("");
+    setEditingTimeEntryId("");
+    setEditingTimeEntryValues(null);
+    setEditingTimeEntryError("");
     setSaveError("");
+    setDeleteConfirmOpen(false);
+    setDeletingTask(false);
+    setDeleteError("");
     setEditOpen(false);
   }, [task]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!currentTask?._id) {
+      setTimeEntries([]);
+      setTimeEntriesLoading(false);
+      setTimeEntriesError("");
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const loadTimeEntries = async () => {
+      setTimeEntriesLoading(true);
+      setTimeEntriesError("");
+      try {
+        const entries = await fetchTaskTimeEntries(currentTask._id);
+        if (isActive) {
+          setTimeEntries(entries);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isActive) {
+          setTimeEntriesError("Unable to load logged time right now.");
+        }
+      } finally {
+        if (isActive) {
+          setTimeEntriesLoading(false);
+        }
+      }
+    };
+
+    loadTimeEntries();
+    return () => {
+      isActive = false;
+    };
+  }, [currentTask]);
 
   useEffect(() => {
     let isActive = true;
@@ -199,6 +320,253 @@ const TaskView = ({ task }) => {
     setSaveError("");
   };
 
+  const handleStartEstimateEdit = () => {
+    setEstimateEditOpen(true);
+    setEstimateEditValue(
+      currentTask?.estimatedCompletionTime !== undefined
+        ? String(currentTask.estimatedCompletionTime)
+        : "0"
+    );
+    setEstimateEditError("");
+  };
+
+  const handleCancelEstimateEdit = () => {
+    setEstimateEditOpen(false);
+    setEstimateEditValue(
+      currentTask?.estimatedCompletionTime !== undefined
+        ? String(currentTask.estimatedCompletionTime)
+        : "0"
+    );
+    setEstimateEditError("");
+  };
+
+  const handleSaveEstimate = async () => {
+    if (!currentTask) return;
+
+    const nextEstimate = parseEditableNumber(estimateEditValue);
+    if (Number.isNaN(nextEstimate) || nextEstimate < 0) {
+      setEstimateEditError("Estimated hours must be 0 or greater.");
+      return;
+    }
+
+    setEstimateEditSaving(true);
+    setEstimateEditError("");
+    try {
+      const updatedTask = await updateTask(currentTask._id, {
+        estimatedCompletionTime: nextEstimate
+      });
+      setCurrentTask(updatedTask);
+      setFormValues(buildFormValues(updatedTask));
+      setEstimateEditValue(
+        updatedTask?.estimatedCompletionTime !== undefined
+          ? String(updatedTask.estimatedCompletionTime)
+          : "0"
+      );
+      setEstimateEditOpen(false);
+    } catch (err) {
+      console.error(err);
+      setEstimateEditError("Unable to update estimated hours right now.");
+    } finally {
+      setEstimateEditSaving(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!currentTask?._id) return;
+
+    setDeletingTask(true);
+    setDeleteError("");
+    try {
+      await deleteTask(currentTask._id);
+      navigate("/board");
+    } catch (err) {
+      console.error(err);
+      setDeleteError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to delete task right now."
+      );
+    } finally {
+      setDeletingTask(false);
+    }
+  };
+
+  const loggedDurationHours = useMemo(() => {
+    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
+      return null;
+    }
+
+    if (
+      !timeEntryValues.startedAt.isValid() ||
+      !timeEntryValues.endedAt.isValid() ||
+      !timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)
+    ) {
+      return null;
+    }
+
+    return Math.round(
+      timeEntryValues.endedAt.diff(timeEntryValues.startedAt, "minute", true) / 60 * 100
+    ) / 100;
+  }, [timeEntryValues.endedAt, timeEntryValues.startedAt]);
+
+  const handleLogTime = async () => {
+    if (!currentTask) return;
+    if (timeEntryRequestInFlightRef.current) return;
+
+    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
+      setTimeEntryError("Select both a start and end time.");
+      return;
+    }
+
+    if (
+      !timeEntryValues.startedAt.isValid() ||
+      !timeEntryValues.endedAt.isValid()
+    ) {
+      setTimeEntryError("Choose valid start and end times.");
+      return;
+    }
+
+    if (!timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)) {
+      setTimeEntryError("End time must be after start time.");
+      return;
+    }
+
+    if (timeEntryValues.endedAt.isAfter(dayjs())) {
+      setTimeEntryError("End time cannot be in the future.");
+      return;
+    }
+
+    setTimeEntrySaving(true);
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    timeEntryRequestInFlightRef.current = true;
+    try {
+      const response = await createTaskTimeEntry(currentTask._id, {
+        startedAt: timeEntryValues.startedAt.toDate(),
+        endedAt: timeEntryValues.endedAt.toDate()
+      });
+
+      setCurrentTask(response.task);
+      setTimeEntries((prev) => {
+        const entryId = String(response.timeEntry._id);
+        const existingIndex = prev.findIndex((entry) => String(entry._id) === entryId);
+        const nextEntries = existingIndex >= 0
+          ? prev.map((entry, index) => (index === existingIndex ? response.timeEntry : entry))
+          : [response.timeEntry, ...prev];
+
+        return nextEntries.sort(
+          (left, right) => new Date(right.endedAt).getTime() - new Date(left.endedAt).getTime()
+        );
+      });
+      setTimeEntryValues(buildDefaultTimeEntryValues());
+      const loggedHours = Math.round((response.timeEntry.durationMinutes / 60) * 100) / 100;
+      setTimeEntrySuccess(
+        response.duplicate
+          ? `That exact time range was already logged. Total time remains ${response.task.timeSpent} hours.`
+          : `Logged ${loggedHours} hours. Total time is now ${response.task.timeSpent} hours.`
+      );
+    } catch (err) {
+      console.error(err);
+      setTimeEntryError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to log time right now."
+      );
+    } finally {
+      timeEntryRequestInFlightRef.current = false;
+      setTimeEntrySaving(false);
+    }
+  };
+
+  const handleDeleteTimeEntry = async (entryId) => {
+    if (!currentTask || !entryId) return;
+
+    setDeletingTimeEntryId(entryId);
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    try {
+      const response = await deleteTaskTimeEntry(currentTask._id, entryId);
+      setCurrentTask(response.task);
+      setTimeEntries((prev) => prev.filter((entry) => String(entry._id) !== String(entryId)));
+      setTimeEntrySuccess(`Deleted time entry. Total time is now ${response.task.timeSpent} hours.`);
+    } catch (err) {
+      console.error(err);
+      setTimeEntryError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to delete time entry right now."
+      );
+    } finally {
+      setDeletingTimeEntryId("");
+    }
+  };
+
+  const handleStartEditingTimeEntry = (entry) => {
+    setEditingTimeEntryId(entry._id);
+    setEditingTimeEntryValues(buildEditTimeEntryValues(entry));
+    setEditingTimeEntryError("");
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+  };
+
+  const handleCancelEditingTimeEntry = () => {
+    setEditingTimeEntryId("");
+    setEditingTimeEntryValues(null);
+    setEditingTimeEntryError("");
+  };
+
+  const handleSaveEditedTimeEntry = async (entryId) => {
+    if (!currentTask || !editingTimeEntryValues) return;
+
+    if (!editingTimeEntryValues.startedAt || !editingTimeEntryValues.endedAt) {
+      setEditingTimeEntryError("Select both a start and end time.");
+      return;
+    }
+
+    if (
+      !editingTimeEntryValues.startedAt.isValid() ||
+      !editingTimeEntryValues.endedAt.isValid()
+    ) {
+      setEditingTimeEntryError("Choose valid start and end times.");
+      return;
+    }
+
+    if (!editingTimeEntryValues.endedAt.isAfter(editingTimeEntryValues.startedAt)) {
+      setEditingTimeEntryError("End time must be after start time.");
+      return;
+    }
+
+    if (editingTimeEntryValues.endedAt.isAfter(dayjs())) {
+      setEditingTimeEntryError("End time cannot be in the future.");
+      return;
+    }
+
+    setEditingTimeEntrySaving(true);
+    setEditingTimeEntryError("");
+    setTimeEntryError("");
+    setTimeEntrySuccess("");
+    try {
+      const response = await updateTaskTimeEntry(currentTask._id, entryId, {
+        startedAt: editingTimeEntryValues.startedAt.toDate(),
+        endedAt: editingTimeEntryValues.endedAt.toDate()
+      });
+
+      setCurrentTask(response.task);
+      setTimeEntries((prev) =>
+        prev
+          .map((entry) => (String(entry._id) === String(entryId) ? response.timeEntry : entry))
+          .sort((left, right) => new Date(right.endedAt).getTime() - new Date(left.endedAt).getTime())
+      );
+      const updatedHours = Math.round((response.timeEntry.durationMinutes / 60) * 100) / 100;
+      setTimeEntrySuccess(
+        `Updated time entry to ${updatedHours} hours. Total time is now ${response.task.timeSpent} hours.`
+      );
+      setEditingTimeEntryId("");
+      setEditingTimeEntryValues(null);
+    } catch (err) {
+      console.error(err);
+      setEditingTimeEntryError(
+        err.response?.data?.error || err.response?.data?.message || "Unable to update time entry right now."
+      );
+    } finally {
+      setEditingTimeEntrySaving(false);
+    }
+  };
+
   if (!currentTask) {
     return (
       <Container maxWidth="lg" sx={{ py: 6, textAlign: "left" }}>
@@ -290,6 +658,64 @@ const TaskView = ({ task }) => {
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
             <Typography variant="h6" fontWeight={700} gutterBottom>
+              Log time
+            </Typography>
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Record a concrete block of time for this task. This updates both the task progress
+                cache and the visualization analytics.
+              </Typography>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={2}
+              >
+                <DateTimePicker
+                  label="Start time"
+                  value={timeEntryValues.startedAt}
+                  onChange={(value) =>
+                    setTimeEntryValues((prev) => ({ ...prev, startedAt: value }))
+                  }
+                  maxDateTime={dayjs()}
+                  textFieldProps={{
+                    fullWidth: true,
+                    size: "small"
+                  }}
+                />
+                <DateTimePicker
+                  label="End time"
+                  value={timeEntryValues.endedAt}
+                  onChange={(value) =>
+                    setTimeEntryValues((prev) => ({ ...prev, endedAt: value }))
+                  }
+                  minDateTime={timeEntryValues.startedAt || undefined}
+                  maxDateTime={dayjs()}
+                  textFieldProps={{
+                    fullWidth: true,
+                    size: "small"
+                  }}
+                />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {loggedDurationHours !== null
+                  ? `This entry will add ${loggedDurationHours} hours.`
+                  : "Choose a valid time range to preview the logged duration."}
+              </Typography>
+              {timeEntryError && <Typography color="error">{timeEntryError}</Typography>}
+              {timeEntrySuccess && <Typography color="success.main">{timeEntrySuccess}</Typography>}
+              <Box>
+                <Button
+                  variant="contained"
+                  onClick={handleLogTime}
+                  disabled={timeEntrySaving}
+                >
+                  {timeEntrySaving ? "Logging..." : "Log time"}
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
               Task details
             </Typography>
             <Box
@@ -327,15 +753,186 @@ const TaskView = ({ task }) => {
                 <Typography variant="caption" color="text.secondary">
                   Estimated hours
                 </Typography>
-                <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
+                {estimateEditOpen ? (
+                  <Stack spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField
+                      value={estimateEditValue}
+                      onChange={(event) => setEstimateEditValue(event.target.value)}
+                      type="number"
+                      size="small"
+                      inputProps={{ min: 0, step: "0.25" }}
+                    />
+                    {estimateEditError && (
+                      <Typography variant="caption" color="error">
+                        {estimateEditError}
+                      </Typography>
+                    )}
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={handleSaveEstimate}
+                        disabled={estimateEditSaving}
+                      >
+                        {estimateEditSaving ? "Saving..." : "Save"}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleCancelEstimateEdit}
+                        disabled={estimateEditSaving}
+                      >
+                        Cancel
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
+                    <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
+                    <Button size="small" onClick={handleStartEstimateEdit}>
+                      Edit
+                    </Button>
+                  </Stack>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Time spent
+                  Total time spent
                 </Typography>
                 <Typography>{currentTask.timeSpent || 0}</Typography>
               </Box>
             </Box>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              Recent time entries
+            </Typography>
+            {timeEntriesLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : timeEntriesError ? (
+              <Typography color="error">{timeEntriesError}</Typography>
+            ) : timeEntries.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No logged time yet for this task.
+              </Typography>
+            ) : (
+              <Stack spacing={1.5}>
+                {timeEntries.map((entry) => {
+                  const start = dayjs(entry.startedAt);
+                  const end = dayjs(entry.endedAt);
+                  const isEditing = editingTimeEntryId === entry._id;
+
+                  return (
+                    <Box
+                      key={entry._id}
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1.5
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={2}
+                        sx={{ alignItems: "baseline", justifyContent: "space-between" }}
+                      >
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={700}>
+                            {formatDurationLabel(entry.durationMinutes)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {start.format("MMM D, YYYY h:mm A")} - {end.format("h:mm A")}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {Math.round((entry.durationMinutes / 60) * 100) / 100}h
+                          </Typography>
+                          <Button
+                            size="small"
+                            onClick={() => handleStartEditingTimeEntry(entry)}
+                            disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteTimeEntry(entry._id)}
+                            disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
+                          >
+                            {deletingTimeEntryId === entry._id ? "Deleting..." : "Delete"}
+                          </Button>
+                        </Stack>
+                      </Stack>
+                      {isEditing && editingTimeEntryValues && (
+                        <Stack spacing={1.5} sx={{ mt: 2 }}>
+                          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                            <DateTimePicker
+                              label="Edit start time"
+                              value={editingTimeEntryValues.startedAt}
+                              onChange={(value) =>
+                                setEditingTimeEntryValues((prev) => ({
+                                  ...prev,
+                                  startedAt: value
+                                }))
+                              }
+                              maxDateTime={dayjs()}
+                              textFieldProps={{
+                                fullWidth: true,
+                                size: "small"
+                              }}
+                            />
+                            <DateTimePicker
+                              label="Edit end time"
+                              value={editingTimeEntryValues.endedAt}
+                              onChange={(value) =>
+                                setEditingTimeEntryValues((prev) => ({
+                                  ...prev,
+                                  endedAt: value
+                                }))
+                              }
+                              minDateTime={editingTimeEntryValues.startedAt || undefined}
+                              maxDateTime={dayjs()}
+                              textFieldProps={{
+                                fullWidth: true,
+                                size: "small"
+                              }}
+                            />
+                          </Stack>
+                          {editingTimeEntryError && (
+                            <Typography color="error">{editingTimeEntryError}</Typography>
+                          )}
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => handleSaveEditedTimeEntry(entry._id)}
+                              disabled={editingTimeEntrySaving}
+                            >
+                              {editingTimeEntrySaving ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={handleCancelEditingTimeEntry}
+                              disabled={editingTimeEntrySaving}
+                            >
+                              Cancel
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
           </Paper>
         </Stack>
 
@@ -355,6 +952,33 @@ const TaskView = ({ task }) => {
                 <Button variant="outlined" component={Link} to={`/goals/${parentGoal._id}`}>
                   Open parent goal
                 </Button>
+              )}
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  setDeleteConfirmOpen((prev) => !prev);
+                  setDeleteError("");
+                }}
+                disabled={deletingTask}
+              >
+                {deleteConfirmOpen ? "Cancel delete" : "Delete task"}
+              </Button>
+              {deleteConfirmOpen && (
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    This will delete the task and its logged time entries.
+                  </Typography>
+                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleDeleteTask}
+                    disabled={deletingTask}
+                  >
+                    {deletingTask ? "Deleting..." : "Confirm delete"}
+                  </Button>
+                </Stack>
               )}
             </Stack>
           </Paper>

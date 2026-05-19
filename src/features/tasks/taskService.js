@@ -22,6 +22,46 @@ export const updateTask = async (taskId, updates) => {
   }
 };
 
+export const createTaskTimeEntry = async (taskId, timeEntryData) => {
+  try {
+    const res = await apiClient.post(`/tasks/${taskId}/time-entries`, timeEntryData);
+    return res.data;
+  } catch (err) {
+    console.error("Error creating task time entry:", err);
+    throw err;
+  }
+};
+
+export const fetchTaskTimeEntries = async (taskId) => {
+  try {
+    const res = await apiClient.get(`/tasks/${taskId}/time-entries`);
+    return res.data;
+  } catch (err) {
+    console.error("Error fetching task time entries:", err);
+    throw err;
+  }
+};
+
+export const deleteTaskTimeEntry = async (taskId, entryId) => {
+  try {
+    const res = await apiClient.delete(`/tasks/${taskId}/time-entries/${entryId}`);
+    return res.data;
+  } catch (err) {
+    console.error("Error deleting task time entry:", err);
+    throw err;
+  }
+};
+
+export const updateTaskTimeEntry = async (taskId, entryId, timeEntryData) => {
+  try {
+    const res = await apiClient.put(`/tasks/${taskId}/time-entries/${entryId}`, timeEntryData);
+    return res.data;
+  } catch (err) {
+    console.error("Error updating task time entry:", err);
+    throw err;
+  }
+};
+
 export const deleteTask = async (taskId) => {
   const response = await apiClient.delete(`/tasks/${taskId}`);
   return response.data;

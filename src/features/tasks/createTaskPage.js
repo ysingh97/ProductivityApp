@@ -1,21 +1,41 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Box, CircularProgress, Container, Paper, Stack, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Paper,
+  Stack,
+  Typography
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { useParams, useSearchParams } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import TaskForm from "./taskForm";
 import { createTask, fetchTaskById, updateTask } from "./taskService";
 
 const CreateTaskPage = () => {
-    const [tasks, setTasks] = useState([]);
     const [error, setError] = useState(null);
+    const [savedTask, setSavedTask] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
     const { taskId } = useParams(); // task id if editing
     const [searchParams] = useSearchParams();
     const goalId = searchParams.get("goalId"); // optional parent goal for new task
+    const listId = searchParams.get("listId"); // optional fixed list for new task
 
     const [task, setTask] = useState(null);
     const [loading, setLoading] = useState(false);
 
     const isEditing = Boolean(taskId);
+    const sourceLink = isEditing && task?._id
+      ? { to: `/tasks/${task._id}`, label: "Back to task" }
+      : listId
+        ? { to: `/lists/${listId}`, label: "Back to source list" }
+        : goalId
+          ? { to: `/goals/${goalId}`, label: "Back to parent goal" }
+          : null;
 
     useEffect(() => {
         if (isEditing) {
@@ -30,31 +50,41 @@ const CreateTaskPage = () => {
             } finally { setLoading(false); }
           };
           loadTask();
-        } else if (goalId) {
-          // Creating new task with parent goal
-          setTask({ parentGoalId: goalId });
+        } else if (goalId || listId) {
+          // Creating new task with optional parent goal or fixed list
+          setTask({
+            ...(goalId ? { parentGoalId: goalId } : {}),
+            ...(listId ? { listId } : {})
+          });
         } else {
           // Creating new task without parent goal
           setTask(null);
         }
-    }, [taskId, goalId, isEditing]);
+    }, [taskId, goalId, listId, isEditing]);
     // const location = useLocation();
     // const task = location.state?.task || null;
     // console.log("CreateTaskPage - task: ", task);
     const handleTaskSubmit = async (taskData) => {
       setError(null);
+      setSavedTask(null);
+      setSubmitting(true);
+
       try {
-        if (isEditing && task?._id) {
-          const updatedTask = await updateTask(task._id, taskData);
-          setTasks((prevTasks) =>
-            prevTasks.map((t) => (t._id === updatedTask._id ? updatedTask : t))
-          );
-        } else {
-          const newTask = await createTask(taskData);
-          setTasks((prevTasks) => [...prevTasks, newTask]);
+        const nextTask = isEditing && task?._id
+          ? await updateTask(task._id, taskData)
+          : await createTask(taskData);
+
+        if (isEditing) {
+          setTask(nextTask);
         }
+        setSavedTask(nextTask);
+        return nextTask;
       } catch (err) {
-        setError(err.message);
+        const message = err.response?.data?.message || err.message || "Failed to save task.";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setSubmitting(false);
       }
     };
 
@@ -94,11 +124,39 @@ const CreateTaskPage = () => {
                 <Typography variant="body2" color="text.secondary">
                   Build the task in a focused form, then refine progress and details from the task view.
                 </Typography>
+                {sourceLink && (
+                  <Button
+                    component={Link}
+                    to={sourceLink.to}
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    {sourceLink.label}
+                  </Button>
+                )}
               </Stack>
             </Paper>
 
             <Stack spacing={2}>
               {error && <Alert severity="error">{error}</Alert>}
+              {savedTask && (
+                <Alert
+                  severity="success"
+                  action={
+                    <Button
+                      component={Link}
+                      to={`/tasks/${savedTask._id}`}
+                      color="inherit"
+                      size="small"
+                      endIcon={<ArrowForwardIcon />}
+                    >
+                      Open
+                    </Button>
+                  }
+                >
+                  {isEditing ? "Updated" : "Created"} "{savedTask.title}".
+                </Alert>
+              )}
               {loading ? (
                 <Paper
                   variant="outlined"
@@ -118,7 +176,13 @@ const CreateTaskPage = () => {
                   </Stack>
                 </Paper>
               ) : (
-                <TaskForm task={task} onSubmit={handleTaskSubmit} isEditing={isEditing} />
+                <TaskForm
+                  task={task}
+                  onSubmit={handleTaskSubmit}
+                  isEditing={isEditing}
+                  isListFixed={Boolean(!isEditing && listId)}
+                  submitting={submitting}
+                />
               )}
             </Stack>
           </Box>

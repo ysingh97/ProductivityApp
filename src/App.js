@@ -4,6 +4,7 @@ import CreateTaskPage from './features/tasks/createTaskPage';
 import CreateListPage from './features/lists/createListPage';
 import CreateGoalPage from './features/goals/createGoalPage';
 import ListPage from './features/lists/listPage';
+import ListsOverview from './features/lists/listsOverview';
 import GoalPage from './features/goals/goalPage';
 import TaskPage from './features/tasks/taskPage';
 // import EditTaskPage from './features/tasks/editTaskPage';
@@ -156,6 +157,8 @@ function App() {
                   <Route path="/board" element={<TaskBoard />} />
                   <Route path="/task/new" element={<CreateTaskPage />} />
                   <Route path="/task/:taskId/edit" element={<CreateTaskPage />} />
+                  <Route path="/lists" element={<ListsOverview />} />
+                  <Route path="/lists/new" element={<CreateListPage />} />
                   <Route path="/createListPage" element={<CreateListPage />} />
                   <Route path="/goal/new" element={<CreateGoalPage />} />
                   <Route path="/goal/:goalId/edit" element={<CreateGoalPage />} />

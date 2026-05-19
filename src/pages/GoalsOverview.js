@@ -12,6 +12,7 @@ import {
   Divider,
   FormControl,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -38,6 +39,37 @@ const secondarySortOptions = [
   { value: "created", label: "Created date" }
 ];
 const ALL_CATEGORIES_VALUE = "__all_categories__";
+
+const formatHours = (value) => {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+};
+
+const compareDates = (a, b) => {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a - b;
+};
+
+const compareBy = (a, b, key) => {
+  switch (key) {
+    case "deadline":
+      return compareDates(a.dueDate, b.dueDate);
+    case "title":
+      return (a.title || "").localeCompare(b.title || "", undefined, {
+        sensitivity: "base"
+      });
+    case "category":
+      return (a.categoryLabel || "").localeCompare(b.categoryLabel || "", undefined, {
+        sensitivity: "base"
+      });
+    case "created":
+      return compareDates(a.createdDate, b.createdDate);
+    default:
+      return 0;
+  }
+};
 
 const GoalsOverview = () => {
   const [goals, setGoals] = useState([]);
@@ -157,32 +189,6 @@ const GoalsOverview = () => {
     });
   }, [normalizedGoals, query, statusFilter, categoryFilter]);
 
-  const compareDates = (a, b) => {
-    if (!a && !b) return 0;
-    if (!a) return 1;
-    if (!b) return -1;
-    return a - b;
-  };
-
-  const compareBy = (a, b, key) => {
-    switch (key) {
-      case "deadline":
-        return compareDates(a.dueDate, b.dueDate);
-      case "title":
-        return (a.title || "").localeCompare(b.title || "", undefined, {
-          sensitivity: "base"
-        });
-      case "category":
-        return (a.categoryLabel || "").localeCompare(b.categoryLabel || "", undefined, {
-          sensitivity: "base"
-        });
-      case "created":
-        return compareDates(a.createdDate, b.createdDate);
-      default:
-        return 0;
-    }
-  };
-
   const sortedGoals = useMemo(() => {
     const goalsCopy = [...filteredGoals];
     goalsCopy.sort((a, b) => {
@@ -250,6 +256,11 @@ const GoalsOverview = () => {
     const dueLabel = goal.dueDate ? dateFormatter.format(goal.dueDate) : "No deadline";
     const isOverdue = goal.dueDate && goal.dueDate < startOfToday && !goal.isComplete;
     const subgoalCount = directSubgoalCount.get(String(goal._id)) || 0;
+    const estimatedHours = Number(goal.estimatedHours) || 0;
+    const timeSpent = Number(goal.timeSpent) || 0;
+    const timeLeft = Number(goal.timeLeft) || 0;
+    const progressValue =
+      estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
 
     return (
       <Accordion
@@ -310,6 +321,28 @@ const GoalsOverview = () => {
               {goal.description ? goal.description : "No description yet."}
             </Typography>
 
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                Goal progress
+              </Typography>
+              {estimatedHours > 0 ? (
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatHours(timeSpent)} / {formatHours(estimatedHours)} hrs
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={progressValue}
+                    sx={{ height: 8, borderRadius: 999 }}
+                  />
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Add an estimate to track remaining time for this goal.
+                </Typography>
+              )}
+            </Box>
+
             <Box
               sx={{
                 display: "grid",
@@ -339,19 +372,19 @@ const GoalsOverview = () => {
                 <Typography variant="caption" color="text.secondary">
                   Estimated hours
                 </Typography>
-                <Typography>{goal.estimatedHours ?? 0}</Typography>
+                <Typography>{formatHours(estimatedHours)}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Time spent
                 </Typography>
-                <Typography>{goal.timeSpent ?? 0}</Typography>
+                <Typography>{formatHours(timeSpent)}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Time left
                 </Typography>
-                <Typography>{goal.timeLeft ?? 0}</Typography>
+                <Typography>{formatHours(timeLeft)}</Typography>
               </Box>
             </Box>
 
