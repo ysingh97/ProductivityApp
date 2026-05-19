@@ -54,9 +54,20 @@ Provider-specific secrets will depend on the selected hosts, for example deploy 
 
 1. Pull request runs CI only.
 2. Merge to `main` runs CI, then deploys to `staging`.
-3. Staging smoke checks verify the frontend and API are reachable.
+3. Staging smoke checks verify the frontend and API are reachable with `npm run smoke:deploy`.
 4. Production deploy is triggered manually from GitHub Actions.
 5. Production deploy requires the `production` environment approval gate.
+
+## Smoke Checks
+
+Use `npm run smoke:deploy` after a deployment.
+
+Supported environment variables:
+
+- `SMOKE_FRONTEND_URL`: frontend URL to verify.
+- `SMOKE_API_BASE_URL`: API base URL ending in `/api`; the script checks `/health`.
+- `SMOKE_API_HEALTH_URL`: explicit health endpoint URL, if the default is not correct.
+- `SMOKE_TIMEOUT_MS`: optional request timeout. Defaults to `10000`.
 
 ## Staging Data
 
