@@ -28,7 +28,13 @@ const getCategoryTitle = (value) => {
   return value.title || "";
 };
 
-const TaskForm = ({ task, onSubmit, isEditing = false, isListFixed = false }) => {
+const TaskForm = ({
+  task,
+  onSubmit,
+  isEditing = false,
+  isListFixed = false,
+  submitting = false
+}) => {
   const [lists, setLists] = useState([]);
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -121,7 +127,7 @@ const TaskForm = ({ task, onSubmit, isEditing = false, isListFixed = false }) =>
     }
   }, [selectedParentGoal]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
@@ -150,18 +156,22 @@ const TaskForm = ({ task, onSubmit, isEditing = false, isListFixed = false }) =>
     if (!selectedParentGoal?.value) {
       taskData.category = category;
     }
-    onSubmit(taskData);
+    try {
+      await onSubmit(taskData);
 
-    if (!isEditing) {
-      setTitle("");
-      setDescription("");
-      setCategory("");
-      setEstimatedCompletionTime(0);
-      if (!isListFixed) {
-        setSelectedList(null);
+      if (!isEditing) {
+        setTitle("");
+        setDescription("");
+        setCategory("");
+        setEstimatedCompletionTime(0);
+        if (!isListFixed) {
+          setSelectedList(null);
+        }
+        setSelectedParentGoal(null);
+        setTargetCompletionDate(null);
       }
-      setSelectedParentGoal(null);
-      setTargetCompletionDate(null);
+    } catch {
+      // The page wrapper displays API errors; the form keeps local validation errors only.
     }
   };
 
@@ -361,8 +371,8 @@ const TaskForm = ({ task, onSubmit, isEditing = false, isListFixed = false }) =>
                   "Standalone tasks can keep their own category."
                 )}
               </Typography>
-              <Button type="submit" variant="contained" size="large" disabled={loading}>
-                {isEditing ? "Update task" : "Create task"}
+              <Button type="submit" variant="contained" size="large" disabled={loading || submitting}>
+                {submitting ? "Saving..." : isEditing ? "Update task" : "Create task"}
               </Button>
             </Box>
           </Stack>

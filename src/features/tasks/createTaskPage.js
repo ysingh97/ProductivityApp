@@ -1,13 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Box, CircularProgress, Container, Paper, Stack, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Paper,
+  Stack,
+  Typography
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { useParams, useSearchParams } from "react-router-dom";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import TaskForm from "./taskForm";
 import { createTask, fetchTaskById, updateTask } from "./taskService";
 
 const CreateTaskPage = () => {
-    const [tasks, setTasks] = useState([]);
     const [error, setError] = useState(null);
+    const [savedTask, setSavedTask] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
     const { taskId } = useParams(); // task id if editing
     const [searchParams] = useSearchParams();
     const goalId = searchParams.get("goalId"); // optional parent goal for new task
@@ -47,18 +58,25 @@ const CreateTaskPage = () => {
     // console.log("CreateTaskPage - task: ", task);
     const handleTaskSubmit = async (taskData) => {
       setError(null);
+      setSavedTask(null);
+      setSubmitting(true);
+
       try {
-        if (isEditing && task?._id) {
-          const updatedTask = await updateTask(task._id, taskData);
-          setTasks((prevTasks) =>
-            prevTasks.map((t) => (t._id === updatedTask._id ? updatedTask : t))
-          );
-        } else {
-          const newTask = await createTask(taskData);
-          setTasks((prevTasks) => [...prevTasks, newTask]);
+        const nextTask = isEditing && task?._id
+          ? await updateTask(task._id, taskData)
+          : await createTask(taskData);
+
+        if (isEditing) {
+          setTask(nextTask);
         }
+        setSavedTask(nextTask);
+        return nextTask;
       } catch (err) {
-        setError(err.message);
+        const message = err.response?.data?.message || err.message || "Failed to save task.";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setSubmitting(false);
       }
     };
 
@@ -103,6 +121,24 @@ const CreateTaskPage = () => {
 
             <Stack spacing={2}>
               {error && <Alert severity="error">{error}</Alert>}
+              {savedTask && (
+                <Alert
+                  severity="success"
+                  action={
+                    <Button
+                      component={Link}
+                      to={`/tasks/${savedTask._id}`}
+                      color="inherit"
+                      size="small"
+                      endIcon={<ArrowForwardIcon />}
+                    >
+                      Open
+                    </Button>
+                  }
+                >
+                  {isEditing ? "Updated" : "Created"} "{savedTask.title}".
+                </Alert>
+              )}
               {loading ? (
                 <Paper
                   variant="outlined"
@@ -127,6 +163,7 @@ const CreateTaskPage = () => {
                   onSubmit={handleTaskSubmit}
                   isEditing={isEditing}
                   isListFixed={Boolean(!isEditing && listId)}
+                  submitting={submitting}
                 />
               )}
             </Stack>
