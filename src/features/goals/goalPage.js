@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { deleteGoal, fetchGoalById } from './goalService';
+import { fetchGoalById } from './goalService';
 import GoalView from './goalView';
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 const GoalPage = () => {
   const [goal, setGoal] = useState(null);
