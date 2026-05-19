@@ -92,7 +92,25 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
       goalData.category = category;
     }
     try {
-      await onSubmit(goalData);
+      const savedGoal = await onSubmit(goalData);
+      if (savedGoal?._id) {
+        setParentGoals((prevGoals) => {
+          const goalExists = prevGoals.some(
+            (parentGoalOption) => String(parentGoalOption._id) === String(savedGoal._id)
+          );
+
+          if (goalExists) {
+            return prevGoals.map((parentGoalOption) =>
+              String(parentGoalOption._id) === String(savedGoal._id)
+                ? savedGoal
+                : parentGoalOption
+            );
+          }
+
+          return [...prevGoals, savedGoal];
+        });
+      }
+
       if (!isEditing) {
         setTitle("");
         setDescription("");
