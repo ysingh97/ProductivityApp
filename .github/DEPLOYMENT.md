@@ -26,8 +26,14 @@ Recommended protection:
 The `CI` workflow runs:
 
 - Backend tests from `app-server` with `npm test`.
+- Backend source artifact upload for deploy-ready server files.
 - Frontend production build from the repository root with `npm run build`.
 - Frontend artifact upload for the generated `build` directory.
+
+Artifacts retained by CI:
+
+- `backend-source`: backend application source, package files, scripts, services, and workers. It intentionally excludes `node_modules`, local `.env` files, tests, and test-data.
+- `frontend-build`: compiled frontend static assets from the root `build` directory.
 
 ## Required Decisions Before CD
 

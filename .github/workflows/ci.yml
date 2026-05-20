@@ -40,6 +40,37 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Upload backend source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-source
+          path: |
+            app-server/app.js
+            app-server/server.js
+            app-server/package.json
+            app-server/package-lock.json
+            app-server/config/**
+            app-server/controllers/**
+            app-server/middleware/**
+            app-server/models/**
+            app-server/routes/**
+            app-server/scripts/**
+            app-server/services/**
+            app-server/utils/**
+            app-server/workers/**
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Write backend summary
+        run: |
+          {
+            echo "## Backend Tests"
+            echo ""
+            echo "- Dependencies installed with \`npm ci\` in \`app-server\`."
+            echo "- Backend tests passed with \`npm test\`."
+            echo "- Uploaded artifact: \`backend-source\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
@@ -69,3 +100,13 @@ jobs:
           path: build
           if-no-files-found: error
           retention-days: 7
+
+      - name: Write frontend summary
+        run: |
+          {
+            echo "## Frontend Build"
+            echo ""
+            echo "- Dependencies installed with \`npm ci\`."
+            echo "- Frontend build passed with \`npm run build\`."
+            echo "- Uploaded artifact: \`frontend-build\`."
+          } >> "$GITHUB_STEP_SUMMARY"
