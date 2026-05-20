@@ -1,0 +1,57 @@
+name: Smoke Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Environment to check.
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+      frontend_url:
+        description: Frontend URL to verify. Leave blank to skip.
+        required: false
+        type: string
+      api_base_url:
+        description: API base URL ending in /api. Leave blank if using api_health_url.
+        required: false
+        type: string
+      api_health_url:
+        description: Explicit API health URL. Leave blank to derive from api_base_url.
+        required: false
+        type: string
+      timeout_ms:
+        description: Request timeout in milliseconds.
+        required: false
+        type: string
+        default: "10000"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-check:
+    name: Smoke Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ${{ inputs.target_environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run smoke checks
+        run: npm run smoke:deploy
+        env:
+          SMOKE_FRONTEND_URL: ${{ inputs.frontend_url }}
+          SMOKE_API_BASE_URL: ${{ inputs.api_base_url }}
+          SMOKE_API_HEALTH_URL: ${{ inputs.api_health_url }}
+          SMOKE_TIMEOUT_MS: ${{ inputs.timeout_ms }}

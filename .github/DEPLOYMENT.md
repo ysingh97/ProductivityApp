@@ -60,7 +60,7 @@ Provider-specific secrets will depend on the selected hosts, for example deploy 
 
 ## Smoke Checks
 
-Use `npm run smoke:deploy` after a deployment.
+Use `npm run smoke:deploy` after a deployment. You can also run the `Smoke Check` GitHub Actions workflow manually and provide the deployed URLs as inputs.
 
 Supported environment variables:
 
