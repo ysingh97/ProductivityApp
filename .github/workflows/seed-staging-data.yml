@@ -1,0 +1,80 @@
+name: Seed Staging Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Action to run against the staging database.
+        required: true
+        type: choice
+        options:
+          - list-users
+          - seed-visualization-data
+        default: list-users
+      email:
+        description: Account email to seed. Required for seed-visualization-data.
+        required: false
+        type: string
+      confirmation:
+        description: Type SEED_STAGING to confirm staging data mutation.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  seed-staging-data:
+    name: Seed Staging Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    defaults:
+      run:
+        working-directory: app-server
+    env:
+      MONGO_URI: ${{ secrets.STAGING_MONGO_URI }}
+      SEED_ACTION: ${{ inputs.action }}
+      SEED_EMAIL: ${{ inputs.email }}
+      SEED_CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate inputs
+        run: |
+          if [ -z "${MONGO_URI}" ]; then
+            echo "STAGING_MONGO_URI environment secret is required." >&2
+            exit 1
+          fi
+
+          if [ "${SEED_ACTION}" = "seed-visualization-data" ]; then
+            if [ -z "${SEED_EMAIL}" ]; then
+              echo "email input is required when seeding visualization data." >&2
+              exit 1
+            fi
+
+            if [ "${SEED_CONFIRMATION}" != "SEED_STAGING" ]; then
+              echo "Type SEED_STAGING in the confirmation input to mutate staging data." >&2
+              exit 1
+            fi
+          fi
+
+      - name: List staging users
+        if: ${{ inputs.action == 'list-users' }}
+        run: npm run seed:viz-history -- --list-users
+
+      - name: Seed staging visualization history
+        if: ${{ inputs.action == 'seed-visualization-data' }}
+        run: npm run seed:viz-history -- --email "${SEED_EMAIL}"

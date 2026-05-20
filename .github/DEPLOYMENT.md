@@ -47,6 +47,7 @@ Common environment secrets:
 - `MONGO_URI`
 - `GOOGLE_CLIENT_ID`
 - `ALLOWED_ORIGINS`
+- `STAGING_MONGO_URI`, used only by the manual staging seed workflow.
 
 Provider-specific secrets will depend on the selected hosts, for example deploy tokens, project ids, service ids, or API keys.
 
@@ -72,3 +73,10 @@ Supported environment variables:
 ## Staging Data
 
 Do not seed production. Staging can use controlled seed scripts or a dedicated test account after the staging database is isolated from production.
+
+Use the `Seed Staging Data` GitHub Actions workflow to manage staging visualization data:
+
+- Choose `list-users` to inspect available staging accounts.
+- Choose `seed-visualization-data` and provide an account email to seed historical visualization data.
+- Type `SEED_STAGING` in the confirmation input before mutating staging data.
+- Configure `STAGING_MONGO_URI` as a secret on the `staging` GitHub environment.

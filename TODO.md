@@ -16,6 +16,7 @@
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.
 - Add a Google Calendar sync status indicator in the site header so users can see whether calendar sync is connected, pending, or failing.
 - Add search functionality for goals and tasks so users can quickly find items by title and related metadata.
+- Hide nonessential console logging behind a debug-mode flag so production and CI/CD logs stay clean and do not expose sensitive data.
 - Add recurring task support, including recurrence rules, generated task instances, and clear UX for editing one occurrence vs the full series.
 - Allow users to view completed tasks and completed goals, with clear filters or dedicated views so completed work remains accessible without crowding active items.
 - Add proper account deletion handling, including confirmation UX and cleanup of all user-owned data and third-party integration records.
