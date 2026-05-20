@@ -30,6 +30,12 @@ The `CI` workflow runs:
 - Frontend production build from the repository root with `npm run build`.
 - Frontend artifact upload for the generated `build` directory.
 
+Run the local equivalent before pushing with:
+
+```bash
+npm run ci:local
+```
+
 Artifacts retained by CI:
 
 - `backend-source`: backend application source, package files, scripts, services, and workers. It intentionally excludes `node_modules`, local `.env` files, tests, and test-data.
