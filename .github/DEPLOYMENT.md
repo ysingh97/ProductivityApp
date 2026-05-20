@@ -27,6 +27,7 @@ The `CI` workflow runs:
 
 - Backend tests from `app-server` with `npm test`.
 - Frontend production build from the repository root with `npm run build`.
+- Frontend artifact upload for the generated `build` directory.
 
 ## Required Decisions Before CD
 
