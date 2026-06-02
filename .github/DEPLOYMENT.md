@@ -1,6 +1,6 @@
 # Deployment Plan
 
-This project currently has CI only. Deploy jobs should be added after the frontend and backend hosting providers are chosen.
+This project uses GitHub Actions for CI and Render deploy hooks for staging CD.
 
 ## Branch Model
 
@@ -11,7 +11,7 @@ This project currently has CI only. Deploy jobs should be added after the fronte
 
 ## GitHub Environments
 
-Create these environments in GitHub repository settings:
+Configure these environments in GitHub repository settings:
 
 - `staging`
 - `production`
@@ -20,6 +20,18 @@ Recommended protection:
 
 - `staging`: no required reviewers.
 - `production`: require manual approval before deployment.
+
+The `staging` environment requires these secrets:
+
+- `STAGING_MONGO_URI`: staging-only MongoDB connection string used by the manual seed workflow.
+- `RENDER_STAGING_FRONTEND_DEPLOY_HOOK`: Render deploy hook for the staging static site.
+- `RENDER_STAGING_BACKEND_DEPLOY_HOOK`: Render deploy hook for the staging API service.
+- `RENDER_STAGING_WORKER_DEPLOY_HOOK`: Render deploy hook for the staging Google Calendar worker.
+
+The `staging` environment requires these variables:
+
+- `STAGING_FRONTEND_URL`: `https://productivityhubstaging.onrender.com`
+- `STAGING_API_BASE_URL`: `https://productivity-api-staging.onrender.com/api`
 
 ## Current CI Gates
 
@@ -41,34 +53,37 @@ Artifacts retained by CI:
 - `backend-source`: backend application source, package files, scripts, services, and workers. It intentionally excludes `node_modules`, local `.env` files, tests, and test-data.
 - `frontend-build`: compiled frontend static assets from the root `build` directory.
 
-## Required Decisions Before CD
+## Staging CD
 
-Choose hosting providers for:
+The `Deploy Staging` workflow:
 
-- Frontend static build.
-- Backend Node/Express API.
-- Background worker process for Google Calendar sync, if it should run separately from the API.
+1. Runs automatically after the `CI` workflow succeeds on `main`.
+2. Can also be triggered manually with `workflow_dispatch`.
+3. Triggers Render deploy hooks for the staging API, Google Calendar worker, and static frontend.
+4. Waits briefly for Render deployments to start.
+5. Retries frontend and API health smoke checks while Render finishes deploying.
 
-After providers are chosen, add provider-specific deploy jobs rather than generic placeholders.
+Render deploy hooks enqueue deployments asynchronously. This workflow verifies that staging is
+healthy after deploy requests, but it does not poll Render's internal deployment status. Add
+Render API polling later if the workflow needs to prove that each service deployed a specific
+commit before reporting success.
 
-## Expected Secrets
+## Render Configuration
 
-Common environment secrets:
+Staging Render services must use the `main` branch with automatic deployments disabled. GitHub
+Actions triggers deployments only after CI passes.
 
-- `REACT_APP_API_URL`
-- `REACT_APP_GOOGLE_CLIENT_ID`
-- `MONGO_URI`
-- `GOOGLE_CLIENT_ID`
-- `ALLOWED_ORIGINS`
-- `STAGING_MONGO_URI`, used only by the manual staging seed workflow.
+The staging API and worker must share the same staging-only `MONGO_URI` and
+`GOOGLE_CALENDAR_TOKEN_SECRET`. The static frontend must use:
 
-Provider-specific secrets will depend on the selected hosts, for example deploy tokens, project ids, service ids, or API keys.
+- `REACT_APP_API_URL=https://productivity-api-staging.onrender.com/api`
+- `REACT_APP_GOOGLE_CLIENT_ID=<Google OAuth client ID>`
 
 ## Target Flow
 
 1. Pull request runs CI only.
 2. Merge to `main` runs CI, then deploys to `staging`.
-3. Staging smoke checks verify the frontend and API are reachable with `npm run smoke:deploy`.
+3. The `Deploy Staging` workflow triggers Render staging deploy hooks and retries smoke checks.
 4. Production deploy is triggered manually from GitHub Actions.
 5. Production deploy requires the `production` environment approval gate.
 
