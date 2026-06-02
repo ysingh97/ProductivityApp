@@ -4,9 +4,9 @@ This project uses GitHub Actions for CI and Render deploy hooks for staging CD.
 
 ## Branch Model
 
-- Feature branches open pull requests into `main`.
+- Feature branches open pull requests into `master`.
 - Pull requests must pass the `CI` workflow before merge.
-- Merges to `main` are eligible for staging deployment.
+- Merges to `master` are eligible for staging deployment.
 - Production deployment should be manual until the staging flow is proven stable.
 
 ## GitHub Environments
@@ -57,7 +57,7 @@ Artifacts retained by CI:
 
 The `Deploy Staging` workflow:
 
-1. Runs automatically after the `CI` workflow succeeds on `main`.
+1. Runs automatically after the `CI` workflow succeeds on `master`.
 2. Can also be triggered manually with `workflow_dispatch`.
 3. Triggers Render deploy hooks for the staging API, Google Calendar worker, and static frontend.
 4. Waits briefly for Render deployments to start.
@@ -70,7 +70,7 @@ commit before reporting success.
 
 ## Render Configuration
 
-Staging Render services must use the `main` branch with automatic deployments disabled. GitHub
+Staging Render services must use the `master` branch with automatic deployments disabled. GitHub
 Actions triggers deployments only after CI passes.
 
 The staging API and worker must share the same staging-only `MONGO_URI` and
@@ -82,7 +82,7 @@ The staging API and worker must share the same staging-only `MONGO_URI` and
 ## Target Flow
 
 1. Pull request runs CI only.
-2. Merge to `main` runs CI, then deploys to `staging`.
+2. Merge to `master` runs CI, then deploys to `staging`.
 3. The `Deploy Staging` workflow triggers Render staging deploy hooks and retries smoke checks.
 4. Production deploy is triggered manually from GitHub Actions.
 5. Production deploy requires the `production` environment approval gate.
