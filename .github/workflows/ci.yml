@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: app-server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Upload backend source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-source
+          path: |
+            app-server/app.js
+            app-server/server.js
+            app-server/package.json
+            app-server/package-lock.json
+            app-server/config/**
+            app-server/controllers/**
+            app-server/middleware/**
+            app-server/models/**
+            app-server/routes/**
+            app-server/scripts/**
+            app-server/services/**
+            app-server/utils/**
+            app-server/workers/**
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Write backend summary
+        run: |
+          {
+            echo "## Backend Tests"
+            echo ""
+            echo "- Dependencies installed with \`npm ci\` in \`app-server\`."
+            echo "- Backend tests passed with \`npm test\`."
+            echo "- Uploaded artifact: \`backend-source\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: build
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Write frontend summary
+        run: |
+          {
+            echo "## Frontend Build"
+            echo ""
+            echo "- Dependencies installed with \`npm ci\`."
+            echo "- Frontend build passed with \`npm run build\`."
+            echo "- Uploaded artifact: \`frontend-build\`."
+          } >> "$GITHUB_STEP_SUMMARY"
