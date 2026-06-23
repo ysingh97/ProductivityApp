@@ -1,0 +1,94 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY_PRODUCTION to deploy production.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK }}
+      RENDER_PRODUCTION_BACKEND_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_BACKEND_DEPLOY_HOOK }}
+      RENDER_PRODUCTION_WORKER_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_WORKER_DEPLOY_HOOK }}
+      SMOKE_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+      SMOKE_API_BASE_URL: ${{ vars.PRODUCTION_API_BASE_URL }}
+      DEPLOY_CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate production deployment inputs
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "master" ]; then
+            echo "Production deployments must be run from master. Current ref: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+          if [ "${DEPLOY_CONFIRMATION}" != "DEPLOY_PRODUCTION" ]; then
+            echo "Type DEPLOY_PRODUCTION in the confirmation input to deploy production." >&2
+            exit 1
+          fi
+
+          required_variables=(
+            RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK
+            RENDER_PRODUCTION_BACKEND_DEPLOY_HOOK
+            RENDER_PRODUCTION_WORKER_DEPLOY_HOOK
+            SMOKE_FRONTEND_URL
+            SMOKE_API_BASE_URL
+          )
+
+          for variable_name in "${required_variables[@]}"; do
+            if [ -z "${!variable_name}" ]; then
+              echo "${variable_name} is required." >&2
+              exit 1
+            fi
+          done
+
+      - name: Trigger Render production deploys
+        run: |
+          curl --fail --silent --show-error --output /dev/null --request POST "${RENDER_PRODUCTION_BACKEND_DEPLOY_HOOK}"
+          curl --fail --silent --show-error --output /dev/null --request POST "${RENDER_PRODUCTION_WORKER_DEPLOY_HOOK}"
+          curl --fail --silent --show-error --output /dev/null --request POST "${RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK}"
+
+      - name: Wait for Render deploys to start
+        run: sleep 120
+
+      - name: Retry production smoke checks
+        env:
+          SMOKE_TIMEOUT_MS: "10000"
+        run: |
+          for attempt in $(seq 1 15); do
+            echo "Running production smoke check attempt ${attempt} of 15."
+
+            if npm run smoke:deploy; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 15 ]; then
+              echo "Production smoke checks did not pass after 15 attempts." >&2
+              exit 1
+            fi
+
+            sleep 20
+          done
