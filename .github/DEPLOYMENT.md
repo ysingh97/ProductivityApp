@@ -33,6 +33,17 @@ The `staging` environment requires these variables:
 - `STAGING_FRONTEND_URL`: `https://productivityhubstaging.onrender.com`
 - `STAGING_API_BASE_URL`: `https://productivity-api-staging.onrender.com/api`
 
+The `production` environment requires these secrets:
+
+- `RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK`: Render deploy hook for the production static site.
+- `RENDER_PRODUCTION_BACKEND_DEPLOY_HOOK`: Render deploy hook for the production API service.
+- `RENDER_PRODUCTION_WORKER_DEPLOY_HOOK`: Render deploy hook for the production Google Calendar worker.
+
+The `production` environment requires these variables:
+
+- `PRODUCTION_FRONTEND_URL`: `https://productivityhub-63h3.onrender.com`
+- `PRODUCTION_API_BASE_URL`: `https://productivity-api-hnbf.onrender.com/api`
+
 ## Current CI Gates
 
 The `CI` workflow runs:
@@ -68,6 +79,21 @@ healthy after deploy requests, but it does not poll Render's internal deployment
 Render API polling later if the workflow needs to prove that each service deployed a specific
 commit before reporting success.
 
+## Production CD
+
+The `Deploy Production` workflow:
+
+1. Runs only when manually triggered with `workflow_dispatch`.
+2. Requires the workflow to run from `master`.
+3. Requires the confirmation input `DEPLOY_PRODUCTION`.
+4. Targets the GitHub `production` environment so production environment approval gates apply.
+5. Triggers Render deploy hooks for the production API, Google Calendar worker, and static frontend.
+6. Waits briefly for Render deployments to start.
+7. Retries frontend and API health smoke checks while Render finishes deploying.
+
+Production deploys intentionally do not run automatically after merges. Promote production only
+after the staging deployment from the same `master` branch state has passed.
+
 ## Render Configuration
 
 Staging Render services must use the `master` branch with automatic deployments disabled. GitHub
@@ -79,12 +105,19 @@ The staging API and worker must share the same staging-only `MONGO_URI` and
 - `REACT_APP_API_URL=https://productivity-api-staging.onrender.com/api`
 - `REACT_APP_GOOGLE_CLIENT_ID=<Google OAuth client ID>`
 
+Production Render services must also use the `master` branch with automatic deployments disabled.
+The production API and worker must share the production-only `MONGO_URI` for `productivity_prod`
+and the same production `GOOGLE_CALENDAR_TOKEN_SECRET`. The static frontend must use:
+
+- `REACT_APP_API_URL=https://productivity-api-hnbf.onrender.com/api`
+- `REACT_APP_GOOGLE_CLIENT_ID=<Google OAuth client ID>`
+
 ## Target Flow
 
 1. Pull request runs CI only.
 2. Merge to `master` runs CI, then deploys to `staging`.
 3. The `Deploy Staging` workflow triggers Render staging deploy hooks and retries smoke checks.
-4. Production deploy is triggered manually from GitHub Actions.
+4. Production deploy is triggered manually from GitHub Actions with `DEPLOY_PRODUCTION`.
 5. Production deploy requires the `production` environment approval gate.
 
 ## Smoke Checks
