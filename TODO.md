@@ -18,6 +18,7 @@
 - Add search functionality for goals and tasks so users can quickly find items by title and related metadata.
 - Adjust dark-mode UI contrast, including borders and dividers that are currently too subtle or invisible.
 - Hide nonessential console logging behind a debug-mode flag so production and CI/CD logs stay clean and do not expose sensitive data.
+- Optimize CI so backend tests and frontend builds only run when relevant backend, frontend, dependency, or workflow files change.
 - Add recurring task support, including recurrence rules, generated task instances, and clear UX for editing one occurrence vs the full series.
 - Fix the `Not Found` error when refreshing any page, likely by checking frontend routing fallback behavior and backend/static host configuration for client-side routes.
 - Allow users to view completed tasks and completed goals, with clear filters or dedicated views so completed work remains accessible without crowding active items.
