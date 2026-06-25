@@ -10,6 +10,11 @@ const markAuthExpired = () => {
   }
 };
 
+const isTestAuthToken = (token) =>
+  process.env.NODE_ENV !== 'production' &&
+  typeof token === 'string' &&
+  token.startsWith('test:');
+
 const decodeJwtPayload = (token) => {
   if (!token) return null;
   const parts = token.split('.');
@@ -24,6 +29,8 @@ const decodeJwtPayload = (token) => {
 };
 
 const isTokenExpired = (token) => {
+  // Allow deterministic non-JWT test personas for local automation outside production.
+  if (isTestAuthToken(token)) return false;
   const payload = decodeJwtPayload(token);
   if (!payload || typeof payload.exp !== 'number') return true;
   const now = Math.floor(Date.now() / 1000);
