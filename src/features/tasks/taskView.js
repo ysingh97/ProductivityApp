@@ -32,6 +32,13 @@ import {
   updateTaskTimeEntry,
   updateTask
 } from "./taskService";
+import {
+  getTaskEstimateHoursError,
+  getTaskTargetCompletionDateError,
+  getTimeEntryDurationHours,
+  getTimeEntryRangeError,
+  parseTaskEstimateHours
+} from "./taskValidation";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -64,11 +71,6 @@ const buildFormValues = (taskData) => ({
 const parseNumber = (value) => {
   const parsed = Number(value);
   return Number.isNaN(parsed) ? 0 : parsed;
-};
-
-const parseEditableNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : NaN;
 };
 
 const buildDefaultTimeEntryValues = () => {
@@ -271,17 +273,14 @@ const TaskView = ({ task }) => {
       ? dayjs(selectedParentGoal.targetCompletionDate)
       : null;
 
-    if (formValues.targetCompletionDate && formValues.targetCompletionDate.isBefore(now)) {
-      setSaveError("Target completion date cannot be earlier than the current time.");
-      return;
-    }
+    const targetDateError = getTaskTargetCompletionDateError({
+      targetCompletionDate: formValues.targetCompletionDate,
+      now,
+      parentDeadline
+    });
 
-    if (
-      formValues.targetCompletionDate &&
-      parentDeadline &&
-      formValues.targetCompletionDate.isAfter(parentDeadline)
-    ) {
-      setSaveError("Subtasks cannot have a target completion date later than the parent goal.");
+    if (targetDateError) {
+      setSaveError(targetDateError);
       return;
     }
 
@@ -343,11 +342,13 @@ const TaskView = ({ task }) => {
   const handleSaveEstimate = async () => {
     if (!currentTask) return;
 
-    const nextEstimate = parseEditableNumber(estimateEditValue);
-    if (Number.isNaN(nextEstimate) || nextEstimate < 0) {
-      setEstimateEditError("Estimated hours must be 0 or greater.");
+    const estimateError = getTaskEstimateHoursError(estimateEditValue);
+    if (estimateError) {
+      setEstimateEditError(estimateError);
       return;
     }
+
+    const nextEstimate = parseTaskEstimateHours(estimateEditValue);
 
     setEstimateEditSaving(true);
     setEstimateEditError("");
@@ -390,47 +391,19 @@ const TaskView = ({ task }) => {
   };
 
   const loggedDurationHours = useMemo(() => {
-    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
-      return null;
-    }
-
-    if (
-      !timeEntryValues.startedAt.isValid() ||
-      !timeEntryValues.endedAt.isValid() ||
-      !timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)
-    ) {
-      return null;
-    }
-
-    return Math.round(
-      timeEntryValues.endedAt.diff(timeEntryValues.startedAt, "minute", true) / 60 * 100
-    ) / 100;
+    return getTimeEntryDurationHours(timeEntryValues);
   }, [timeEntryValues.endedAt, timeEntryValues.startedAt]);
 
   const handleLogTime = async () => {
     if (!currentTask) return;
     if (timeEntryRequestInFlightRef.current) return;
 
-    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
-      setTimeEntryError("Select both a start and end time.");
-      return;
-    }
-
-    if (
-      !timeEntryValues.startedAt.isValid() ||
-      !timeEntryValues.endedAt.isValid()
-    ) {
-      setTimeEntryError("Choose valid start and end times.");
-      return;
-    }
-
-    if (!timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)) {
-      setTimeEntryError("End time must be after start time.");
-      return;
-    }
-
-    if (timeEntryValues.endedAt.isAfter(dayjs())) {
-      setTimeEntryError("End time cannot be in the future.");
+    const timeEntryRangeError = getTimeEntryRangeError({
+      ...timeEntryValues,
+      now: dayjs()
+    });
+    if (timeEntryRangeError) {
+      setTimeEntryError(timeEntryRangeError);
       return;
     }
 
@@ -512,26 +485,12 @@ const TaskView = ({ task }) => {
   const handleSaveEditedTimeEntry = async (entryId) => {
     if (!currentTask || !editingTimeEntryValues) return;
 
-    if (!editingTimeEntryValues.startedAt || !editingTimeEntryValues.endedAt) {
-      setEditingTimeEntryError("Select both a start and end time.");
-      return;
-    }
-
-    if (
-      !editingTimeEntryValues.startedAt.isValid() ||
-      !editingTimeEntryValues.endedAt.isValid()
-    ) {
-      setEditingTimeEntryError("Choose valid start and end times.");
-      return;
-    }
-
-    if (!editingTimeEntryValues.endedAt.isAfter(editingTimeEntryValues.startedAt)) {
-      setEditingTimeEntryError("End time must be after start time.");
-      return;
-    }
-
-    if (editingTimeEntryValues.endedAt.isAfter(dayjs())) {
-      setEditingTimeEntryError("End time cannot be in the future.");
+    const timeEntryRangeError = getTimeEntryRangeError({
+      ...editingTimeEntryValues,
+      now: dayjs()
+    });
+    if (timeEntryRangeError) {
+      setEditingTimeEntryError(timeEntryRangeError);
       return;
     }
 
