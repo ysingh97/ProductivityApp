@@ -1,17 +1,26 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 
-jest.mock('./features/tasks/taskService', () => ({
-  fetchTasks: jest.fn(async () => [])
+jest.mock('./api/client', () => ({
+  __esModule: true,
+  default: {
+    post: jest.fn()
+  }
 }));
 
-jest.mock('./features/lists/listService', () => ({
-  fetchLists: jest.fn(async () => [])
-}));
-
-jest.mock('./features/goals/goalService', () => ({
-  fetchGoals: jest.fn(async () => [])
-}));
+jest.mock('./pages/taskboard', () => () => <div>Dashboard</div>);
+jest.mock('./features/tasks/createTaskPage', () => () => <div>Create Task Page</div>);
+jest.mock('./features/lists/createListPage', () => () => <div>Create List Page</div>);
+jest.mock('./features/goals/createGoalPage', () => () => <div>Create Goal Page</div>);
+jest.mock('./features/lists/listPage', () => () => <div>List Page</div>);
+jest.mock('./features/lists/listsOverview', () => () => <div>Lists Overview</div>);
+jest.mock('./features/goals/goalPage', () => () => <div>Goal Page</div>);
+jest.mock('./features/tasks/taskPage', () => () => <div>Task Page</div>);
+jest.mock('./pages/GoalsOverview', () => () => <div>Goals Overview</div>);
+jest.mock('./pages/GoalTreeView', () => () => <div>Goal Tree View</div>);
+jest.mock('./pages/CalendarView', () => () => <div>Calendar View</div>);
+jest.mock('./pages/Visualizations', () => () => <div>Visualizations</div>);
+jest.mock('./pages/GoogleCalendarSettings', () => () => <div>Google Calendar Settings</div>);
 
 const testUser = {
   id: 'user-1',
