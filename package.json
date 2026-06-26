@@ -29,6 +29,9 @@
     "test:backend": "npm --prefix app-server test",
     "ci:local": "npm run test:backend && npm run build:frontend",
     "smoke:deploy": "node scripts/smokeCheck.js",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:install": "playwright install chromium",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -52,6 +55,7 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.1.0",
     "web-vitals": "^4.2.4"
