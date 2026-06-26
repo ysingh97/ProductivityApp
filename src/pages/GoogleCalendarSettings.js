@@ -71,7 +71,6 @@ const GoogleCalendarSettings = () => {
 
   const loadStatus = async () => {
     setLoadingStatus(true);
-    setError("");
     try {
       const nextStatus = await fetchGoogleCalendarStatus();
       setStatus(nextStatus);
