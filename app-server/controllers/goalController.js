@@ -3,6 +3,7 @@ const Task = require('../models/task');
 const Category = require('../models/category');
 const TimeEntry = require('../models/timeEntry');
 const { enqueueGoogleSync } = require('../services/calendarSyncService');
+const { isValidObjectId } = require('../utils/objectId');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
 const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
@@ -217,6 +218,10 @@ const getGoals = async (req, res) => {
 
 const getGoalById = async (req, res) => {
     try {
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ message: "Invalid goal ID" });
+        }
+
         await syncGoalTimeTotals(req.params.id, req.user.id);
         const goal = await Goal.findOne({ _id: req.params.id, userId: req.user.id })
             .populate('category', 'title');
@@ -235,6 +240,9 @@ const createGoal = async (req, res) => {
         let parentGoal = null;
         const parentGoalId = goalBody.parentGoalId || null;
         if (parentGoalId) {
+            if (!isValidObjectId(parentGoalId)) {
+                return res.status(400).json({ message: "Invalid parentGoal ID" });
+            }
             parentGoal = await Goal.findOne({ _id: parentGoalId, userId: req.user.id });
             if (!parentGoal) {
                 return res.status(400).json({ message: "Invalid parentGoal ID" });
@@ -288,6 +296,10 @@ const updateGoal = async (req, res) => {
         const { id } = req.params;
         const { userId, timeSpent, timeLeft, ...updates } = req.body;
 
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid goal ID" });
+        }
+
         const existingGoal = await Goal.findOne({ _id: id, userId: req.user.id });
         if (!existingGoal) {
             return res.status(404).json({ message: "Goal not found" });
@@ -303,6 +315,9 @@ const updateGoal = async (req, res) => {
         const nextParentIdString = nextParentId ? String(nextParentId) : null;
 
         if (hasParentUpdate && nextParentIdString) {
+            if (!isValidObjectId(nextParentIdString)) {
+                return res.status(400).json({ message: "Invalid parentGoal ID" });
+            }
             if (nextParentIdString === String(id)) {
                 return res.status(400).json({ message: "Goal cannot be its own parent" });
             }
@@ -388,6 +403,10 @@ const updateGoal = async (req, res) => {
 
 const deleteGoal = async (req, res) => {
     try {
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ message: "Invalid goal ID" });
+        }
+
         const goalToDelete = await Goal.findOne({ _id: req.params.id, userId: req.user.id });
 
         if (!goalToDelete) {

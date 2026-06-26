@@ -1,5 +1,6 @@
 const List = require('../models/list'); // Import the List model
 const Goal = require('../models/goal');
+const { isValidObjectId } = require('../utils/objectId');
 
 const getLists = async (req, res) => {
     try {
@@ -15,6 +16,9 @@ const createList = async (req, res) => {
         const { userId, tasks, ...listBody } = req.body;
 
         if (listBody.goalId) {
+            if (!isValidObjectId(listBody.goalId)) {
+                return res.status(400).json({ message: "Invalid goal for this user" });
+            }
             const goal = await Goal.findOne({ _id: listBody.goalId, userId: req.user.id });
             if (!goal) {
                 return res.status(400).json({ message: "Invalid goal for this user" });
@@ -35,6 +39,9 @@ const createList = async (req, res) => {
 
 const getListsByGoalId = async (req, res) => {
     try {
+        if (!isValidObjectId(req.params.goalId)) {
+            return res.status(400).json({ message: "Invalid goal ID" });
+        }
         const lists = await List.find({ goalId: req.params.goalId, userId: req.user.id });
         res.status(200).json(lists);
     } catch (err) {
