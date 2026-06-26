@@ -32,24 +32,24 @@ const requireAuth = async (req, res, next) => {
     const payload = await verifyGoogleToken(token);
     const { sub: googleId, email, name, picture } = payload;
 
-    let user = await User.findOne({ googleId });
-    if (!user) {
-      user = await User.create({
-        googleId,
-        email,
-        name,
-        picture
-      });
-    } else if (
-      user.email !== email ||
-      user.name !== name ||
-      user.picture !== picture
-    ) {
-      user.email = email;
-      user.name = name;
-      user.picture = picture;
-      await user.save();
-    }
+    const user = await User.findOneAndUpdate(
+      { googleId },
+      {
+        $set: {
+          email,
+          name,
+          picture
+        },
+        $setOnInsert: {
+          googleId
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true
+      }
+    );
 
     req.user = {
       id: user._id,

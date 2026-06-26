@@ -47,6 +47,21 @@ test('protected routes accept enabled test auth tokens', async () => {
   });
 });
 
+test('protected routes reuse the same test auth user under concurrent requests', async () => {
+  const [firstResponse, secondResponse] = await Promise.all([
+    request(app)
+      .get('/api/categories')
+      .set('Authorization', 'Bearer test:basic'),
+    request(app)
+      .get('/api/categories')
+      .set('Authorization', 'Bearer test:basic')
+  ]);
+
+  expect(firstResponse.status).toBe(200);
+  expect(secondResponse.status).toBe(200);
+  expect(await User.countDocuments({ googleId: 'test-basic' })).toBe(1);
+});
+
 test('protected routes still reject requests without auth tokens', async () => {
   await request(app)
     .get('/api/categories')
