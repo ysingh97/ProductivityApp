@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 
 jest.mock('./api/client', () => ({
@@ -50,6 +50,11 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   window.history.pushState({}, '', '/');
+  document.body.innerHTML = '';
+
+  const googleScript = document.createElement('script');
+  googleScript.id = 'google-identity-script';
+  document.body.appendChild(googleScript);
 });
 
 test('renders the sign-in screen for unauthenticated users', () => {
@@ -86,4 +91,48 @@ test('allows non-production test auth personas to open protected routes', async 
 
   expect(await screen.findByText(/dashboard/i)).toBeInTheDocument();
   expect(screen.getByText(/viz-basic@example\.test/i)).toBeInTheDocument();
+});
+
+test('hydrates the stored color mode preference for authenticated routes', async () => {
+  localStorage.setItem('authToken', 'test:basic');
+  localStorage.setItem('authUser', JSON.stringify(testUser));
+  localStorage.setItem('colorMode', 'dark');
+  window.history.pushState({}, '', '/board');
+
+  render(<App />);
+
+  expect(await screen.findByText(/dashboard/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument();
+});
+
+test('persists color mode changes from the app shell toggle', async () => {
+  localStorage.setItem('authToken', 'test:basic');
+  localStorage.setItem('authUser', JSON.stringify(testUser));
+  window.history.pushState({}, '', '/board');
+
+  render(<App />);
+
+  const toggleButton = await screen.findByRole('button', { name: /switch to dark mode/i });
+  fireEvent.click(toggleButton);
+
+  await waitFor(() => expect(localStorage.getItem('colorMode')).toBe('dark'));
+  expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument();
+});
+
+test('signing out from the app shell clears auth and returns to sign-in', async () => {
+  localStorage.setItem('authToken', 'test:basic');
+  localStorage.setItem('authUser', JSON.stringify(testUser));
+  window.history.pushState({}, '', '/board');
+
+  render(<App />);
+
+  expect(await screen.findByText(/dashboard/i)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /viz-basic@example\.test/i }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: /sign out/i }));
+
+  await waitFor(() => expect(window.location.pathname).toBe('/'));
+  expect(screen.getByText(/welcome back/i)).toBeInTheDocument();
+  await waitFor(() => expect(localStorage.getItem('authToken')).toBeNull());
+  expect(localStorage.getItem('authUser')).toBeNull();
 });
