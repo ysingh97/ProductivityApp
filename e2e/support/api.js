@@ -71,11 +71,21 @@ const createTaskFixture = (overrides = {}) =>
     }
   });
 
+const createTaskTimeEntryFixture = (taskId, overrides = {}) =>
+  apiRequest(`/tasks/${taskId}/time-entries`, {
+    method: "POST",
+    body: {
+      startedAt: overrides.startedAt,
+      endedAt: overrides.endedAt
+    }
+  });
+
 module.exports = {
   apiBaseUrl,
   apiRequest,
   createGoalFixture,
   createListFixture,
+  createTaskTimeEntryFixture,
   createTaskFixture,
   futureIso,
   uniqueSuffix
