@@ -1,4 +1,4 @@
-const { TEST_AUTH_TOKEN } = require("./auth");
+const { TEST_AUTH_TOKEN, createTestAuthSession, getTestAuthToken } = require("./auth");
 
 const apiBaseUrl = process.env.E2E_API_BASE_URL || "http://localhost:5000/api";
 
@@ -13,10 +13,15 @@ const futureIso = (daysFromNow = 14) => {
 };
 
 const apiRequest = async (path, options = {}) => {
+  const session = options.session ? createTestAuthSession(options.session) : null;
+  const authToken =
+    options.token ||
+    session?.token ||
+    (options.persona ? getTestAuthToken(options.persona) : TEST_AUTH_TOKEN);
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: options.method || "GET",
     headers: {
-      Authorization: `Bearer ${TEST_AUTH_TOKEN}`,
+      Authorization: `Bearer ${authToken}`,
       "Content-Type": "application/json",
       ...(options.headers || {})
     },
@@ -35,17 +40,18 @@ const apiRequest = async (path, options = {}) => {
   return data;
 };
 
-const createListFixture = (overrides = {}) =>
+const createListFixture = (overrides = {}, options = {}) =>
   apiRequest("/lists", {
     method: "POST",
     body: {
       title: `E2E List ${uniqueSuffix()}`,
       description: "Playwright smoke list.",
       ...overrides
-    }
+    },
+    ...options
   });
 
-const createGoalFixture = (overrides = {}) =>
+const createGoalFixture = (overrides = {}, options = {}) =>
   apiRequest("/goals", {
     method: "POST",
     body: {
@@ -55,10 +61,11 @@ const createGoalFixture = (overrides = {}) =>
       estimatedHours: 4,
       targetCompletionDate: futureIso(21),
       ...overrides
-    }
+    },
+    ...options
   });
 
-const createTaskFixture = (overrides = {}) =>
+const createTaskFixture = (overrides = {}, options = {}) =>
   apiRequest("/tasks", {
     method: "POST",
     body: {
@@ -68,16 +75,25 @@ const createTaskFixture = (overrides = {}) =>
       estimatedCompletionTime: 2,
       targetCompletionDate: futureIso(14),
       ...overrides
-    }
+    },
+    ...options
   });
 
-const createTaskTimeEntryFixture = (taskId, overrides = {}) =>
+const createTaskTimeEntryFixture = (taskId, overrides = {}, options = {}) =>
   apiRequest(`/tasks/${taskId}/time-entries`, {
     method: "POST",
     body: {
       startedAt: overrides.startedAt,
       endedAt: overrides.endedAt
-    }
+    },
+    ...options
+  });
+
+const updateTaskFixture = (taskId, updates = {}, options = {}) =>
+  apiRequest(`/tasks/${taskId}`, {
+    method: "PUT",
+    body: updates,
+    ...options
   });
 
 module.exports = {
@@ -88,5 +104,6 @@ module.exports = {
   createTaskTimeEntryFixture,
   createTaskFixture,
   futureIso,
+  updateTaskFixture,
   uniqueSuffix
 };

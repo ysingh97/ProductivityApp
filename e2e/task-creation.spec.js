@@ -6,9 +6,11 @@ const { fillDateTimeField } = require("./support/datetime");
 test("creates a standalone task from the UI and shows it in the next-seven-days bucket", async ({
   page
 }) => {
-  const taskTitle = `Playwright Task ${uniqueSuffix()}`;
+  const suffix = uniqueSuffix();
+  const auth = { session: `task-creation-${suffix}` };
+  const taskTitle = `Playwright Task ${suffix}`;
   const taskDescription = "Created by the Playwright task creation spec.";
-  const category = "Deep Work";
+  const category = "Work";
   const estimatedHours = "3.5";
   const targetDate = new Date();
   const targetDateLabelFormatter = new Intl.DateTimeFormat("en-US", {
@@ -27,7 +29,7 @@ test("creates a standalone task from the UI and shows it in the next-seven-days 
   const targetDateLabel = targetDateLabelFormatter.format(targetDate);
   const dashboardDateLabel = dashboardDateLabelFormatter.format(targetDate);
 
-  await seedTestAuth(page);
+  await seedTestAuth(page, auth);
   await page.goto("/task/new");
 
   await expect(page.getByRole("heading", { name: /create task/i }).first()).toBeVisible();
@@ -53,9 +55,14 @@ test("creates a standalone task from the UI and shows it in the next-seven-days 
   await expect(page).toHaveURL(/\/tasks\/[a-f0-9]{24}$/);
   await expect(page.getByRole("heading", { name: taskTitle })).toBeVisible();
   await expect(page.getByText(taskDescription)).toBeVisible();
-  await expect(page.getByText(category, { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(estimatedHours, { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(targetDateLabel, { exact: true })).toBeVisible();
+
+  const taskDetailsCard = page
+    .locator(".MuiPaper-root")
+    .filter({ has: page.getByRole("heading", { name: /task details/i }) })
+    .first();
+  await expect(taskDetailsCard.getByText(category, { exact: true })).toBeVisible();
+  await expect(taskDetailsCard.getByText(estimatedHours, { exact: true })).toBeVisible();
+  await expect(taskDetailsCard.getByText(targetDateLabel, { exact: true })).toBeVisible();
 
   await page.goto("/board");
 
