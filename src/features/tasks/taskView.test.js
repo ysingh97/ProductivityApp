@@ -170,16 +170,14 @@ describe("TaskView", () => {
 
     renderTaskView(task);
 
-    await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: /^edit$/i })).toHaveLength(2)
-    );
+    expect(await screen.findByRole("button", { name: /edit time entry /i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /^edit$/i })[1]);
+    fireEvent.click(screen.getByRole("button", { name: /edit time entry /i }));
 
     setDateTimeValue("Edit start time", "2025-01-15T09:00:00.000Z");
     setDateTimeValue("Edit end time", "2025-01-15T11:30:00.000Z");
 
-    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save time entry /i }));
 
     await waitFor(() =>
       expect(updateTaskTimeEntry).toHaveBeenCalledWith("task-1", "entry-1", {
@@ -205,9 +203,9 @@ describe("TaskView", () => {
 
     renderTaskView(task);
 
-    expect(await screen.findByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /delete time entry /i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /delete time entry /i }));
 
     await waitFor(() => expect(deleteTaskTimeEntry).toHaveBeenCalledWith("task-1", "entry-1"));
 

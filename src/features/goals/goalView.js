@@ -407,7 +407,7 @@ const GoalView = ({ goal }) => {
                         inputProps={{ min: 0, step: "0.25" }}
                       />
                       {estimatedHoursEditError && (
-                        <Typography variant="caption" color="error">
+                        <Typography variant="caption" color="error" role="alert">
                           {estimatedHoursEditError}
                         </Typography>
                       )}
@@ -433,7 +433,11 @@ const GoalView = ({ goal }) => {
                   ) : (
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
                       <Typography>{formatHours(estimatedHours)}</Typography>
-                      <Button size="small" onClick={handleStartEstimatedHoursEdit}>
+                      <Button
+                        size="small"
+                        onClick={handleStartEstimatedHoursEdit}
+                        aria-label="Edit goal estimated hours"
+                      >
                         Edit
                       </Button>
                     </Stack>
@@ -550,7 +554,11 @@ const GoalView = ({ goal }) => {
                   <Typography variant="body2" color="text.secondary">
                     This deletes this goal. Existing child goals are detached by the current backend behavior.
                   </Typography>
-                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  {deleteError && (
+                    <Typography color="error" role="alert">
+                      {deleteError}
+                    </Typography>
+                  )}
                   <Button
                     variant="contained"
                     color="error"
@@ -686,7 +694,11 @@ const GoalView = ({ goal }) => {
                   }
                   label="Mark complete"
                 />
-                {saveError && <Typography color="error">{saveError}</Typography>}
+                {saveError && (
+                  <Typography color="error" role="alert">
+                    {saveError}
+                  </Typography>
+                )}
                 <Divider />
                 <Stack direction="row" spacing={1}>
                   <Button variant="contained" onClick={handleSave} disabled={saving}>

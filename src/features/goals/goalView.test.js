@@ -109,7 +109,7 @@ describe("GoalView", () => {
     fireEvent.change(screen.getByLabelText(/category/i), {
       target: { value: "Delivery" }
     });
-    fireEvent.change(screen.getByLabelText(/estimated hours/i), {
+    fireEvent.change(screen.getByRole("spinbutton", { name: /estimated hours/i }), {
       target: { value: "10" }
     });
     fireEvent.change(screen.getByLabelText(/target completion date/i), {

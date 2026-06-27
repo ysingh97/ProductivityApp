@@ -104,6 +104,13 @@ const formatDurationLabel = (durationMinutes) => {
   return `${hours}h ${minutes}m`;
 };
 
+const formatTimeEntryRangeLabel = (entry) => {
+  const start = dayjs(entry.startedAt);
+  const end = dayjs(entry.endedAt);
+
+  return `${start.format("MMM D, YYYY h:mm A")} - ${end.format("h:mm A")}`;
+};
+
 const TaskView = ({ task }) => {
   const navigate = useNavigate();
   const [currentTask, setCurrentTask] = useState(task);
@@ -659,8 +666,16 @@ const TaskView = ({ task }) => {
                   ? `This entry will add ${loggedDurationHours} hours.`
                   : "Choose a valid time range to preview the logged duration."}
               </Typography>
-              {timeEntryError && <Typography color="error">{timeEntryError}</Typography>}
-              {timeEntrySuccess && <Typography color="success.main">{timeEntrySuccess}</Typography>}
+              {timeEntryError && (
+                <Typography color="error" role="alert">
+                  {timeEntryError}
+                </Typography>
+              )}
+              {timeEntrySuccess && (
+                <Typography color="success.main" role="status" aria-live="polite">
+                  {timeEntrySuccess}
+                </Typography>
+              )}
               <Box>
                 <Button
                   variant="contained"
@@ -722,7 +737,7 @@ const TaskView = ({ task }) => {
                       inputProps={{ min: 0, step: "0.25" }}
                     />
                     {estimateEditError && (
-                      <Typography variant="caption" color="error">
+                      <Typography variant="caption" color="error" role="alert">
                         {estimateEditError}
                       </Typography>
                     )}
@@ -748,7 +763,11 @@ const TaskView = ({ task }) => {
                 ) : (
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
                     <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
-                    <Button size="small" onClick={handleStartEstimateEdit}>
+                    <Button
+                      size="small"
+                      onClick={handleStartEstimateEdit}
+                      aria-label="Edit task estimated hours"
+                    >
                       Edit
                     </Button>
                   </Stack>
@@ -780,8 +799,7 @@ const TaskView = ({ task }) => {
             ) : (
               <Stack spacing={1.5}>
                 {timeEntries.map((entry) => {
-                  const start = dayjs(entry.startedAt);
-                  const end = dayjs(entry.endedAt);
+                  const timeEntryRangeLabel = formatTimeEntryRangeLabel(entry);
                   const isEditing = editingTimeEntryId === entry._id;
 
                   return (
@@ -805,7 +823,7 @@ const TaskView = ({ task }) => {
                             {formatDurationLabel(entry.durationMinutes)}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            {start.format("MMM D, YYYY h:mm A")} - {end.format("h:mm A")}
+                            {timeEntryRangeLabel}
                           </Typography>
                         </Box>
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -815,6 +833,7 @@ const TaskView = ({ task }) => {
                           <Button
                             size="small"
                             onClick={() => handleStartEditingTimeEntry(entry)}
+                            aria-label={`Edit time entry ${timeEntryRangeLabel}`}
                             disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
                           >
                             Edit
@@ -823,6 +842,7 @@ const TaskView = ({ task }) => {
                             size="small"
                             color="error"
                             onClick={() => handleDeleteTimeEntry(entry._id)}
+                            aria-label={`Delete time entry ${timeEntryRangeLabel}`}
                             disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
                           >
                             {deletingTimeEntryId === entry._id ? "Deleting..." : "Delete"}
@@ -865,13 +885,16 @@ const TaskView = ({ task }) => {
                             />
                           </Stack>
                           {editingTimeEntryError && (
-                            <Typography color="error">{editingTimeEntryError}</Typography>
+                            <Typography color="error" role="alert">
+                              {editingTimeEntryError}
+                            </Typography>
                           )}
                           <Stack direction="row" spacing={1}>
                             <Button
                               size="small"
                               variant="contained"
                               onClick={() => handleSaveEditedTimeEntry(entry._id)}
+                              aria-label={`Save time entry ${timeEntryRangeLabel}`}
                               disabled={editingTimeEntrySaving}
                             >
                               {editingTimeEntrySaving ? "Saving..." : "Save"}
@@ -880,6 +903,7 @@ const TaskView = ({ task }) => {
                               size="small"
                               variant="outlined"
                               onClick={handleCancelEditingTimeEntry}
+                              aria-label={`Cancel editing time entry ${timeEntryRangeLabel}`}
                               disabled={editingTimeEntrySaving}
                             >
                               Cancel
@@ -928,7 +952,11 @@ const TaskView = ({ task }) => {
                   <Typography variant="body2" color="text.secondary">
                     This will delete the task and its logged time entries.
                   </Typography>
-                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  {deleteError && (
+                    <Typography color="error" role="alert">
+                      {deleteError}
+                    </Typography>
+                  )}
                   <Button
                     variant="contained"
                     color="error"
@@ -1084,7 +1112,11 @@ const TaskView = ({ task }) => {
                   }
                   label="Mark complete"
                 />
-                {saveError && <Typography color="error">{saveError}</Typography>}
+                {saveError && (
+                  <Typography color="error" role="alert">
+                    {saveError}
+                  </Typography>
+                )}
                 <Divider />
                 <Stack direction="row" spacing={1}>
                   <Button variant="contained" onClick={handleSave} disabled={saving}>
