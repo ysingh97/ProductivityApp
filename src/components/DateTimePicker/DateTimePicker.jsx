@@ -12,7 +12,20 @@ export default function MyDateTimePicker({ value, onChange, textFieldProps, ...p
         value={value}
         onChange={onChange}
         {...pickerProps}
-        renderInput={(params) => <TextField {...params} {...textFieldProps} />}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            {...textFieldProps}
+            inputProps={{
+              ...params.inputProps,
+              ...(textFieldProps?.inputProps || {})
+            }}
+            InputProps={{
+              ...params.InputProps,
+              ...(textFieldProps?.InputProps || {})
+            }}
+          />
+        )}
       />
     </LocalizationProvider>
   );
