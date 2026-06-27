@@ -2,203 +2,197 @@
 
 ## Current baseline
 
-- Backend: `npm --prefix app-server test` passes 66 tests across auth gating, analytics date/bucket math, list route validation, task time-entry lifecycle, and goal/task total rollups.
-- Frontend: the React test runner now executes again, but automated UI coverage is still only smoke-level.
-- Automation enabler: non-production `test:*` auth tokens now work in the frontend auth context, which means browser automation can bypass Google sign-in when `ALLOW_TEST_AUTH=true` on the backend.
-- Existing unit-style coverage is limited. The clearest current example is model-level validation in `app-server/__tests__/timeEntry.test.js`.
+- Backend: `npm --prefix app-server test` passes 94 tests across auth routes, category routes, analytics range/bucket math, CRUD validation, goal/task total rollups, Google Calendar routes, CORS/health wiring, and test-auth helpers.
+- Frontend: `npm test -- --watchAll=false` passes 68 tests across auth/session handling, shared validation helpers, task and goal forms/views, and page-level state for Goals Overview, Calendar, Visualizations, Google Calendar Settings, and Goal Tree View.
+- Browser E2E: `npx playwright test` passes 17 Chromium specs across auth shell behavior, deep-link refreshes, list/task/goal workflows, reparenting, delete semantics, dashboards, calendar, visualizations, Google Calendar settings, and multi-account isolation.
+- Automation enabler: session-scoped `test:*` auth tokens let Playwright create isolated personas per scenario, so E2E specs do not need to share one long-lived mock account.
 
-## What is already covered well
+## Automated coverage map
 
-- Analytics aggregation logic, including date-range overlap handling and bucket generation.
-- Goal/task derived totals (`timeSpent`, `timeLeft`) and ancestor rollups.
-- Task time-entry create, update, delete, duplicate handling, and user isolation.
-- Protected-route auth enforcement in the backend.
-- Mock persona data seeding in backend tests.
+### Backend integration and route coverage
 
-## Highest-value gaps
+- `/api/auth/google`
+  - Missing credential rejection, invalid credential rejection, first sign-in user creation, and existing-user profile updates are covered.
+- `/api/categories`
+  - Auth enforcement, alphabetical ordering, and cross-user isolation.
+- `/api/analytics/*`
+  - Inclusive date filtering, overlap math, daily/weekly/monthly bucketing, uncategorized data, empty ranges, and validation failures.
+- Goal/task/time-entry routes
+  - Cached total refreshes, list membership moves, parent-goal changes, category sync, delete cascades/detaches, duplicate time-entry handling, and malformed id/payload validation.
+- Google Calendar integration routes
+  - Connect URL generation, callback success/error behavior, status reads, calendar listing, settings saves, manual sync queuing, and disconnect.
+- App wiring
+  - Health endpoint reachability, allowed/disallowed CORS origins, and protected test-auth behavior.
 
-### Backend integration gaps
+### Frontend page and component coverage
 
-1. `app-server/routes/authRoutes.js`
-   - Missing tests for missing credentials, invalid credentials, and user upsert/update behavior.
-2. `app-server/routes/categoryRoutes.js`
-   - Missing tests for auth protection, alphabetical sorting, and cross-user isolation.
-3. `app-server/controllers/googleCalendarController.js`
-   - No automated coverage for connect URL generation, callback success/error handling, status responses, settings saves, manual sync, and disconnect.
-4. CRUD negative paths
-   - Add 400/404 coverage for invalid `goalId`, `listId`, `taskId`, parent self-reference, and malformed payloads on task/goal/list routes.
-5. CORS and app wiring
-   - Add a small suite around `app-server/app.js` to verify allowed/disallowed origins and the unauthenticated health endpoint.
+- Auth/session
+  - `src/context/AuthContext.js`
+  - `src/context/authUtils.js`
+  - `src/api/client.js`
+  - `src/components/RequireAuth.js`
+  - `src/App.js` route smoke coverage
+- Shared validation helpers
+  - `src/features/tasks/taskValidation.js`
+  - `src/features/goals/goalValidation.js`
+- Task and goal flows
+  - `src/features/tasks/taskForm.js`
+  - `src/features/tasks/taskView.js`
+  - `src/features/goals/goalForm.js`
+  - `src/features/goals/goalView.js`
+- Filter-heavy and integration-heavy pages
+  - `src/pages/GoalsOverview.js`
+  - `src/pages/CalendarView.js`
+  - `src/pages/Visualizations.js`
+  - `src/pages/GoogleCalendarSettings.js`
+  - `src/pages/GoalTreeView.js`
 
-### Frontend component and page gaps
+### Browser E2E coverage
 
-1. Auth/session handling
-   - `src/context/AuthContext.js`
-   - `src/api/client.js`
-   - `src/components/RequireAuth.js`
-2. Task creation/editing/time-entry flows
-   - `src/features/tasks/taskForm.js`
-   - `src/features/tasks/taskView.js`
-3. Goal creation/editing and hierarchy rules
-   - `src/features/goals/goalForm.js`
-   - `src/features/goals/goalView.js`
-   - `src/pages/GoalTreeView.js`
-4. View/filter-heavy pages
-   - `src/pages/GoalsOverview.js`
-   - `src/pages/CalendarView.js`
-   - `src/pages/Visualizations.js`
-5. Google Calendar settings state machine
-   - `src/pages/GoogleCalendarSettings.js`
-6. Reparenting regressions
-   - task moved from one goal tree to another
-   - sub-goal moved from one parent goal to another
-   - old/new ancestor totals, tree placement, and inherited category/deadline behavior
+- `e2e/auth-and-shell.spec.js`
+  - Signed-out redirect, seeded session persistence, shell navigation, theme persistence, sign-out.
+- `e2e/deep-links.spec.js`
+  - Direct navigation and browser refresh resilience on major routed pages.
+- `e2e/list-creation.spec.js`
+  - List creation and empty-title blocking.
+- `e2e/task-creation.spec.js`
+  - Standalone task creation and dashboard visibility.
+- `e2e/task-time-entry.spec.js`
+  - Log/edit/delete/duplicate time-entry lifecycle.
+- `e2e/goal-rollup.spec.js`
+  - Descendant task time updates reflected in goal rollups.
+- `e2e/goal-linked-task.spec.js`
+  - Goal-linked task creation, inherited deadline/category rules, task editing, completion, and list assignment.
+- `e2e/reparenting.spec.js`
+  - Goal and task reparenting across trees, ancestor rollups, inherited category changes, and deadline guardrails.
+- `e2e/list-management.spec.js`
+  - Lists overview/detail management and task deletion from list context.
+- `e2e/dashboard-buckets.spec.js`
+  - Overdue/today/next-7-days buckets and `No Date` empty-state rendering.
+- `e2e/goals-overview.spec.js`
+  - Search, filter, grouping, sorting, and tree-view navigation.
+- `e2e/calendar-view.spec.js`
+  - Week/month switching, goal/task visibility toggles, goal filters, and navigation from cells.
+- `e2e/visualizations.spec.js`
+  - Range controls, invalid custom ranges, chart-mode switching, visible-series toggles, and empty states.
+- `e2e/google-calendar-settings.spec.js`
+  - Browser-level settings UI flow with mocked OAuth and API responses.
+- `e2e/deletion-semantics.spec.js`
+  - Task deletion, goal deletion, detach behavior, and rollup refreshes.
+- `e2e/multi-account-isolation.spec.js`
+  - Cross-persona data isolation in separate browser contexts.
 
-### Unit-test gaps
+## Where unit tests fit
 
-1. Extracted pure business logic
-   - Several high-value rules live inside large React components or controllers, which makes them awkward to unit test directly.
-2. Reused validation rules
-   - Task and goal deadline, estimate, and parent-child constraints are duplicated across create/edit surfaces and should be centralized.
-3. Date/range derivation helpers
-   - Calendar and analytics logic should be covered by fast deterministic tests before relying on page-level or route-level coverage.
+Unit tests sit at the bottom of the pyramid. They should cover pure rules and state derivation that do not need routing, DOM rendering, HTTP, or MongoDB.
+
+Already in good shape:
+
+- Auth token parsing and expiry checks in `src/context/authUtils.js`
+- Shared task validation rules in `src/features/tasks/taskValidation.js`
+- Shared goal validation rules in `src/features/goals/goalValidation.js`
+
+Still good extraction targets:
+
+1. `src/pages/CalendarView.js` and `src/components/DashboardCalendar.js`
+   - top-level goal resolution
+   - date-range filtering
+   - per-day grouping helpers
+2. `src/pages/Visualizations.js`
+   - range-label derivation
+   - bucket selection helpers
+   - snapshot/summary formatting
+3. `app-server/controllers/taskController.js` and `app-server/controllers/goalController.js`
+   - parent/deadline/category normalization rules
+4. `app-server/controllers/googleCalendarController.js` and related services
+   - payload shaping and provider-error normalization
+
+## Remaining highest-value gaps
+
+Most of the gaps that originally motivated this plan are now closed. The highest-value remaining items are narrower:
+
+1. Browser E2E for top-level goal creation
+   - Goal creation is covered at the page/component level, but there is no dedicated Playwright flow yet.
+2. Browser E2E for sub-goal creation
+   - Inherited parent/deadline rules are covered in frontend tests, but the browser path from a goal detail page still needs its own spec.
+3. Real Google sign-in and expired-session behavior
+   - Automation currently uses seeded test auth and mocked 401 handling, not live Google identity flows.
+4. Live Google Calendar smoke coverage
+   - Route tests and mocked browser tests exist, but real OAuth/provider sync behavior still belongs in a staging/manual lane.
+5. Populated `No Date` dashboard coverage
+   - The current browser spec verifies the `No Date` section and its empty state. A real populated no-date task scenario should be added if deterministic seeding supports it.
+6. Optional next tier
+   - accessibility audits
+   - cross-browser coverage beyond Chromium
+   - visual regression checks if release risk warrants them
 
 ## Recommended test pyramid
 
 ### 0. Unit tests
 
-Use unit tests for pure logic and small validation/state helpers. These should be the fastest tests in the repo and should not require routing, DOM rendering, HTTP mocking, or MongoDB.
+Use unit tests for extracted pure logic and validation helpers.
 
 Good fit:
 
-- date parsing, bucketing, and range-label logic
-- auth token parsing and expiry checks
-- task/goal validation rules
-- tree and rollup helper functions once extracted from controllers/components
+- date parsing and range derivation
+- auth token parsing/expiry logic
+- shared task/goal validation helpers
+- normalized provider payload helpers
 
 Poor fit:
 
 - route wiring
 - persistence behavior
-- CORS behavior
-- browser refresh/deep-link regressions
-- cross-page user workflows
-
-Best extraction targets for this repo:
-
-1. `src/context/AuthContext.js`
-   - Extract `isTestAuthToken`, `decodeJwtPayload`, and `isTokenExpired` into a small auth utility module.
-2. `src/features/tasks/taskForm.js` and `src/features/tasks/taskView.js`
-   - Extract shared task validation into a `taskValidation` helper:
-   - future-date checks
-   - parent-goal deadline checks
-   - estimate parsing/normalization
-   - time-entry range validation
-3. `src/features/goals/goalForm.js` and `src/features/goals/goalView.js`
-   - Extract shared goal validation into a `goalValidation` helper:
-   - future-date checks
-   - parent-goal deadline checks
-   - estimate parsing/normalization
-4. `src/pages/Visualizations.js`
-   - Extract range and chart-state helpers:
-   - `formatRangeLabel`
-   - `getAutoBucket`
-   - `getAllowedBuckets`
-   - `getPreviousRangeState`
-   - signed-hour formatting and snapshot derivation
-5. `src/pages/CalendarView.js` and `src/components/DashboardCalendar.js`
-   - Extract calendar/tree helpers:
-   - top-level goal resolution
-   - item filtering by date range
-   - per-day grouping
-6. `app-server/controllers/analyticsController.js`
-   - Extract analytics date helpers and bucket math into a utility/service module so they can be tested without Express or Mongo setup.
-7. `app-server/controllers/taskController.js` and `app-server/controllers/goalController.js`
-   - Extract parent/deadline/category normalization rules where possible, then unit test them separately from route integration tests.
+- browser refresh regressions
+- cross-page workflows
+- real-provider OAuth behavior
 
 ### 1. Backend integration tests
 
 Keep using Jest + Supertest + `mongodb-memory-server`.
 
-Add next:
+Best next additions:
 
-- Small unit suites for extracted analytics, auth, and validation helpers.
-- Auth route tests for `/api/auth/google`.
-- Category route tests for `/api/categories`.
-- Google Calendar route/controller tests with mocked service dependencies.
-- Negative-path validation tests for goal/task/list CRUD.
-- App-level CORS tests.
+- focused suites for extracted controller/service helpers
+- Google Calendar worker/background sync behavior
+- provider-failure and retry-path coverage around sync jobs
 
 ### 2. Frontend page integration tests
 
-Use React Testing Library with MSW.
+Use React Testing Library for component/page state that does not need a real browser.
 
-Prioritize:
+Best next additions:
 
-1. `App`, `RequireAuth`, and `apiClient` 401 handling.
-2. `TaskForm` and `GoalForm` behavior after shared validation logic is extracted.
-3. `TaskView` time-entry add/edit/delete flows.
-4. `GoalsOverview` filters/sorts.
-5. `CalendarView` and `Visualizations` control state changes.
-6. `GoogleCalendarSettings` connected/disconnected/error states.
+- extracted calendar helpers once they move out of page components
+- extracted visualization range/bucket helpers
+- any future goal-create/sub-goal-create edge cases before adding more E2E
 
 ### 3. Browser E2E tests
 
-Use Playwright.
+Use Playwright for routing, refresh resilience, destructive actions, multi-page workflows, and multi-account separation.
 
-Automate first:
+Default approach:
 
-1. Auth bootstrap and protected-route access.
-2. Deep-link and browser refresh resilience on routed pages.
-3. Create list.
-4. Create standalone task.
-5. Create goal-linked task.
-6. Log/edit/delete task time.
-7. Goal rollup update after time-entry changes.
-8. Goal/task reparenting between different parent goal trees.
-9. Calendar and analytics smoke checks.
-
-Do not start with:
-
-- Real Google sign-in UI automation.
-- Live Google Calendar API automation in CI.
-
-Instead:
-
-- Seed `localStorage.authToken = "test:basic"` and `localStorage.authUser`.
-- Run the backend with `ALLOW_TEST_AUTH=true`.
-- Stub or sandbox Google Calendar endpoints for CI.
+- seed `localStorage.authToken` and `localStorage.authUser`
+- run backend with `ALLOW_TEST_AUTH=true`
+- use isolated session personas per scenario
+- stub external Google Calendar endpoints in CI
 
 ## Suggested implementation order
 
-### Phase 1
-
-- Keep backend suite green.
-- Extract pure helpers before adding large numbers of frontend tests.
-- Add focused unit tests for extracted auth, analytics, and validation helpers.
-- Add MSW to frontend tests.
-- Add page-level tests for auth, task form, goal form, and task time-entry flows.
-
-### Phase 2
-
-- Add Playwright with seeded test personas.
-- Automate the `P0` scenarios from `docs/manual-e2e-test-pass.md`.
-- Run Playwright smoke on every PR.
-
-### Phase 3
-
-- Expand Playwright to cover filters, calendar, analytics, and delete/detach semantics.
-- Add explicit reparenting regression coverage for goals and tasks, including old/new ancestor total validation.
-- Add Google Calendar controller tests with service mocks.
-- Add monthly extended regression coverage for multi-account isolation and external integrations.
+1. Keep backend Jest, frontend Jest, and Playwright green in CI.
+2. Add Playwright coverage for top-level goal creation and sub-goal creation next.
+3. Decide whether to add a staging-only live Google sign-in / Google Calendar smoke lane.
+4. Add a populated `No Date` dashboard scenario once deterministic seeding supports it.
+5. Expand accessibility or multi-browser coverage only if the release process benefits from the extra runtime.
 
 ## Definition of done
 
-- Every user-facing flow has at least one automated test at the highest-value layer.
-- Every validation rule has either a backend integration test or a page-level frontend test.
+- Every user-facing flow has at least one automated test at the highest-value layer that is practical.
+- Real-provider flows that cannot live in CI are explicitly documented as manual/staging checks.
 - Every bug fix adds a regression test.
 - CI runs:
   - backend Jest
   - frontend Jest
   - frontend build
-  - Playwright smoke
+  - Playwright smoke or full suite

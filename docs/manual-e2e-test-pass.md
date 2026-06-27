@@ -2,6 +2,8 @@
 
 Use these tables as copyable run sheets. Leave `Actual Result`, `Pass/Fail`, and `Notes` blank during execution, then fill them in during the pass.
 
+For routine regression work, prioritize the scenarios marked `Partially automated` or `Manual only`. Scenarios marked `Automated` already have Playwright coverage and are best used for human spot-checks on major releases, staging deploys, or visual UX review.
+
 ## Run notes
 
 - Preferred environment: local or staging with a clean test account.
@@ -12,6 +14,55 @@ Use these tables as copyable run sheets. Leave `Actual Result`, `Pass/Fail`, and
   - one standalone task
   - one goal-linked task
   - at least two time entries across different dates/categories
+
+## Automation legend
+
+- `Automated`
+  - Covered end to end in Playwright.
+- `Partially automated`
+  - Some automated coverage exists, but the manual pass still covers a real provider flow, a missing browser path, or a scenario not yet deterministic in CI.
+- `Manual only`
+  - No dedicated browser automation exists yet.
+
+## Current automation map
+
+| Scenario | Status | Primary automated coverage | Remaining manual focus |
+| --- | --- | --- | --- |
+| `E2E-01` Sign-in, protected routing, and session recovery | Partially automated | `e2e/auth-and-shell.spec.js`, `src/api/client.test.js` | Real Google sign-in and real expired-session behavior |
+| `E2E-02` App shell navigation and theme persistence | Automated | `e2e/auth-and-shell.spec.js` | Optional visual spot-check after shell changes |
+| `E2E-03` Deep-link and browser refresh resilience | Automated | `e2e/deep-links.spec.js` | Optional deployed-environment spot-check |
+| `E2E-04` Create a list | Automated | `e2e/list-creation.spec.js` | Optional exploratory UX review |
+| `E2E-05` Create a standalone task | Automated | `e2e/task-creation.spec.js` | Optional exploratory UX review |
+| `E2E-06` Time-entry lifecycle on a task | Automated | `e2e/task-time-entry.spec.js` | Optional exploratory UX review |
+| `E2E-07` Goal progress rollup from descendant tasks | Automated | `e2e/goal-rollup.spec.js` | Optional exploratory UX review |
+| `E2E-08` Create a top-level goal | Partially automated | `src/features/goals/goalForm.test.js`, `src/features/goals/goalView.test.js` | Dedicated browser-level create-goal flow |
+| `E2E-09` Create a sub-goal with inherited category and deadline guardrails | Partially automated | `src/features/goals/goalForm.test.js` | Dedicated browser-level create-sub-goal flow |
+| `E2E-10` Create a goal-linked task with inherited rules | Automated | `e2e/goal-linked-task.spec.js` | Optional exploratory UX review |
+| `E2E-11` Edit task details and completion state | Automated | `e2e/goal-linked-task.spec.js` | Optional exploratory UX review |
+| `E2E-12` Reparent goals and tasks across goal trees | Automated | `e2e/reparenting.spec.js` | Optional exploratory UX review |
+| `E2E-13` Lists overview and list detail management | Automated | `e2e/list-management.spec.js` | Optional exploratory UX review |
+| `E2E-14` Goals overview filters, sorting, and tree navigation | Automated | `e2e/goals-overview.spec.js` | Optional exploratory UX review |
+| `E2E-15` Dashboard due-date buckets | Partially automated | `e2e/dashboard-buckets.spec.js` | Populated `No Date` bucket with a real undated task when supported |
+| `E2E-16` Calendar views, filters, and navigation | Automated | `e2e/calendar-view.spec.js` | Optional exploratory UX review |
+| `E2E-17` Visualizations range controls and chart states | Automated | `e2e/visualizations.spec.js` | Optional exploratory UX review |
+| `E2E-18` Goal and task deletion semantics | Automated | `e2e/deletion-semantics.spec.js` | Optional exploratory UX review |
+| `E2E-19` Google Calendar integration lifecycle | Partially automated | `e2e/google-calendar-settings.spec.js`, `app-server/__tests__/googleCalendarRoutes.test.js` | Live OAuth and real provider sync behavior |
+| `E2E-20` Multi-account isolation | Partially automated | `e2e/multi-account-isolation.spec.js` | Real Google-account switching and account chooser behavior |
+
+## Recommended manual focus
+
+- `E2E-01`
+  - Use a real Google sign-in and verify the actual expired-session path.
+- `E2E-08`
+  - Run the full browser flow for top-level goal creation until a Playwright spec exists.
+- `E2E-09`
+  - Run the full browser flow for sub-goal creation from a parent goal page until a Playwright spec exists.
+- `E2E-15`
+  - Recheck the `No Date` bucket with a real undated task once deterministic seeding or product support is in place.
+- `E2E-19`
+  - Use a disposable live Google Calendar connection in staging when validating real integration behavior.
+- `E2E-20`
+  - Verify real-account isolation if the release changes auth/account-switching behavior.
 
 ## Smoke scenarios
 
