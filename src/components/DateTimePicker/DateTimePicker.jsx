@@ -4,13 +4,21 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import TextField from '@mui/material/TextField';
 
+const normalizeToMinute = (value) => {
+  if (!value || typeof value.second !== 'function' || typeof value.millisecond !== 'function') {
+    return value;
+  }
+
+  return value.second(0).millisecond(0);
+};
+
 export default function MyDateTimePicker({ value, onChange, textFieldProps, ...pickerProps }) {
   return (
     <LocalizationProvider adapterLocale="en" dateAdapter={AdapterDayjs}>
       <DateTimePicker
         label="Target Completion Date"
         value={value}
-        onChange={onChange}
+        onChange={(nextValue) => onChange(normalizeToMinute(nextValue))}
         {...pickerProps}
         renderInput={(params) => (
           <TextField

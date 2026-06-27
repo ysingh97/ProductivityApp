@@ -74,7 +74,7 @@ const parseNumber = (value) => {
 };
 
 const buildDefaultTimeEntryValues = () => {
-  const end = dayjs();
+  const end = dayjs().second(0).millisecond(0);
   const start = end.subtract(1, "hour");
 
   return {
