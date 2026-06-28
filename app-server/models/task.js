@@ -56,7 +56,7 @@ const taskSchema = new mongoose.Schema({
   },
   targetCompletionDate: {
     type: Date,
-    required: true
+    default: null
   }
 });
 
