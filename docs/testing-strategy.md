@@ -2,8 +2,8 @@
 
 ## Current baseline
 
-- Backend: `npm --prefix app-server test` passes 94 tests across auth routes, category routes, analytics range/bucket math, CRUD validation, goal/task total rollups, Google Calendar routes, CORS/health wiring, and test-auth helpers.
-- Frontend: `npm test -- --watchAll=false` passes 68 tests across auth/session handling, shared validation helpers, task and goal forms/views, and page-level state for Goals Overview, Calendar, Visualizations, Google Calendar Settings, and Goal Tree View.
+- Backend: `npm --prefix app-server test` passes 96 tests across auth routes, category routes, analytics range/bucket math, CRUD validation, goal/task total rollups, Google Calendar routes, CORS/health wiring, and test-auth helpers.
+- Frontend: `npm test -- --watchAll=false` passes 70 tests across auth/session handling, shared validation helpers, task and goal forms/views, and page-level state for Goals Overview, Calendar, Visualizations, Google Calendar Settings, and Goal Tree View.
 - Browser E2E: `npx playwright test` passes 17 Chromium specs across auth shell behavior, deep-link refreshes, list/task/goal workflows, reparenting, delete semantics, dashboards, calendar, visualizations, Google Calendar settings, and multi-account isolation.
 - Automation enabler: session-scoped `test:*` auth tokens let Playwright create isolated personas per scenario, so E2E specs do not need to share one long-lived mock account.
 
@@ -68,7 +68,7 @@
 - `e2e/list-management.spec.js`
   - Lists overview/detail management and task deletion from list context.
 - `e2e/dashboard-buckets.spec.js`
-  - Overdue/today/next-7-days buckets and `No Date` empty-state rendering.
+  - Overdue/today/next-7-days buckets, populated `No Date` coverage, and task deep-links from each section.
 - `e2e/goals-overview.spec.js`
   - Search, filter, grouping, sorting, and tree-view navigation.
 - `e2e/calendar-view.spec.js`
@@ -119,9 +119,7 @@ Most of the gaps that originally motivated this plan are now closed. The highest
    - Automation currently uses seeded test auth and mocked 401 handling, not live Google identity flows.
 4. Live Google Calendar smoke coverage
    - Route tests and mocked browser tests exist, but real OAuth/provider sync behavior still belongs in a staging/manual lane.
-5. Populated `No Date` dashboard coverage
-   - The current browser spec verifies the `No Date` section and its empty state. A real populated no-date task scenario should be added if deterministic seeding supports it.
-6. Optional next tier
+5. Optional next tier
    - accessibility audits
    - cross-browser coverage beyond Chromium
    - visual regression checks if release risk warrants them
@@ -183,8 +181,7 @@ Default approach:
 1. Keep backend Jest, frontend Jest, and Playwright green in CI.
 2. Add Playwright coverage for top-level goal creation and sub-goal creation next.
 3. Decide whether to add a staging-only live Google sign-in / Google Calendar smoke lane.
-4. Add a populated `No Date` dashboard scenario once deterministic seeding supports it.
-5. Expand accessibility or multi-browser coverage only if the release process benefits from the extra runtime.
+4. Expand accessibility or multi-browser coverage only if the release process benefits from the extra runtime.
 
 ## Definition of done
 

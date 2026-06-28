@@ -42,7 +42,7 @@ For routine regression work, prioritize the scenarios marked `Partially automate
 | `E2E-12` Reparent goals and tasks across goal trees | Automated | `e2e/reparenting.spec.js` | Optional exploratory UX review |
 | `E2E-13` Lists overview and list detail management | Automated | `e2e/list-management.spec.js` | Optional exploratory UX review |
 | `E2E-14` Goals overview filters, sorting, and tree navigation | Automated | `e2e/goals-overview.spec.js` | Optional exploratory UX review |
-| `E2E-15` Dashboard due-date buckets | Partially automated | `e2e/dashboard-buckets.spec.js` | Populated `No Date` bucket with a real undated task when supported |
+| `E2E-15` Dashboard due-date buckets | Automated | `e2e/dashboard-buckets.spec.js` | Optional exploratory UX review |
 | `E2E-16` Calendar views, filters, and navigation | Automated | `e2e/calendar-view.spec.js` | Optional exploratory UX review |
 | `E2E-17` Visualizations range controls and chart states | Automated | `e2e/visualizations.spec.js` | Optional exploratory UX review |
 | `E2E-18` Goal and task deletion semantics | Automated | `e2e/deletion-semantics.spec.js` | Optional exploratory UX review |
@@ -57,8 +57,6 @@ For routine regression work, prioritize the scenarios marked `Partially automate
   - Run the full browser flow for top-level goal creation until a Playwright spec exists.
 - `E2E-09`
   - Run the full browser flow for sub-goal creation from a parent goal page until a Playwright spec exists.
-- `E2E-15`
-  - Recheck the `No Date` bucket with a real undated task once deterministic seeding or product support is in place.
 - `E2E-19`
   - Use a disposable live Google Calendar connection in staging when validating real integration behavior.
 - `E2E-20`
