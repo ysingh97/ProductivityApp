@@ -397,9 +397,7 @@ const TaskView = ({ task }) => {
     }
   };
 
-  const loggedDurationHours = useMemo(() => {
-    return getTimeEntryDurationHours(timeEntryValues);
-  }, [timeEntryValues.endedAt, timeEntryValues.startedAt]);
+  const loggedDurationHours = getTimeEntryDurationHours(timeEntryValues);
 
   const handleLogTime = async () => {
     if (!currentTask) return;
