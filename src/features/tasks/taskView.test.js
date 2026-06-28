@@ -214,4 +214,35 @@ describe("TaskView", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/no logged time yet for this task/i)).toBeInTheDocument();
   });
+
+  test("clears an existing target date and persists null through save", async () => {
+    const updatedTask = buildTask({
+      targetCompletionDate: null
+    });
+
+    updateTask.mockResolvedValue(updatedTask);
+
+    renderTaskView(buildTask());
+
+    await screen.findByText("Dec 1, 2026");
+
+    fireEvent.click(screen.getByRole("button", { name: /edit details/i }));
+    setDateTimeValue("Date Time", "");
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        title: "Prepare roadmap",
+        description: "Draft the next release plan.",
+        listId: null,
+        parentGoalId: null,
+        estimatedCompletionTime: 4,
+        isComplete: false,
+        targetCompletionDate: null,
+        category: "Planning"
+      })
+    );
+
+    expect(await screen.findByText("No deadline")).toBeInTheDocument();
+  });
 });

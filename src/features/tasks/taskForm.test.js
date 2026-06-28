@@ -128,6 +128,37 @@ describe("TaskForm", () => {
     expect(payload).not.toHaveProperty("category");
   });
 
+  test("submits null when the target completion date is left empty", async () => {
+    const onSubmit = jest.fn().mockResolvedValue({});
+
+    render(<TaskForm onSubmit={onSubmit} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /create task/i })).not.toBeDisabled()
+    );
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Write release notes" }
+    });
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: "Focus" }
+    });
+    fireEvent.change(screen.getByLabelText(/estimated hours/i), {
+      target: { value: "2.5" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /create task/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Write release notes",
+        category: "Focus",
+        targetCompletionDate: null
+      })
+    );
+  });
+
   test("blocks submission when the task target date exceeds the parent goal deadline", async () => {
     const onSubmit = jest.fn().mockResolvedValue({});
 

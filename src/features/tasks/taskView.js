@@ -300,11 +300,11 @@ const TaskView = ({ task }) => {
         listId: formValues.listId || null,
         parentGoalId: formValues.parentGoalId || null,
         estimatedCompletionTime: parseNumber(formValues.estimatedCompletionTime),
-        isComplete: formValues.isComplete
+        isComplete: formValues.isComplete,
+        targetCompletionDate: formValues.targetCompletionDate
+          ? formValues.targetCompletionDate.toDate()
+          : null
       };
-      if (formValues.targetCompletionDate) {
-        updates.targetCompletionDate = formValues.targetCompletionDate.toDate();
-      }
       if (!formValues.parentGoalId) {
         updates.category = formValues.category;
       }
