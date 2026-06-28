@@ -4,7 +4,7 @@
 
 - Backend: `npm --prefix app-server test` passes 96 tests across auth routes, category routes, analytics range/bucket math, CRUD validation, goal/task total rollups, Google Calendar routes, CORS/health wiring, and test-auth helpers.
 - Frontend: `npm test -- --watchAll=false` passes 70 tests across auth/session handling, shared validation helpers, task and goal forms/views, and page-level state for Goals Overview, Calendar, Visualizations, Google Calendar Settings, and Goal Tree View.
-- Browser E2E: `npx playwright test` passes 17 Chromium specs across auth shell behavior, deep-link refreshes, list/task/goal workflows, reparenting, delete semantics, dashboards, calendar, visualizations, Google Calendar settings, and multi-account isolation.
+- Browser E2E: `npx playwright test` passes 20 Chromium specs across auth shell behavior, expired-session recovery, deep-link refreshes, list/task/goal workflows, goal creation, reparenting, delete semantics, dashboards, calendar, visualizations, Google Calendar settings, and multi-account isolation.
 - Automation enabler: session-scoped `test:*` auth tokens let Playwright create isolated personas per scenario, so E2E specs do not need to share one long-lived mock account.
 
 ## Automated coverage map
@@ -50,13 +50,17 @@
 ### Browser E2E coverage
 
 - `e2e/auth-and-shell.spec.js`
-  - Signed-out redirect, seeded session persistence, shell navigation, theme persistence, sign-out.
+  - Signed-out redirect, expired stored-session redirect, seeded session persistence, shell navigation, theme persistence, sign-out.
 - `e2e/deep-links.spec.js`
   - Direct navigation and browser refresh resilience on major routed pages.
 - `e2e/list-creation.spec.js`
   - List creation and empty-title blocking.
 - `e2e/task-creation.spec.js`
   - Standalone task creation and dashboard visibility.
+- `e2e/goal-creation.spec.js`
+  - Top-level goal creation plus verification in goal detail, Goals Overview, and Goal Tree View.
+- `e2e/sub-goal-creation.spec.js`
+  - Sub-goal creation from a parent goal, inherited category behavior, and deadline guardrails.
 - `e2e/task-time-entry.spec.js`
   - Log/edit/delete/duplicate time-entry lifecycle.
 - `e2e/goal-rollup.spec.js`
@@ -109,17 +113,13 @@ Still good extraction targets:
 
 ## Remaining highest-value gaps
 
-Most of the gaps that originally motivated this plan are now closed. The highest-value remaining items are narrower:
+Most of the practical first-party app gaps are now closed. The remaining gaps are external or optional:
 
-1. Browser E2E for top-level goal creation
-   - Goal creation is covered at the page/component level, but there is no dedicated Playwright flow yet.
-2. Browser E2E for sub-goal creation
-   - Inherited parent/deadline rules are covered in frontend tests, but the browser path from a goal detail page still needs its own spec.
-3. Real Google sign-in and expired-session behavior
-   - Automation currently uses seeded test auth and mocked 401 handling, not live Google identity flows.
-4. Live Google Calendar smoke coverage
+1. Real Google sign-in and account-chooser behavior
+   - Automation covers signed-out redirects, expired-session recovery, and seeded session persistence, but not the live Google identity UI or callback behavior.
+2. Live Google Calendar smoke coverage
    - Route tests and mocked browser tests exist, but real OAuth/provider sync behavior still belongs in a staging/manual lane.
-5. Optional next tier
+3. Optional next tier
    - accessibility audits
    - cross-browser coverage beyond Chromium
    - visual regression checks if release risk warrants them
@@ -179,9 +179,8 @@ Default approach:
 ## Suggested implementation order
 
 1. Keep backend Jest, frontend Jest, and Playwright green in CI.
-2. Add Playwright coverage for top-level goal creation and sub-goal creation next.
-3. Decide whether to add a staging-only live Google sign-in / Google Calendar smoke lane.
-4. Expand accessibility or multi-browser coverage only if the release process benefits from the extra runtime.
+2. Decide whether to add a staging-only live Google sign-in / Google Calendar smoke lane.
+3. Expand accessibility or multi-browser coverage only if the release process benefits from the extra runtime.
 
 ## Definition of done
 

@@ -28,15 +28,15 @@ For routine regression work, prioritize the scenarios marked `Partially automate
 
 | Scenario | Status | Primary automated coverage | Remaining manual focus |
 | --- | --- | --- | --- |
-| `E2E-01` Sign-in, protected routing, and session recovery | Partially automated | `e2e/auth-and-shell.spec.js`, `src/api/client.test.js` | Real Google sign-in and real expired-session behavior |
+| `E2E-01` Sign-in, protected routing, and session recovery | Partially automated | `e2e/auth-and-shell.spec.js`, `src/api/client.test.js`, `src/context/AuthContext.test.js` | Live Google sign-in and account chooser behavior |
 | `E2E-02` App shell navigation and theme persistence | Automated | `e2e/auth-and-shell.spec.js` | Optional visual spot-check after shell changes |
 | `E2E-03` Deep-link and browser refresh resilience | Automated | `e2e/deep-links.spec.js` | Optional deployed-environment spot-check |
 | `E2E-04` Create a list | Automated | `e2e/list-creation.spec.js` | Optional exploratory UX review |
 | `E2E-05` Create a standalone task | Automated | `e2e/task-creation.spec.js` | Optional exploratory UX review |
 | `E2E-06` Time-entry lifecycle on a task | Automated | `e2e/task-time-entry.spec.js` | Optional exploratory UX review |
 | `E2E-07` Goal progress rollup from descendant tasks | Automated | `e2e/goal-rollup.spec.js` | Optional exploratory UX review |
-| `E2E-08` Create a top-level goal | Partially automated | `src/features/goals/goalForm.test.js`, `src/features/goals/goalView.test.js` | Dedicated browser-level create-goal flow |
-| `E2E-09` Create a sub-goal with inherited category and deadline guardrails | Partially automated | `src/features/goals/goalForm.test.js` | Dedicated browser-level create-sub-goal flow |
+| `E2E-08` Create a top-level goal | Automated | `e2e/goal-creation.spec.js` | Optional exploratory UX review |
+| `E2E-09` Create a sub-goal with inherited category and deadline guardrails | Automated | `e2e/sub-goal-creation.spec.js` | Optional exploratory UX review |
 | `E2E-10` Create a goal-linked task with inherited rules | Automated | `e2e/goal-linked-task.spec.js` | Optional exploratory UX review |
 | `E2E-11` Edit task details and completion state | Automated | `e2e/goal-linked-task.spec.js` | Optional exploratory UX review |
 | `E2E-12` Reparent goals and tasks across goal trees | Automated | `e2e/reparenting.spec.js` | Optional exploratory UX review |
@@ -52,11 +52,7 @@ For routine regression work, prioritize the scenarios marked `Partially automate
 ## Recommended manual focus
 
 - `E2E-01`
-  - Use a real Google sign-in and verify the actual expired-session path.
-- `E2E-08`
-  - Run the full browser flow for top-level goal creation until a Playwright spec exists.
-- `E2E-09`
-  - Run the full browser flow for sub-goal creation from a parent goal page until a Playwright spec exists.
+  - Use a real Google sign-in and verify the live account chooser/callback path.
 - `E2E-19`
   - Use a disposable live Google Calendar connection in staging when validating real integration behavior.
 - `E2E-20`
