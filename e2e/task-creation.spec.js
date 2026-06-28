@@ -66,7 +66,11 @@ test("creates a standalone task from the UI and shows it in the next-seven-days 
 
   await page.goto("/board");
 
-  await expect(page.getByRole("heading", { name: /next 7 days/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: taskTitle })).toBeVisible();
-  await expect(page.getByText(dashboardDateLabel, { exact: true }).first()).toBeVisible();
+  const nextWeekSection = page.locator(".MuiPaper-root").filter({
+    has: page.getByRole("heading", { name: /next 7 days/i })
+  }).first();
+
+  await expect(nextWeekSection.getByRole("heading", { name: /next 7 days/i })).toBeVisible();
+  await expect(nextWeekSection.getByRole("link", { name: taskTitle })).toBeVisible();
+  await expect(nextWeekSection.getByText(dashboardDateLabel, { exact: true })).toBeVisible();
 });
