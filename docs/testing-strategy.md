@@ -7,6 +7,132 @@
 - Browser E2E: `npx playwright test` passes 20 Chromium specs across auth shell behavior, expired-session recovery, deep-link refreshes, list/task/goal workflows, goal creation, reparenting, delete semantics, dashboards, calendar, visualizations, Google Calendar settings, and multi-account isolation.
 - Automation enabler: session-scoped `test:*` auth tokens let Playwright create isolated personas per scenario, so E2E specs do not need to share one long-lived mock account.
 
+## Test commands
+
+Use this as the single local runbook for test setup, targeted runs, and full verification.
+
+### One-time setup
+
+- Install frontend/root dependencies:
+  ```powershell
+  npm install
+  ```
+- Install backend dependencies:
+  ```powershell
+  npm --prefix app-server install
+  ```
+- Install Playwright's Chromium browser:
+  ```powershell
+  npm run test:e2e:install
+  ```
+
+### Start the app manually
+
+Use these for exploratory testing or the manual E2E pass.
+
+- Start the backend API in development mode:
+  ```powershell
+  npm --prefix app-server run dev
+  ```
+- Start the frontend development server:
+  ```powershell
+  npm start
+  ```
+- If you want the Google Calendar worker running locally during manual integration checks:
+  ```powershell
+  npm --prefix app-server run worker:google-calendar
+  ```
+
+Playwright does not need the app started manually. `playwright.config.js` starts the frontend and backend automatically through its `webServer` entries.
+
+### Run the automated suites
+
+- Backend Jest:
+  ```powershell
+  npm run test:backend
+  ```
+- Backend Jest direct form:
+  ```powershell
+  npm --prefix app-server test
+  ```
+- Frontend Jest once:
+  ```powershell
+  npm test -- --watchAll=false
+  ```
+- Frontend production build:
+  ```powershell
+  npm run build
+  ```
+- Full Playwright suite in headless mode:
+  ```powershell
+  npm run test:e2e
+  ```
+- Full Playwright suite in headed mode:
+  ```powershell
+  npm run test:e2e:headed
+  ```
+- Deployed smoke check:
+  ```powershell
+  npm run smoke:deploy
+  ```
+
+### Run a focused subset
+
+- One backend suite by filename pattern:
+  ```powershell
+  npm --prefix app-server test -- taskTimeEntries.test.js
+  ```
+- One frontend test file in PowerShell:
+  ```powershell
+  $env:CI='true'; npm test -- --watch=false src/features/tasks/taskView.test.js
+  ```
+- A few frontend test files in one run:
+  ```powershell
+  $env:CI='true'; npm test -- --watch=false src/features/tasks/taskForm.test.js src/features/tasks/taskView.test.js
+  ```
+- One Playwright spec:
+  ```powershell
+  npx playwright test e2e/reparenting.spec.js
+  ```
+- One Playwright spec in headed mode:
+  ```powershell
+  npx playwright test e2e/reparenting.spec.js --headed
+  ```
+
+### Run the full local verification gate
+
+Use this when you want the same broad confidence level used during the recent coverage work.
+
+1. Backend Jest
+   ```powershell
+   npm run test:backend
+   ```
+2. Frontend Jest
+   ```powershell
+   $env:CI='true'; npm test -- --watch=false
+   ```
+3. Frontend build
+   ```powershell
+   npm run build
+   ```
+4. Full Playwright suite
+   ```powershell
+   npx playwright test
+   ```
+
+### Existing shortcuts and caveats
+
+- `npm run ci:local` currently runs:
+  - backend Jest
+  - frontend build
+- `npm run ci:local` does not currently run:
+  - frontend Jest
+  - Playwright
+- If Playwright fails because browser binaries are missing or outdated, rerun:
+  ```powershell
+  npm run test:e2e:install
+  ```
+
 ## Automated coverage map
 
 ### Backend integration and route coverage
