@@ -27,6 +27,11 @@ test("shows tasks in the correct dashboard due-date buckets", async ({ page }) =
     category: "Work",
     targetCompletionDate: todayDate.toISOString()
   }, auth);
+  const noDateTask = await createTaskFixture({
+    title: `No Date Task ${suffix}`,
+    category: "Work",
+    targetCompletionDate: null
+  }, auth);
   const nextWeekTask = await createTaskFixture({
     title: `Next Week Task ${suffix}`,
     category: "Work",
@@ -53,7 +58,8 @@ test("shows tasks in the correct dashboard due-date buckets", async ({ page }) =
   await expect(overdueSection.getByRole("link", { name: overdueTask.title })).toBeVisible();
   await expect(todaySection.getByRole("link", { name: todayTask.title })).toBeVisible();
   await expect(nextWeekSection.getByRole("link", { name: nextWeekTask.title })).toBeVisible();
-  await expect(noDateSection.getByText(/everything has a date\./i)).toBeVisible();
+  await expect(noDateSection.getByRole("link", { name: noDateTask.title })).toBeVisible();
+  await expect(noDateSection.getByText(/everything has a date\./i)).not.toBeVisible();
 
   await overdueSection.getByRole("link", { name: overdueTask.title }).click();
   await expect(page).toHaveURL(new RegExp(`/tasks/${overdueTask._id}$`));
@@ -68,4 +74,9 @@ test("shows tasks in the correct dashboard due-date buckets", async ({ page }) =
   await nextWeekSection.getByRole("link", { name: nextWeekTask.title }).click();
   await expect(page).toHaveURL(new RegExp(`/tasks/${nextWeekTask._id}$`));
   await expect(page.getByRole("heading", { name: nextWeekTask.title })).toBeVisible();
+
+  await page.goto("/board");
+  await noDateSection.getByRole("link", { name: noDateTask.title }).click();
+  await expect(page).toHaveURL(new RegExp(`/tasks/${noDateTask._id}$`));
+  await expect(page.getByRole("heading", { name: noDateTask.title })).toBeVisible();
 });
