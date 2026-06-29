@@ -1,6 +1,15 @@
 const { test, expect } = require("@playwright/test");
 const { seedTestAuth } = require("./support/auth");
 
+const formatLastSyncAt = (value) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
+
 test("walks the Google Calendar settings UI through connect, save, sync, and disconnect states", async ({
   page
 }) => {
@@ -132,7 +141,7 @@ test("walks the Google Calendar settings UI through connect, save, sync, and dis
   await expect(page.getByRole("combobox", { name: /destination calendar/i })).toHaveText(
     "Team Calendar"
   );
-  await expect(page.getByText("Jun 26, 2026, 12:30 PM")).toBeVisible();
+  await expect(page.getByText(formatLastSyncAt(lastSyncAt))).toBeVisible();
 
   await page.getByRole("button", { name: /disconnect google calendar/i }).click();
   await expect(page.getByText(/google calendar disconnected\./i)).toBeVisible();
