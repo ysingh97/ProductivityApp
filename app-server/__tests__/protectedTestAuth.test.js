@@ -15,6 +15,7 @@ beforeAll(async () => {
   process.env.ALLOW_TEST_AUTH = 'true';
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
+  await User.syncIndexes();
   app = createApp();
 });
 

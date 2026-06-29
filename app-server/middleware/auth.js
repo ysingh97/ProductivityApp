@@ -18,6 +18,52 @@ const verifyGoogleToken = async (token) => {
   return ticket.getPayload();
 };
 
+const isDuplicateKeyError = (err) => err?.code === 11000;
+
+const upsertAuthenticatedUser = async ({ googleId, email, name, picture }) => {
+  const updates = {
+    $set: {
+      email,
+      name,
+      picture
+    },
+    $setOnInsert: {
+      googleId
+    }
+  };
+
+  try {
+    return await User.findOneAndUpdate(
+      { googleId },
+      updates,
+      {
+        new: true,
+        upsert: true,
+        runValidators: true
+      }
+    );
+  } catch (err) {
+    if (!isDuplicateKeyError(err)) {
+      throw err;
+    }
+
+    return User.findOneAndUpdate(
+      { googleId },
+      {
+        $set: {
+          email,
+          name,
+          picture
+        }
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+  }
+};
+
 const requireAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ')
@@ -32,24 +78,12 @@ const requireAuth = async (req, res, next) => {
     const payload = await verifyGoogleToken(token);
     const { sub: googleId, email, name, picture } = payload;
 
-    const user = await User.findOneAndUpdate(
-      { googleId },
-      {
-        $set: {
-          email,
-          name,
-          picture
-        },
-        $setOnInsert: {
-          googleId
-        }
-      },
-      {
-        new: true,
-        upsert: true,
-        runValidators: true
-      }
-    );
+    const user = await upsertAuthenticatedUser({
+      googleId,
+      email,
+      name,
+      picture
+    });
 
     req.user = {
       id: user._id,
