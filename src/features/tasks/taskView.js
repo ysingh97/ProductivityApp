@@ -32,6 +32,13 @@ import {
   updateTaskTimeEntry,
   updateTask
 } from "./taskService";
+import {
+  getTaskEstimateHoursError,
+  getTaskTargetCompletionDateError,
+  getTimeEntryDurationHours,
+  getTimeEntryRangeError,
+  parseTaskEstimateHours
+} from "./taskValidation";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -66,13 +73,8 @@ const parseNumber = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-const parseEditableNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : NaN;
-};
-
 const buildDefaultTimeEntryValues = () => {
-  const end = dayjs();
+  const end = dayjs().second(0).millisecond(0);
   const start = end.subtract(1, "hour");
 
   return {
@@ -100,6 +102,13 @@ const formatDurationLabel = (durationMinutes) => {
   }
 
   return `${hours}h ${minutes}m`;
+};
+
+const formatTimeEntryRangeLabel = (entry) => {
+  const start = dayjs(entry.startedAt);
+  const end = dayjs(entry.endedAt);
+
+  return `${start.format("MMM D, YYYY h:mm A")} - ${end.format("h:mm A")}`;
 };
 
 const TaskView = ({ task }) => {
@@ -271,17 +280,14 @@ const TaskView = ({ task }) => {
       ? dayjs(selectedParentGoal.targetCompletionDate)
       : null;
 
-    if (formValues.targetCompletionDate && formValues.targetCompletionDate.isBefore(now)) {
-      setSaveError("Target completion date cannot be earlier than the current time.");
-      return;
-    }
+    const targetDateError = getTaskTargetCompletionDateError({
+      targetCompletionDate: formValues.targetCompletionDate,
+      now,
+      parentDeadline
+    });
 
-    if (
-      formValues.targetCompletionDate &&
-      parentDeadline &&
-      formValues.targetCompletionDate.isAfter(parentDeadline)
-    ) {
-      setSaveError("Subtasks cannot have a target completion date later than the parent goal.");
+    if (targetDateError) {
+      setSaveError(targetDateError);
       return;
     }
 
@@ -294,11 +300,11 @@ const TaskView = ({ task }) => {
         listId: formValues.listId || null,
         parentGoalId: formValues.parentGoalId || null,
         estimatedCompletionTime: parseNumber(formValues.estimatedCompletionTime),
-        isComplete: formValues.isComplete
+        isComplete: formValues.isComplete,
+        targetCompletionDate: formValues.targetCompletionDate
+          ? formValues.targetCompletionDate.toDate()
+          : null
       };
-      if (formValues.targetCompletionDate) {
-        updates.targetCompletionDate = formValues.targetCompletionDate.toDate();
-      }
       if (!formValues.parentGoalId) {
         updates.category = formValues.category;
       }
@@ -343,11 +349,13 @@ const TaskView = ({ task }) => {
   const handleSaveEstimate = async () => {
     if (!currentTask) return;
 
-    const nextEstimate = parseEditableNumber(estimateEditValue);
-    if (Number.isNaN(nextEstimate) || nextEstimate < 0) {
-      setEstimateEditError("Estimated hours must be 0 or greater.");
+    const estimateError = getTaskEstimateHoursError(estimateEditValue);
+    if (estimateError) {
+      setEstimateEditError(estimateError);
       return;
     }
+
+    const nextEstimate = parseTaskEstimateHours(estimateEditValue);
 
     setEstimateEditSaving(true);
     setEstimateEditError("");
@@ -389,48 +397,18 @@ const TaskView = ({ task }) => {
     }
   };
 
-  const loggedDurationHours = useMemo(() => {
-    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
-      return null;
-    }
-
-    if (
-      !timeEntryValues.startedAt.isValid() ||
-      !timeEntryValues.endedAt.isValid() ||
-      !timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)
-    ) {
-      return null;
-    }
-
-    return Math.round(
-      timeEntryValues.endedAt.diff(timeEntryValues.startedAt, "minute", true) / 60 * 100
-    ) / 100;
-  }, [timeEntryValues.endedAt, timeEntryValues.startedAt]);
+  const loggedDurationHours = getTimeEntryDurationHours(timeEntryValues);
 
   const handleLogTime = async () => {
     if (!currentTask) return;
     if (timeEntryRequestInFlightRef.current) return;
 
-    if (!timeEntryValues.startedAt || !timeEntryValues.endedAt) {
-      setTimeEntryError("Select both a start and end time.");
-      return;
-    }
-
-    if (
-      !timeEntryValues.startedAt.isValid() ||
-      !timeEntryValues.endedAt.isValid()
-    ) {
-      setTimeEntryError("Choose valid start and end times.");
-      return;
-    }
-
-    if (!timeEntryValues.endedAt.isAfter(timeEntryValues.startedAt)) {
-      setTimeEntryError("End time must be after start time.");
-      return;
-    }
-
-    if (timeEntryValues.endedAt.isAfter(dayjs())) {
-      setTimeEntryError("End time cannot be in the future.");
+    const timeEntryRangeError = getTimeEntryRangeError({
+      ...timeEntryValues,
+      now: dayjs()
+    });
+    if (timeEntryRangeError) {
+      setTimeEntryError(timeEntryRangeError);
       return;
     }
 
@@ -512,26 +490,12 @@ const TaskView = ({ task }) => {
   const handleSaveEditedTimeEntry = async (entryId) => {
     if (!currentTask || !editingTimeEntryValues) return;
 
-    if (!editingTimeEntryValues.startedAt || !editingTimeEntryValues.endedAt) {
-      setEditingTimeEntryError("Select both a start and end time.");
-      return;
-    }
-
-    if (
-      !editingTimeEntryValues.startedAt.isValid() ||
-      !editingTimeEntryValues.endedAt.isValid()
-    ) {
-      setEditingTimeEntryError("Choose valid start and end times.");
-      return;
-    }
-
-    if (!editingTimeEntryValues.endedAt.isAfter(editingTimeEntryValues.startedAt)) {
-      setEditingTimeEntryError("End time must be after start time.");
-      return;
-    }
-
-    if (editingTimeEntryValues.endedAt.isAfter(dayjs())) {
-      setEditingTimeEntryError("End time cannot be in the future.");
+    const timeEntryRangeError = getTimeEntryRangeError({
+      ...editingTimeEntryValues,
+      now: dayjs()
+    });
+    if (timeEntryRangeError) {
+      setEditingTimeEntryError(timeEntryRangeError);
       return;
     }
 
@@ -700,8 +664,16 @@ const TaskView = ({ task }) => {
                   ? `This entry will add ${loggedDurationHours} hours.`
                   : "Choose a valid time range to preview the logged duration."}
               </Typography>
-              {timeEntryError && <Typography color="error">{timeEntryError}</Typography>}
-              {timeEntrySuccess && <Typography color="success.main">{timeEntrySuccess}</Typography>}
+              {timeEntryError && (
+                <Typography color="error" role="alert">
+                  {timeEntryError}
+                </Typography>
+              )}
+              {timeEntrySuccess && (
+                <Typography color="success.main" role="status" aria-live="polite">
+                  {timeEntrySuccess}
+                </Typography>
+              )}
               <Box>
                 <Button
                   variant="contained"
@@ -763,7 +735,7 @@ const TaskView = ({ task }) => {
                       inputProps={{ min: 0, step: "0.25" }}
                     />
                     {estimateEditError && (
-                      <Typography variant="caption" color="error">
+                      <Typography variant="caption" color="error" role="alert">
                         {estimateEditError}
                       </Typography>
                     )}
@@ -789,7 +761,11 @@ const TaskView = ({ task }) => {
                 ) : (
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
                     <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
-                    <Button size="small" onClick={handleStartEstimateEdit}>
+                    <Button
+                      size="small"
+                      onClick={handleStartEstimateEdit}
+                      aria-label="Edit task estimated hours"
+                    >
                       Edit
                     </Button>
                   </Stack>
@@ -821,8 +797,7 @@ const TaskView = ({ task }) => {
             ) : (
               <Stack spacing={1.5}>
                 {timeEntries.map((entry) => {
-                  const start = dayjs(entry.startedAt);
-                  const end = dayjs(entry.endedAt);
+                  const timeEntryRangeLabel = formatTimeEntryRangeLabel(entry);
                   const isEditing = editingTimeEntryId === entry._id;
 
                   return (
@@ -846,7 +821,7 @@ const TaskView = ({ task }) => {
                             {formatDurationLabel(entry.durationMinutes)}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            {start.format("MMM D, YYYY h:mm A")} - {end.format("h:mm A")}
+                            {timeEntryRangeLabel}
                           </Typography>
                         </Box>
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -856,6 +831,7 @@ const TaskView = ({ task }) => {
                           <Button
                             size="small"
                             onClick={() => handleStartEditingTimeEntry(entry)}
+                            aria-label={`Edit time entry ${timeEntryRangeLabel}`}
                             disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
                           >
                             Edit
@@ -864,6 +840,7 @@ const TaskView = ({ task }) => {
                             size="small"
                             color="error"
                             onClick={() => handleDeleteTimeEntry(entry._id)}
+                            aria-label={`Delete time entry ${timeEntryRangeLabel}`}
                             disabled={deletingTimeEntryId === entry._id || editingTimeEntrySaving}
                           >
                             {deletingTimeEntryId === entry._id ? "Deleting..." : "Delete"}
@@ -906,13 +883,16 @@ const TaskView = ({ task }) => {
                             />
                           </Stack>
                           {editingTimeEntryError && (
-                            <Typography color="error">{editingTimeEntryError}</Typography>
+                            <Typography color="error" role="alert">
+                              {editingTimeEntryError}
+                            </Typography>
                           )}
                           <Stack direction="row" spacing={1}>
                             <Button
                               size="small"
                               variant="contained"
                               onClick={() => handleSaveEditedTimeEntry(entry._id)}
+                              aria-label={`Save time entry ${timeEntryRangeLabel}`}
                               disabled={editingTimeEntrySaving}
                             >
                               {editingTimeEntrySaving ? "Saving..." : "Save"}
@@ -921,6 +901,7 @@ const TaskView = ({ task }) => {
                               size="small"
                               variant="outlined"
                               onClick={handleCancelEditingTimeEntry}
+                              aria-label={`Cancel editing time entry ${timeEntryRangeLabel}`}
                               disabled={editingTimeEntrySaving}
                             >
                               Cancel
@@ -969,7 +950,11 @@ const TaskView = ({ task }) => {
                   <Typography variant="body2" color="text.secondary">
                     This will delete the task and its logged time entries.
                   </Typography>
-                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  {deleteError && (
+                    <Typography color="error" role="alert">
+                      {deleteError}
+                    </Typography>
+                  )}
                   <Button
                     variant="contained"
                     color="error"
@@ -1125,7 +1110,11 @@ const TaskView = ({ task }) => {
                   }
                   label="Mark complete"
                 />
-                {saveError && <Typography color="error">{saveError}</Typography>}
+                {saveError && (
+                  <Typography color="error" role="alert">
+                    {saveError}
+                  </Typography>
+                )}
                 <Divider />
                 <Stack direction="row" spacing={1}>
                   <Button variant="contained" onClick={handleSave} disabled={saving}>

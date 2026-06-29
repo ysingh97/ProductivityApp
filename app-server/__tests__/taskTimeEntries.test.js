@@ -145,6 +145,36 @@ test('task create endpoint adds new task to the selected list', async () => {
   expect(refreshedList.tasks.map(String)).toContain(response.body._id);
 });
 
+test('task create endpoint allows undated standalone tasks', async () => {
+  const { categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  await request(app)
+    .post('/api/tasks')
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      title: 'Undated inbox task',
+      description: 'Task without a deadline',
+      category: workCategory.title,
+      estimatedCompletionTime: 1.5,
+      targetCompletionDate: null
+    })
+    .expect(201)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        title: 'Undated inbox task',
+        estimatedCompletionTime: 1.5,
+        timeSpent: 0,
+        timeLeft: 1.5,
+        targetCompletionDate: null
+      });
+    });
+
+  const persistedTask = await Task.findOne({ title: 'Undated inbox task' }).lean();
+
+  expect(persistedTask.targetCompletionDate).toBeNull();
+});
+
 test('task read endpoints refresh stale cached totals from time entries', async () => {
   const { user, categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');
@@ -310,6 +340,41 @@ test('task update endpoint moves task between list membership arrays', async () 
 
   expect(refreshedSourceList.tasks.map(String)).not.toContain(String(task._id));
   expect(refreshedTargetList.tasks.map(String)).toContain(String(task._id));
+});
+
+test('task update endpoint allows clearing an existing target completion date', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const task = await Task.create({
+    title: 'Clearable due date task',
+    description: 'Task that starts with a date',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedCompletionTime: 3,
+    timeSpent: 0,
+    timeLeft: 3,
+    targetCompletionDate: new Date('2026-01-12T18:00:00.000Z')
+  });
+
+  await request(app)
+    .put(`/api/tasks/${task._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({
+      targetCompletionDate: null
+    })
+    .expect(200)
+    .expect(({ body }) => {
+      expect(body).toMatchObject({
+        _id: String(task._id),
+        targetCompletionDate: null,
+        timeSpent: 0,
+        timeLeft: 3
+      });
+    });
+
+  const persistedTask = await Task.findById(task._id).lean();
+  expect(persistedTask.targetCompletionDate).toBeNull();
 });
 
 test('task update endpoint syncs existing time-entry categories when category changes', async () => {

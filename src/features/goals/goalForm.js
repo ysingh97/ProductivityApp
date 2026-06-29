@@ -16,6 +16,11 @@ import { useLocation } from "react-router-dom";
 import { fetchCategories } from "../categories/categoryService";
 import DateTimePicker from "../../components/DateTimePicker";
 import { fetchGoals } from "./goalService";
+import {
+  getGoalEstimateHoursError,
+  getGoalTargetCompletionDateError,
+  parseGoalEstimateHours
+} from "./goalValidation";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -25,11 +30,6 @@ const getCategoryTitle = (value) => {
     return value;
   }
   return value.title || "";
-};
-
-const parseNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : NaN;
 };
 
 const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false }) => {
@@ -59,24 +59,25 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    const parsedEstimatedHours = parseNumber(estimatedHours);
+    const parsedEstimatedHours = parseGoalEstimateHours(estimatedHours);
 
     const parentDeadline = selectedParentGoal?.targetCompletionDate
       ? dayjs(selectedParentGoal.targetCompletionDate)
       : null;
 
-    if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
-      setError("Target completion date cannot be earlier than the current time.");
+    const targetDateError = getGoalTargetCompletionDateError({
+      targetCompletionDate,
+      now,
+      parentDeadline
+    });
+    if (targetDateError) {
+      setError(targetDateError);
       return;
     }
 
-    if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
-      setError("Sub-goals cannot have a target completion date later than the parent goal.");
-      return;
-    }
-
-    if (Number.isNaN(parsedEstimatedHours) || parsedEstimatedHours < 0) {
-      setError("Estimated hours must be 0 or greater.");
+    const estimateError = getGoalEstimateHoursError(estimatedHours);
+    if (estimateError) {
+      setError(estimateError);
       return;
     }
 

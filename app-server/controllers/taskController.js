@@ -4,6 +4,7 @@ const List = require('../models/list');
 const Category = require('../models/category');
 const TimeEntry = require('../models/timeEntry');
 const { enqueueGoogleSync } = require('../services/calendarSyncService');
+const { isValidObjectId } = require('../utils/objectId');
 
 const normalizeCategoryTitle = (value) => (typeof value === 'string' ? value.trim() : '');
 const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
@@ -264,6 +265,9 @@ const createTask = async (req, res) => {
       let list = null;
 
       if (listId) {
+        if (!isValidObjectId(listId)) {
+          return res.status(400).json({ message: "Invalid list for this user" });
+        }
         list = await List.findOne({ _id: listId, userId: req.user.id });
         if (!list) {
           return res.status(400).json({ message: "Invalid list for this user" });
@@ -273,6 +277,9 @@ const createTask = async (req, res) => {
       let parentGoal = null;
       let categoryId = null;
       if (parentGoalId) {
+        if (!isValidObjectId(parentGoalId)) {
+          return res.status(400).json({ message: "Invalid parentGoal ID" });
+        }
         parentGoal = await Goal.findOne({ _id: parentGoalId, userId: req.user.id });
         if (!parentGoal) {
           return res.status(400).json({ message: "Invalid parentGoal ID" });
@@ -323,6 +330,10 @@ const updateTask = async (req, res) => {
     const { id } = req.params; // task id from URL
     const { userId, timeSpent, timeLeft, ...updates } = req.body;  // fields to update, disallow userId and derived time changes
 
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid task ID" });
+    }
+
     const existingTask = await Task.findOne({ _id: id, userId: req.user.id });
     if (!existingTask) {
       return res.status(404).json({ message: "Task not found" });
@@ -339,6 +350,9 @@ const updateTask = async (req, res) => {
     const nextListIdString = nextListId ? String(nextListId) : null;
 
     if (hasListUpdate && nextListId) {
+      if (!isValidObjectId(nextListId)) {
+        return res.status(400).json({ message: "Invalid list for this user" });
+      }
       const list = await List.findOne({ _id: nextListId, userId: req.user.id });
       if (!list) {
         return res.status(400).json({ message: "Invalid list for this user" });
@@ -356,6 +370,9 @@ const updateTask = async (req, res) => {
     const nextParentGoalIdString = nextParentGoalId ? String(nextParentGoalId) : null;
 
     if (hasParentUpdate && nextParentGoalId) {
+      if (!isValidObjectId(nextParentGoalId)) {
+        return res.status(400).json({ message: "Invalid parentGoal ID" });
+      }
       const parentGoal = await Goal.findOne({ _id: nextParentGoalId, userId: req.user.id });
       if (!parentGoal) {
         return res.status(400).json({ message: "Invalid parentGoal ID" });
@@ -449,6 +466,10 @@ const updateTask = async (req, res) => {
 
 const createTaskTimeEntry = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid task ID' });
+    }
+
     const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -507,6 +528,14 @@ const createTaskTimeEntry = async (req, res) => {
 
 const updateTaskTimeEntry = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid task ID' });
+    }
+
+    if (!isValidObjectId(req.params.entryId)) {
+      return res.status(400).json({ message: 'Invalid time entry ID' });
+    }
+
     const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -567,6 +596,14 @@ const updateTaskTimeEntry = async (req, res) => {
 
 const deleteTaskTimeEntry = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid task ID' });
+    }
+
+    if (!isValidObjectId(req.params.entryId)) {
+      return res.status(400).json({ message: 'Invalid time entry ID' });
+    }
+
     const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -596,6 +633,10 @@ const deleteTaskTimeEntry = async (req, res) => {
 
 const deleteTask = async (req, res) => {
     try {
+      if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
+
       const deletedTask = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
       if (!deletedTask) {
         return res.status(404).json({ message: "Task not found" });
@@ -643,6 +684,10 @@ const deleteTask = async (req, res) => {
 
 const getTaskById = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid task ID" });
+    }
+
     const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
@@ -659,6 +704,10 @@ const getTaskById = async (req, res) => {
 
 const getTaskTimeEntries = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid task ID' });
+    }
+
     const task = await Task.findOne({ _id: req.params.id, userId: req.user.id });
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -682,6 +731,9 @@ const getTaskTimeEntries = async (req, res) => {
 const getTasksByListId = async (req, res) => {
   try {
     const listId = req.params.listId;
+    if (!isValidObjectId(listId)) {
+      return res.status(400).json({ message: 'Invalid list ID' });
+    }
     const tasks = await Task.find({ listId, userId: req.user.id });
     const refreshedTasks = [];
 

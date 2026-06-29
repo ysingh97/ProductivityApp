@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "node scripts/checkBackendBuild.js",
     "test": "cross-env NODE_ENV=test jest --runInBand",
     "dev": "cross-env NODE_ENV=development nodemon server.js",
     "start": "node server.js",

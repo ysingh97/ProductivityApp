@@ -1,4 +1,8 @@
-const { getTestAuthPayload, isTestAuthEnabled } = require('../utils/testAuth');
+const {
+  buildTestSessionPayload,
+  getTestAuthPayload,
+  isTestAuthEnabled
+} = require('../utils/testAuth');
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalAllowTestAuth = process.env.ALLOW_TEST_AUTH;
@@ -45,4 +49,13 @@ test('unknown test personas are rejected', () => {
   process.env.ALLOW_TEST_AUTH = 'true';
 
   expect(getTestAuthPayload('test:unknown')).toBeNull();
+});
+
+test('dynamic test sessions are mapped to deterministic mock users', () => {
+  process.env.NODE_ENV = 'test';
+  process.env.ALLOW_TEST_AUTH = 'true';
+
+  expect(getTestAuthPayload('test:session:goals-overview-123')).toEqual(
+    buildTestSessionPayload('goals-overview-123')
+  );
 });

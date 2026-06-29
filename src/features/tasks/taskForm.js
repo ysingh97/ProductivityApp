@@ -17,6 +17,7 @@ import { fetchCategories } from "../categories/categoryService";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
 import DateTimePicker from "../../components/DateTimePicker";
+import { getTaskTargetCompletionDateError } from "./taskValidation";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -135,13 +136,14 @@ const TaskForm = ({
       ? dayjs(selectedParentGoal.targetCompletionDate)
       : null;
 
-    if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
-      setError("Target completion date cannot be earlier than the current time.");
-      return;
-    }
+    const targetDateError = getTaskTargetCompletionDateError({
+      targetCompletionDate,
+      now,
+      parentDeadline
+    });
 
-    if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
-      setError("Subtasks cannot have a target completion date later than the parent goal.");
+    if (targetDateError) {
+      setError(targetDateError);
       return;
     }
 

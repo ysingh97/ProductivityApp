@@ -23,6 +23,11 @@ import {
 import DateTimePicker from "../../components/DateTimePicker";
 import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
 import { fetchCategories } from "../categories/categoryService";
+import {
+  getGoalEstimateHoursError,
+  getGoalTargetCompletionDateError,
+  parseGoalEstimateHours
+} from "./goalValidation";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -48,11 +53,6 @@ const buildFormValues = (goalData) => ({
     : null,
   isComplete: Boolean(goalData?.isComplete)
 });
-
-const parseNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : NaN;
-};
 
 const formatHours = (value) => {
   const rounded = Math.round((Number(value) || 0) * 100) / 100;
@@ -156,7 +156,7 @@ const GoalView = ({ goal }) => {
     if (!currentGoal) return;
 
     const now = dayjs();
-    const estimatedHours = parseNumber(formValues.estimatedHours);
+    const estimatedHours = parseGoalEstimateHours(formValues.estimatedHours);
     const selectedParentGoal = formValues.parentGoalId
       ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
       : null;
@@ -164,22 +164,19 @@ const GoalView = ({ goal }) => {
       ? dayjs(selectedParentGoal.targetCompletionDate)
       : null;
 
-    if (formValues.targetCompletionDate && formValues.targetCompletionDate.isBefore(now)) {
-      setSaveError("Target completion date cannot be earlier than the current time.");
+    const targetDateError = getGoalTargetCompletionDateError({
+      targetCompletionDate: formValues.targetCompletionDate,
+      now,
+      parentDeadline
+    });
+    if (targetDateError) {
+      setSaveError(targetDateError);
       return;
     }
 
-    if (
-      formValues.targetCompletionDate &&
-      parentDeadline &&
-      formValues.targetCompletionDate.isAfter(parentDeadline)
-    ) {
-      setSaveError("Sub-goals cannot have a target completion date later than the parent goal.");
-      return;
-    }
-
-    if (Number.isNaN(estimatedHours) || estimatedHours < 0) {
-      setSaveError("Estimated hours must be 0 or greater.");
+    const estimateError = getGoalEstimateHoursError(formValues.estimatedHours);
+    if (estimateError) {
+      setSaveError(estimateError);
       return;
     }
 
@@ -236,11 +233,13 @@ const GoalView = ({ goal }) => {
   const handleSaveEstimatedHours = async () => {
     if (!currentGoal) return;
 
-    const nextEstimatedHours = parseNumber(estimatedHoursEditValue);
-    if (Number.isNaN(nextEstimatedHours) || nextEstimatedHours < 0) {
-      setEstimatedHoursEditError("Estimated hours must be 0 or greater.");
+    const estimateError = getGoalEstimateHoursError(estimatedHoursEditValue);
+    if (estimateError) {
+      setEstimatedHoursEditError(estimateError);
       return;
     }
+
+    const nextEstimatedHours = parseGoalEstimateHours(estimatedHoursEditValue);
 
     setEstimatedHoursEditSaving(true);
     setEstimatedHoursEditError("");
@@ -408,7 +407,7 @@ const GoalView = ({ goal }) => {
                         inputProps={{ min: 0, step: "0.25" }}
                       />
                       {estimatedHoursEditError && (
-                        <Typography variant="caption" color="error">
+                        <Typography variant="caption" color="error" role="alert">
                           {estimatedHoursEditError}
                         </Typography>
                       )}
@@ -434,7 +433,11 @@ const GoalView = ({ goal }) => {
                   ) : (
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
                       <Typography>{formatHours(estimatedHours)}</Typography>
-                      <Button size="small" onClick={handleStartEstimatedHoursEdit}>
+                      <Button
+                        size="small"
+                        onClick={handleStartEstimatedHoursEdit}
+                        aria-label="Edit goal estimated hours"
+                      >
                         Edit
                       </Button>
                     </Stack>
@@ -551,7 +554,11 @@ const GoalView = ({ goal }) => {
                   <Typography variant="body2" color="text.secondary">
                     This deletes this goal. Existing child goals are detached by the current backend behavior.
                   </Typography>
-                  {deleteError && <Typography color="error">{deleteError}</Typography>}
+                  {deleteError && (
+                    <Typography color="error" role="alert">
+                      {deleteError}
+                    </Typography>
+                  )}
                   <Button
                     variant="contained"
                     color="error"
@@ -687,7 +694,11 @@ const GoalView = ({ goal }) => {
                   }
                   label="Mark complete"
                 />
-                {saveError && <Typography color="error">{saveError}</Typography>}
+                {saveError && (
+                  <Typography color="error" role="alert">
+                    {saveError}
+                  </Typography>
+                )}
                 <Divider />
                 <Stack direction="row" spacing={1}>
                   <Button variant="contained" onClick={handleSave} disabled={saving}>

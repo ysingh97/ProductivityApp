@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { isTokenExpired } from './authUtils';
 
 const AuthContext = createContext(null);
 
@@ -8,26 +9,6 @@ const markAuthExpired = () => {
   if (typeof sessionStorage !== 'undefined') {
     sessionStorage.setItem('authExpired', '1');
   }
-};
-
-const decodeJwtPayload = (token) => {
-  if (!token) return null;
-  const parts = token.split('.');
-  if (parts.length < 2) return null;
-  const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-  const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
-  try {
-    return JSON.parse(atob(padded));
-  } catch (err) {
-    return null;
-  }
-};
-
-const isTokenExpired = (token) => {
-  const payload = decodeJwtPayload(token);
-  if (!payload || typeof payload.exp !== 'number') return true;
-  const now = Math.floor(Date.now() / 1000);
-  return payload.exp <= now;
 };
 
 export const AuthProvider = ({ children }) => {
