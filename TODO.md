@@ -10,6 +10,7 @@
 ## Potential
 - Consider post-create actions that return task/goal creation flows to the originating list, goal, or tree view after saving.
 - When a goal is created, consider offering immediate next actions such as creating subgoals directly from that saved goal.
+- Move the goal-form helper text `No parent selected means this will be a top-level goal.` closer to the `Parent Goal` dropdown so the relationship is clearer while filling out the form.
 - Consider automatically including the goal tree view inside the goal detail view, with the currently selected goal highlighted so users can keep orientation while navigating related goals.
 - Allow inline editing of estimated time directly in the goal details view, so users can adjust the estimate without opening the full goal edit form.
 - Add CRUD operations to the goal tree view for tasks and goals, such as creating child goals/tasks from a node, editing key fields inline, moving items, and deleting items with confirmation.
