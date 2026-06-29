@@ -51,13 +51,22 @@ Playwright does not need the app started manually. `playwright.config.js` starts
   ```powershell
   npm run test:backend
   ```
+- Backend build verification:
+  ```powershell
+  npm run build:backend
+  ```
 - Backend Jest direct form:
   ```powershell
   npm --prefix app-server test
   ```
 - Frontend Jest once:
   ```powershell
-  npm test -- --watchAll=false
+  npm run test:frontend
+  ```
+  This script already forces `CI=true` for deterministic single-run behavior.
+- Frontend Jest direct form:
+  ```powershell
+  $env:CI='true'; npm test -- --watch=false
   ```
 - Frontend production build:
   ```powershell
@@ -103,19 +112,23 @@ Playwright does not need the app started manually. `playwright.config.js` starts
 
 Use this when you want the same broad confidence level used during the recent coverage work.
 
-1. Backend Jest
+1. Backend build verification
+   ```powershell
+   npm run build:backend
+   ```
+2. Backend Jest
    ```powershell
    npm run test:backend
    ```
-2. Frontend Jest
+3. Frontend Jest
    ```powershell
-   $env:CI='true'; npm test -- --watch=false
+   npm run test:frontend
    ```
-3. Frontend build
+4. Frontend build
    ```powershell
    npm run build
    ```
-4. Full Playwright suite
+5. Full Playwright suite
    ```powershell
    npx playwright test
    ```
@@ -123,10 +136,11 @@ Use this when you want the same broad confidence level used during the recent co
 ### Existing shortcuts and caveats
 
 - `npm run ci:local` currently runs:
+  - backend build verification
   - backend Jest
+  - frontend Jest
   - frontend build
 - `npm run ci:local` does not currently run:
-  - frontend Jest
   - Playwright
 - If Playwright fails because browser binaries are missing or outdated, rerun:
   ```powershell
