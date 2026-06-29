@@ -112,6 +112,13 @@ Playwright does not need the app started manually. `playwright.config.js` starts
 
 Use this when you want the same broad confidence level used during the recent coverage work.
 
+- One-command full gate:
+  ```powershell
+  npm run verify:all
+  ```
+
+Equivalent step-by-step sequence:
+
 1. Backend build verification
    ```powershell
    npm run build:backend
@@ -140,6 +147,9 @@ Use this when you want the same broad confidence level used during the recent co
   - backend Jest
   - frontend Jest
   - frontend build
+- `npm run verify:all` currently runs:
+  - everything in `npm run ci:local`
+  - full Playwright suite
 - `npm run ci:local` does not currently run:
   - Playwright
 - If Playwright fails because browser binaries are missing or outdated, rerun:

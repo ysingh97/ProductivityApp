@@ -30,6 +30,7 @@
     "test:backend": "npm --prefix app-server test",
     "test:frontend": "cross-env CI=true react-scripts test --watch=false",
     "ci:local": "npm run build:backend && npm run test:backend && npm run test:frontend && npm run build:frontend",
+    "verify:all": "npm run ci:local && npm run test:e2e",
     "smoke:deploy": "node scripts/smokeCheck.js",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

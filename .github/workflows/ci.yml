@@ -175,3 +175,44 @@ jobs:
             echo "- Frontend build passed with \`npm run build\`."
             echo "- Uploaded artifact: \`frontend-build\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app-server/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm --prefix app-server ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Write E2E summary
+        run: |
+          {
+            echo "## E2E Tests"
+            echo ""
+            echo "- Installed frontend dependencies with \`npm ci\`."
+            echo "- Installed backend dependencies with \`npm --prefix app-server ci\`."
+            echo "- Installed Playwright Chromium with \`npx playwright install --with-deps chromium\`."
+            echo "- Playwright E2E suite passed with \`npm run test:e2e\`."
+          } >> "$GITHUB_STEP_SUMMARY"

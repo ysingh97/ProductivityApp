@@ -50,8 +50,11 @@ test("keeps lists and tasks isolated across different test-auth personas", async
     await expect(basicPage.getByText(powerList.title, { exact: true })).toHaveCount(0);
 
     await basicPage.goto("/board");
-    await expect(basicPage.getByRole("link", { name: basicTask.title })).toBeVisible();
-    await expect(basicPage.getByRole("link", { name: powerTask.title })).toHaveCount(0);
+    const basicNextWeekSection = basicPage.locator(".MuiPaper-root").filter({
+      has: basicPage.getByRole("heading", { name: /next 7 days/i })
+    }).first();
+    await expect(basicNextWeekSection.getByRole("link", { name: basicTask.title })).toBeVisible();
+    await expect(basicNextWeekSection.getByRole("link", { name: powerTask.title })).toHaveCount(0);
 
     await seedTestAuth(powerPage, { persona: "power" });
     await powerPage.goto("/lists");
@@ -60,8 +63,11 @@ test("keeps lists and tasks isolated across different test-auth personas", async
     await expect(powerPage.getByText(basicList.title, { exact: true })).toHaveCount(0);
 
     await powerPage.goto("/board");
-    await expect(powerPage.getByRole("link", { name: powerTask.title })).toBeVisible();
-    await expect(powerPage.getByRole("link", { name: basicTask.title })).toHaveCount(0);
+    const powerNextWeekSection = powerPage.locator(".MuiPaper-root").filter({
+      has: powerPage.getByRole("heading", { name: /next 7 days/i })
+    }).first();
+    await expect(powerNextWeekSection.getByRole("link", { name: powerTask.title })).toBeVisible();
+    await expect(powerNextWeekSection.getByRole("link", { name: basicTask.title })).toHaveCount(0);
 
     await basicPage.goto("/lists");
     await expect(basicPage.getByText(basicList.title, { exact: true })).toBeVisible();
