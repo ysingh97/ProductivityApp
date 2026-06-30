@@ -965,26 +965,27 @@ const Visualizations = () => {
                           justifyContent: "center",
                           alignItems: "center",
                           minHeight: 320,
-                          minWidth: 0
+                          minWidth: 0,
+                          overflow: "hidden"
                         }}
                       >
-                      <PieChart
-                        height={320}
-                        margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                        series={[
-                          {
-                            data: pieData,
-                            innerRadius: 70,
-                            outerRadius: 110,
-                            paddingAngle: 2,
-                            cornerRadius: 4,
-                            highlightScope: { faded: "global", highlighted: "item" },
-                            faded: { innerRadius: 64, additionalRadius: -6, color: "gray" },
-                            valueFormatter: (value) => `${value.value} hours`
-                          }
-                        ]}
-                        slotProps={{ legend: { hidden: true } }}
-                      />
+                        <PieChart
+                          height={320}
+                          margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                          hideLegend
+                          series={[
+                            {
+                              data: pieData,
+                              innerRadius: 70,
+                              outerRadius: 110,
+                              paddingAngle: 2,
+                              cornerRadius: 4,
+                              highlightScope: { faded: "global", highlighted: "item" },
+                              faded: { innerRadius: 64, additionalRadius: -6, color: "gray" },
+                              valueFormatter: (value) => `${value.value} hours`
+                            }
+                          ]}
+                        />
                       </Box>
 
                       <Stack spacing={2}>
@@ -1254,6 +1255,7 @@ const Visualizations = () => {
                     <LineChart
                       height={320}
                       margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                      hideLegend
                       xAxis={[
                         {
                           scaleType: "point",
@@ -1267,12 +1269,12 @@ const Visualizations = () => {
                         }
                       ]}
                       grid={{ horizontal: true }}
-                      slotProps={{ legend: { hidden: true } }}
                     />
                   ) : (
                     <BarChart
                       height={320}
                       margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                      hideLegend
                       xAxis={[
                         {
                           scaleType: "band",
@@ -1286,7 +1288,6 @@ const Visualizations = () => {
                       ]}
                       series={stackedTrendSeries}
                       grid={{ horizontal: true }}
-                      slotProps={{ legend: { hidden: true } }}
                     />
                   )}
                 </Box>
