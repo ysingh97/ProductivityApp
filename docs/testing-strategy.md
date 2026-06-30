@@ -45,6 +45,25 @@ Use these for exploratory testing or the manual E2E pass.
 
 Playwright does not need the app started manually. `playwright.config.js` starts the frontend and backend automatically through its `webServer` entries.
 
+### Manage staging test data
+
+Use the GitHub Actions workflow `Manage Staging Data` when you need to inspect, seed, or clear a dedicated staging test account.
+
+- `list-users`
+  - No confirmation string required.
+- `seed-visualization-data`
+  - Requires an email input and confirmation string:
+  ```text
+  MANAGE_STAGING_DATA
+  ```
+- `clear-user-data`
+  - Requires an email input and confirmation string:
+  ```text
+  MANAGE_STAGING_DATA
+  ```
+
+See [.github/DEPLOYMENT.md](../.github/DEPLOYMENT.md) for the staging workflow details and caveats around Atlas access and Google Calendar cleanup.
+
 ### Run the automated suites
 
 - Backend Jest:

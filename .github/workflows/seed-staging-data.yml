@@ -60,14 +60,16 @@ jobs:
             exit 1
           fi
 
+          REQUIRED_CONFIRMATION="MANAGE_STAGING_DATA"
+
           if [ "${SEED_ACTION}" = "seed-visualization-data" ]; then
             if [ -z "${SEED_EMAIL}" ]; then
               echo "email input is required when seeding visualization data." >&2
               exit 1
             fi
 
-            if [ "${SEED_CONFIRMATION}" != "SEED_STAGING" ]; then
-              echo "Type SEED_STAGING in the confirmation input to mutate staging data." >&2
+            if [ "${SEED_CONFIRMATION}" != "${REQUIRED_CONFIRMATION}" ]; then
+              echo "Type ${REQUIRED_CONFIRMATION} in the confirmation input to mutate staging data." >&2
               exit 1
             fi
           fi
@@ -78,8 +80,8 @@ jobs:
               exit 1
             fi
 
-            if [ "${SEED_CONFIRMATION}" != "CLEAR_STAGING_USER_DATA" ]; then
-              echo "Type CLEAR_STAGING_USER_DATA in the confirmation input to clear staging user data." >&2
+            if [ "${SEED_CONFIRMATION}" != "${REQUIRED_CONFIRMATION}" ]; then
+              echo "Type ${REQUIRED_CONFIRMATION} in the confirmation input to clear staging user data." >&2
               exit 1
             fi
           fi
