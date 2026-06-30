@@ -1,4 +1,4 @@
-name: Seed Staging Data
+name: Manage Staging Data
 
 on:
   workflow_dispatch:
@@ -10,13 +10,14 @@ on:
         options:
           - list-users
           - seed-visualization-data
+          - clear-user-data
         default: list-users
       email:
-        description: Account email to seed. Required for seed-visualization-data.
+        description: Account email to target. Required for mutating actions.
         required: false
         type: string
       confirmation:
-        description: Type SEED_STAGING to confirm staging data mutation.
+        description: Confirmation string for mutating actions.
         required: false
         type: string
 
@@ -25,7 +26,7 @@ permissions:
 
 jobs:
   seed-staging-data:
-    name: Seed Staging Data
+    name: Manage Staging Data
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: staging
@@ -59,14 +60,28 @@ jobs:
             exit 1
           fi
 
+          REQUIRED_CONFIRMATION="MANAGE_STAGING_DATA"
+
           if [ "${SEED_ACTION}" = "seed-visualization-data" ]; then
             if [ -z "${SEED_EMAIL}" ]; then
               echo "email input is required when seeding visualization data." >&2
               exit 1
             fi
 
-            if [ "${SEED_CONFIRMATION}" != "SEED_STAGING" ]; then
-              echo "Type SEED_STAGING in the confirmation input to mutate staging data." >&2
+            if [ "${SEED_CONFIRMATION}" != "${REQUIRED_CONFIRMATION}" ]; then
+              echo "Type ${REQUIRED_CONFIRMATION} in the confirmation input to mutate staging data." >&2
+              exit 1
+            fi
+          fi
+
+          if [ "${SEED_ACTION}" = "clear-user-data" ]; then
+            if [ -z "${SEED_EMAIL}" ]; then
+              echo "email input is required when clearing staging user data." >&2
+              exit 1
+            fi
+
+            if [ "${SEED_CONFIRMATION}" != "${REQUIRED_CONFIRMATION}" ]; then
+              echo "Type ${REQUIRED_CONFIRMATION} in the confirmation input to clear staging user data." >&2
               exit 1
             fi
           fi
@@ -78,3 +93,7 @@ jobs:
       - name: Seed staging visualization history
         if: ${{ inputs.action == 'seed-visualization-data' }}
         run: npm run seed:viz-history -- --email "${SEED_EMAIL}"
+
+      - name: Clear staging user data
+        if: ${{ inputs.action == 'clear-user-data' }}
+        run: npm run reset:user-data -- --email "${SEED_EMAIL}"

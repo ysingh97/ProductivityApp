@@ -135,9 +135,12 @@ Supported environment variables:
 
 Do not seed production. Staging can use controlled seed scripts or a dedicated test account after the staging database is isolated from production.
 
-Use the `Seed Staging Data` GitHub Actions workflow to manage staging visualization data:
+Use the `Manage Staging Data` GitHub Actions workflow to manage staging test data:
 
 - Choose `list-users` to inspect available staging accounts.
 - Choose `seed-visualization-data` and provide an account email to seed historical visualization data.
-- Type `SEED_STAGING` in the confirmation input before mutating staging data.
+- Choose `clear-user-data` and provide an account email to wipe that user's app data before a fresh manual pass.
+- Type `MANAGE_STAGING_DATA` in the confirmation input before running any mutating staging-data action.
 - Configure `STAGING_MONGO_URI` as a secret on the `staging` GitHub environment.
+- `clear-user-data` preserves the `User` record but removes that user's categories, goals, lists, tasks, time entries, Google Calendar connection state, and sync metadata.
+- `clear-user-data` does not remove any events that were already written to Google Calendar. Clean up those external events separately if needed.

@@ -20,8 +20,9 @@
 - Adjust dark-mode UI contrast, including borders and dividers that are currently too subtle or invisible.
 - Hide nonessential console logging behind a debug-mode flag so production and CI/CD logs stay clean and do not expose sensitive data.
 - Optimize CI so backend tests and frontend builds only run when relevant backend, frontend, dependency, or workflow files change.
+- Consider creating a separate MongoDB Atlas project and staging-only deployment so staging can have its own IP access policy and data-management workflows without affecting production.
 - Add recurring task support, including recurrence rules, generated task instances, and clear UX for editing one occurrence vs the full series.
-- Fix the `Not Found` error when refreshing any page, likely by checking frontend routing fallback behavior and backend/static host configuration for client-side routes.
+- Fix the `Not Found` error when refreshing any page, and document the exact SPA rewrite/fallback requirements for deployed environments like Render (for example `/* -> /index.html`) so browser refreshes and deep links work consistently outside local development.
 - Allow users to view completed tasks and completed goals, with clear filters or dedicated views so completed work remains accessible without crowding active items.
 - Add proper account deletion handling, including confirmation UX and cleanup of all user-owned data and third-party integration records.
 - Revisit time-entry overlap handling. Consider three policy options: `1.` exact-match-only idempotency, where only identical start/end ranges count as duplicates; `2.` reject any overlapping entry for the same task, which prevents double counting but may block legitimate logs; `3.` detect overlap and require user/client resolution, which is the best UX but adds more implementation complexity.

@@ -9,6 +9,7 @@ For routine regression work, prioritize the scenarios marked `Partially automate
 - Preferred environment: local or staging with a clean test account.
 - Command reference: see [testing-strategy.md](./testing-strategy.md), especially the `Test commands` section.
 - For automation later, prefer seeded test personas over real Google UI.
+- For staging cleanup, use the `Manage Staging Data` GitHub Actions workflow with the `clear-user-data` action against a dedicated test account before starting a fresh pass.
 - If you want the full dashboard and analytics checks, seed at least:
   - one top-level goal
   - one sub-goal
