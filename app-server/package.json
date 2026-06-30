@@ -9,6 +9,7 @@
     "dev": "cross-env NODE_ENV=development nodemon server.js",
     "start": "node server.js",
     "seed:viz-history": "cross-env NODE_ENV=development node scripts/seedHistoricalVisualizationData.js",
+    "reset:user-data": "cross-env NODE_ENV=development node scripts/resetUserData.js",
     "worker:google-calendar": "cross-env NODE_ENV=development node workers/googleCalendarSyncWorker.js",
     "worker:start": "node workers/googleCalendarSyncWorker.js"
   },

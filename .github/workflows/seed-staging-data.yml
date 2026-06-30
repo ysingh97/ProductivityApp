@@ -1,4 +1,4 @@
-name: Seed Staging Data
+name: Manage Staging Data
 
 on:
   workflow_dispatch:
@@ -10,13 +10,14 @@ on:
         options:
           - list-users
           - seed-visualization-data
+          - clear-user-data
         default: list-users
       email:
-        description: Account email to seed. Required for seed-visualization-data.
+        description: Account email to target. Required for mutating actions.
         required: false
         type: string
       confirmation:
-        description: Type SEED_STAGING to confirm staging data mutation.
+        description: Confirmation string for mutating actions.
         required: false
         type: string
 
@@ -25,7 +26,7 @@ permissions:
 
 jobs:
   seed-staging-data:
-    name: Seed Staging Data
+    name: Manage Staging Data
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: staging
@@ -71,6 +72,18 @@ jobs:
             fi
           fi
 
+          if [ "${SEED_ACTION}" = "clear-user-data" ]; then
+            if [ -z "${SEED_EMAIL}" ]; then
+              echo "email input is required when clearing staging user data." >&2
+              exit 1
+            fi
+
+            if [ "${SEED_CONFIRMATION}" != "CLEAR_STAGING_USER_DATA" ]; then
+              echo "Type CLEAR_STAGING_USER_DATA in the confirmation input to clear staging user data." >&2
+              exit 1
+            fi
+          fi
+
       - name: List staging users
         if: ${{ inputs.action == 'list-users' }}
         run: npm run seed:viz-history -- --list-users
@@ -78,3 +91,7 @@ jobs:
       - name: Seed staging visualization history
         if: ${{ inputs.action == 'seed-visualization-data' }}
         run: npm run seed:viz-history -- --email "${SEED_EMAIL}"
+
+      - name: Clear staging user data
+        if: ${{ inputs.action == 'clear-user-data' }}
+        run: npm run reset:user-data -- --email "${SEED_EMAIL}"
