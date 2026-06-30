@@ -13,21 +13,34 @@ import {
   fetchTimeSeries
 } from "../features/analytics/analyticsService";
 
+const mockPieChart = jest.fn(() => <div data-testid="pie-chart">Pie chart</div>);
+const mockLineChart = jest.fn(() => <div data-testid="line-chart">Line chart</div>);
+const mockBarChart = jest.fn(() => <div data-testid="bar-chart">Bar chart</div>);
+
 jest.mock("../features/analytics/analyticsService", () => ({
   fetchTimeByCategory: jest.fn(),
   fetchTimeSeries: jest.fn()
 }));
 
 jest.mock("@mui/x-charts/PieChart", () => ({
-  PieChart: () => <div data-testid="pie-chart">Pie chart</div>
+  PieChart: (props) => {
+    mockPieChart(props);
+    return <div data-testid="pie-chart">Pie chart</div>;
+  }
 }));
 
 jest.mock("@mui/x-charts/LineChart", () => ({
-  LineChart: () => <div data-testid="line-chart">Line chart</div>
+  LineChart: (props) => {
+    mockLineChart(props);
+    return <div data-testid="line-chart">Line chart</div>;
+  }
 }));
 
 jest.mock("@mui/x-charts/BarChart", () => ({
-  BarChart: () => <div data-testid="bar-chart">Bar chart</div>
+  BarChart: (props) => {
+    mockBarChart(props);
+    return <div data-testid="bar-chart">Bar chart</div>;
+  }
 }));
 
 const summaryResponse = {
@@ -245,5 +258,23 @@ describe("Visualizations", () => {
     expect(
       await screen.findAllByText(/no time entry data is available for this range\./i)
     ).toHaveLength(2);
+  });
+
+  test("hides built-in chart legends so the custom summaries own the layout", async () => {
+    await flushUpdates(() => {
+      render(<Visualizations />);
+    });
+
+    expect(await screen.findByTestId("pie-chart")).toBeInTheDocument();
+
+    expect(mockPieChart.mock.calls.some(([props]) => props.hideLegend === true)).toBe(true);
+    expect(mockLineChart.mock.calls.some(([props]) => props.hideLegend === true)).toBe(true);
+
+    await flushUpdates(() => {
+      fireEvent.click(screen.getByRole("button", { name: /^stacked$/i }));
+    });
+
+    expect(await screen.findByTestId("bar-chart")).toBeInTheDocument();
+    expect(mockBarChart.mock.calls.some(([props]) => props.hideLegend === true)).toBe(true);
   });
 });
