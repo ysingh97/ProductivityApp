@@ -26,6 +26,7 @@ import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined";
 import Brightness4OutlinedIcon from "@mui/icons-material/Brightness4Outlined";
 import Brightness7OutlinedIcon from "@mui/icons-material/Brightness7Outlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import { SITE_NAME } from "../config/branding";
 import { useAuth } from "../context/AuthContext";
 
 const drawerWidth = 280;
@@ -137,7 +138,7 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
               color: "inherit"
             }}
           >
-            Productivity Hub
+            {SITE_NAME}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
 

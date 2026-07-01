@@ -1,4 +1,4 @@
-# Productivity App
+# Branchwork
 
 ## Auth & API setup
 - Frontend env: set `REACT_APP_API_URL` (e.g. `http://localhost:5000/api`) and `REACT_APP_GOOGLE_CLIENT_ID` in `.env.development`/`.env.production`.
@@ -6,7 +6,7 @@
 - Start backend: `cd app-server && npm run dev` (development). Start frontend: `npm start`.
 - Sign-in: browse to `/` and sign in with Google; all tasks/lists/goals are scoped to the signed-in user.
 - Quick test: create a task/list/goal, sign out, sign in with another Google account and confirm data isolation.
-- Calendar (upcoming): Google Calendar sync will plug in after auth; placeholder CTA is shown on the sign-in screen.
+- Calendar: Google Calendar sync can be connected after sign-in from the in-app settings menu.
 
 # Getting Started with Create React App
 

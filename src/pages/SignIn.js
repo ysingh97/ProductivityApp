@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
-  Button,
   CircularProgress,
   Container,
   Paper,
@@ -10,6 +9,10 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/client";
+import {
+  GOOGLE_CALENDAR_SIGNIN_COPY,
+  SITE_NAME
+} from "../config/branding";
 import { useAuth } from "../context/AuthContext";
 
 const SignIn = () => {
@@ -147,7 +150,7 @@ const SignIn = () => {
                 Welcome back
               </Typography>
               <Typography variant="h4" fontWeight={700} gutterBottom>
-                Productivity Hub
+                {SITE_NAME}
               </Typography>
               <Typography variant="body1" color="text.secondary">
                 Sign in with Google to keep your tasks, lists, and goals synced to your
@@ -181,15 +184,9 @@ const SignIn = () => {
                   {error}
                 </Typography>
               )}
-
-              <Button
-                variant="text"
-                color="secondary"
-                onClick={() => window.open("https://calendar.google.com", "_blank")}
-                sx={{ alignSelf: "flex-start" }}
-              >
-                Coming soon: sync tasks to Google Calendar
-              </Button>
+              <Typography variant="body2" color="text.secondary">
+                {GOOGLE_CALENDAR_SIGNIN_COPY}
+              </Typography>
             </Box>
           </Stack>
         </Paper>

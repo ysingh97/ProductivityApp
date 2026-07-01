@@ -6,6 +6,8 @@
 - Completed: When a new goal is created, add a clear UI affordance that lets the user immediately open that goal. Added a saved-goal confirmation alert with an `Open` action.
 - Completed: When a goal is created, show a clear success indication. Added save confirmation for goal create/update flows; additional next actions remain tracked below.
 - Completed: Fix the goal creation flow so the `Parent Goal` dropdown reflects newly created goals immediately instead of only after a refresh. Saved goals are now merged into the local parent-goal options.
+- Completed: Rename the website/app branding to `Branchwork` across browser metadata, installed-app metadata, and public-facing copy.
+- Completed: Remove the outdated sign-in text saying Google Calendar sync is coming soon. Replaced it with current guidance about connecting sync after sign-in from settings.
 
 ## Potential
 - Consider post-create actions that return task/goal creation flows to the originating list, goal, or tree view after saving.
@@ -17,8 +19,6 @@
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.
 - Add a Google Calendar sync status indicator in the site header so users can see whether calendar sync is connected, pending, or failing.
 - Add search functionality for goals and tasks so users can quickly find items by title and related metadata.
-- Rename the website/app to a more polished product name and propagate that name consistently across the UI, deploy config, and public-facing copy.
-- Remove the sign-in-page text that says Google Calendar sync is coming soon, since the integration now exists and the placeholder copy is outdated.
 - Add a user-facing bug report flow so users can easily submit issues, reproduction details, and optional screenshots or environment context.
 - Adjust dark-mode UI contrast, including borders and dividers that are currently too subtle or invisible.
 - Hide nonessential console logging behind a debug-mode flag so production and CI/CD logs stay clean and do not expose sensitive data.
