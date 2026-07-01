@@ -23,6 +23,7 @@
 - Adjust dark-mode UI contrast, including borders and dividers that are currently too subtle or invisible.
 - Hide nonessential console logging behind a debug-mode flag so production and CI/CD logs stay clean and do not expose sensitive data.
 - Optimize CI so backend tests and frontend builds only run when relevant backend, frontend, dependency, or workflow files change.
+- Consider skipping CI gates entirely when a change only touches non-runtime docs or notes (for example `TODO.md`) and does not affect application code, dependencies, tests, or workflows.
 - Consider creating a separate MongoDB Atlas project and staging-only deployment so staging can have its own IP access policy and data-management workflows without affecting production.
 - Add recurring task support, including recurrence rules, generated task instances, and clear UX for editing one occurrence vs the full series.
 - Fix the `Not Found` error when refreshing any page, and document the exact SPA rewrite/fallback requirements for deployed environments like Render (for example `/* -> /index.html`) so browser refreshes and deep links work consistently outside local development.
