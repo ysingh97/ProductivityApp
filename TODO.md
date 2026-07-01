@@ -17,6 +17,9 @@
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.
 - Add a Google Calendar sync status indicator in the site header so users can see whether calendar sync is connected, pending, or failing.
 - Add search functionality for goals and tasks so users can quickly find items by title and related metadata.
+- Rename the website/app to a more polished product name and propagate that name consistently across the UI, deploy config, and public-facing copy.
+- Remove the sign-in-page text that says Google Calendar sync is coming soon, since the integration now exists and the placeholder copy is outdated.
+- Add a user-facing bug report flow so users can easily submit issues, reproduction details, and optional screenshots or environment context.
 - Adjust dark-mode UI contrast, including borders and dividers that are currently too subtle or invisible.
 - Hide nonessential console logging behind a debug-mode flag so production and CI/CD logs stay clean and do not expose sensitive data.
 - Optimize CI so backend tests and frontend builds only run when relevant backend, frontend, dependency, or workflow files change.
