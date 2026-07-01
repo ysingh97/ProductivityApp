@@ -220,6 +220,21 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
   const parentDeadline = selectedParentGoal?.targetCompletionDate
     ? dayjs(selectedParentGoal.targetCompletionDate)
     : null;
+  const parentGoalHelperText = isParentGoalFixed
+    ? "Locked because you opened this from a parent goal."
+    : selectedParentGoal
+      ? parentDeadline
+        ? `Sub-goals inherit category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+        : "Sub-goals automatically inherit their parent category."
+      : "Optional. No parent selected means this will be a top-level goal.";
+  const parentGoalStatusText = loading
+    ? (
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+          <CircularProgress size={12} />
+          Loading goal options
+        </Box>
+      )
+    : null;
 
   return (
     <Paper
@@ -336,11 +351,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
                     {...params}
                     label="Parent goal"
                     size="small"
-                    helperText={
-                      isParentGoalFixed
-                        ? "Locked because you opened this from a parent goal."
-                        : "Optional. Leave empty to create a top-level goal."
-                    }
+                    helperText={parentGoalHelperText}
                   />
                 )}
               />
@@ -366,20 +377,11 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
                 pt: 0.5
               }}
             >
-              <Typography variant="caption" color="text.secondary">
-                {loading ? (
-                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={12} />
-                    Loading goal options
-                  </Box>
-                ) : selectedParentGoal ? (
-                  parentDeadline
-                    ? `Sub-goals inherit category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
-                    : "Sub-goals automatically inherit their parent category."
-                ) : (
-                  "No parent selected means this will be a top-level goal."
-                )}
-              </Typography>
+              {parentGoalStatusText && (
+                <Typography variant="caption" color="text.secondary">
+                  {parentGoalStatusText}
+                </Typography>
+              )}
               <Button type="submit" variant="contained" size="large" disabled={loading || submitting}>
                 {submitting ? "Saving..." : isEditing ? "Update goal" : "Create goal"}
               </Button>
