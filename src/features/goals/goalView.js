@@ -23,11 +23,13 @@ import {
 import DateTimePicker from "../../components/DateTimePicker";
 import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
 import { fetchCategories } from "../categories/categoryService";
+import { fetchTasks } from "../tasks/taskService";
 import {
   getGoalEstimateHoursError,
   getGoalTargetCompletionDateError,
   parseGoalEstimateHours
 } from "./goalValidation";
+import GoalTreeContextPanel from "./GoalTreeContextPanel";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -63,6 +65,7 @@ const GoalView = ({ goal }) => {
   const navigate = useNavigate();
   const [currentGoal, setCurrentGoal] = useState(goal);
   const [parentGoals, setParentGoals] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
@@ -98,13 +101,15 @@ const GoalView = ({ goal }) => {
     const loadMeta = async () => {
       setLoadingMeta(true);
       try {
-        const [goalData, categoryData] = await Promise.all([
+        const [goalData, categoryData, taskData] = await Promise.all([
           fetchGoals(),
-          fetchCategories()
+          fetchCategories(),
+          fetchTasks()
         ]);
         if (isActive) {
           setParentGoals(goalData);
           setCategories(categoryData);
+          setTasks(taskData);
         }
       } catch (err) {
         console.error(err);
@@ -505,6 +510,19 @@ const GoalView = ({ goal }) => {
         </Stack>
 
         <Stack spacing={3}>
+          {loadingMeta ? (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+              <Stack spacing={1.5} sx={{ alignItems: "center" }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading goal context
+                </Typography>
+              </Stack>
+            </Paper>
+          ) : (
+            <GoalTreeContextPanel currentGoal={currentGoal} goals={parentGoals} tasks={tasks} />
+          )}
+
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
             <Typography variant="subtitle1" fontWeight={700}>
               Actions

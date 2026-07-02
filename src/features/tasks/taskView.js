@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import DateTimePicker from "../../components/DateTimePicker";
 import TaskCompletionBar from "./taskCompletionBar";
+import GoalTreeContextPanel from "../goals/GoalTreeContextPanel";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
 import { fetchCategories } from "../categories/categoryService";
@@ -28,6 +29,7 @@ import {
   createTaskTimeEntry,
   deleteTask,
   deleteTaskTimeEntry,
+  fetchTasks,
   fetchTaskTimeEntries,
   updateTaskTimeEntry,
   updateTask
@@ -115,6 +117,7 @@ const TaskView = ({ task }) => {
   const navigate = useNavigate();
   const [currentTask, setCurrentTask] = useState(task);
   const [parentGoals, setParentGoals] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [lists, setLists] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -213,13 +216,15 @@ const TaskView = ({ task }) => {
     const loadMeta = async () => {
       setLoadingMeta(true);
       try {
-        const [goalData, listData, categoryData] = await Promise.all([
+        const [goalData, taskData, listData, categoryData] = await Promise.all([
           fetchGoals(),
+          fetchTasks(),
           fetchLists(),
           fetchCategories()
         ]);
         if (isActive) {
           setParentGoals(goalData);
+          setTasks(taskData);
           setLists(listData);
           setCategories(categoryData);
         }
@@ -918,6 +923,19 @@ const TaskView = ({ task }) => {
         </Stack>
 
         <Stack spacing={3}>
+          {loadingMeta ? (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+              <Stack spacing={1.5} sx={{ alignItems: "center" }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading goal context
+                </Typography>
+              </Stack>
+            </Paper>
+          ) : (
+            <GoalTreeContextPanel currentTask={currentTask} goals={parentGoals} tasks={tasks} />
+          )}
+
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
             <Typography variant="subtitle1" fontWeight={700}>
               Actions

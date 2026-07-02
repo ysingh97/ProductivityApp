@@ -9,11 +9,12 @@
 - Completed: Rename the website/app branding to `Branchwork` across browser metadata, installed-app metadata, and public-facing copy.
 - Completed: Remove the outdated sign-in text saying Google Calendar sync is coming soon. Replaced it with current guidance about connecting sync after sign-in from settings.
 - Completed: Move the goal-form helper text about top-level goals closer to the `Parent Goal` dropdown so the relationship is clearer while filling out the form.
+- Completed: Include goal tree context inside the goal detail view, with the current goal highlighted so users can keep orientation while navigating related goals.
+- Completed: Include goal tree context inside the task detail view, with the current task highlighted so task pages keep the same goal-tree orientation as goal pages.
 
 ## Potential
 - Consider post-create actions that return task/goal creation flows to the originating list, goal, or tree view after saving.
 - When a goal is created, consider offering immediate next actions such as creating subgoals directly from that saved goal.
-- Consider automatically including the goal tree view inside the goal detail view, with the currently selected goal highlighted so users can keep orientation while navigating related goals.
 - Allow inline editing of estimated time directly in the goal details view, so users can adjust the estimate without opening the full goal edit form.
 - Add CRUD operations to the goal tree view for tasks and goals, such as creating child goals/tasks from a node, editing key fields inline, moving items, and deleting items with confirmation.
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.

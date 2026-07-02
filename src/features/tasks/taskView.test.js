@@ -10,6 +10,7 @@ import {
   createTaskTimeEntry,
   deleteTask,
   deleteTaskTimeEntry,
+  fetchTasks,
   fetchTaskTimeEntries,
   updateTask,
   updateTaskTimeEntry
@@ -31,6 +32,7 @@ jest.mock("./taskService", () => ({
   createTaskTimeEntry: jest.fn(),
   deleteTask: jest.fn(),
   deleteTaskTimeEntry: jest.fn(),
+  fetchTasks: jest.fn(),
   fetchTaskTimeEntries: jest.fn(),
   updateTask: jest.fn(),
   updateTaskTimeEntry: jest.fn()
@@ -81,6 +83,19 @@ const buildTimeEntry = (overrides = {}) => ({
   ...overrides
 });
 
+const buildGoal = (overrides = {}) => ({
+  _id: "goal-1",
+  title: "Launch Program",
+  category: { title: "Planning" },
+  estimatedHours: 8,
+  timeSpent: 1,
+  timeLeft: 7,
+  isComplete: false,
+  targetCompletionDate: "2026-12-12T10:00:00.000Z",
+  parentGoalId: null,
+  ...overrides
+});
+
 const setDateTimeValue = (label, value) => {
   fireEvent.change(screen.getByLabelText(label), {
     target: { value }
@@ -92,6 +107,7 @@ describe("TaskView", () => {
     jest.clearAllMocks();
 
     fetchGoals.mockResolvedValue([]);
+    fetchTasks.mockResolvedValue([]);
     fetchLists.mockResolvedValue([]);
     fetchCategories.mockResolvedValue([]);
     fetchTaskTimeEntries.mockResolvedValue([]);
@@ -244,5 +260,54 @@ describe("TaskView", () => {
     );
 
     expect(await screen.findByText("No deadline")).toBeInTheDocument();
+  });
+
+  test("shows goal tree context for a task linked to a goal tree", async () => {
+    const rootGoal = buildGoal({
+      _id: "goal-root",
+      title: "Reach N2 Japanese Fluency"
+    });
+    const childGoal = buildGoal({
+      _id: "goal-child",
+      title: "Finish Genki Textbook",
+      parentGoalId: "goal-root"
+    });
+    const siblingTask = buildTask({
+      _id: "task-sibling",
+      title: "Review kanji deck",
+      parentGoalId: "goal-child"
+    });
+    const currentTask = buildTask({
+      _id: "task-current",
+      title: "Take mock listening test",
+      parentGoalId: "goal-child"
+    });
+
+    fetchGoals.mockResolvedValue([rootGoal, childGoal]);
+    fetchTasks.mockResolvedValue([siblingTask, currentTask]);
+
+    renderTaskView(currentTask);
+
+    const panel = await screen.findByRole("region", { name: /goal tree context/i });
+
+    expect(
+      await screen.findByText(/viewing the tree rooted at reach n2 japanese fluency\. the current task is highlighted\./i)
+    ).toBeInTheDocument();
+    expect(panel).toHaveTextContent("Goal");
+    expect(panel).toHaveTextContent("Task");
+    expect(panel).toHaveTextContent("Current");
+    expect(panel).toHaveTextContent("Review kanji deck");
+    expect(panel).toHaveTextContent("Take mock listening test");
+  });
+
+  test("shows a not-linked message when the task has no parent goal", async () => {
+    renderTaskView(buildTask({ parentGoalId: null }));
+
+    expect(
+      await screen.findByText(/this task is not linked to a goal tree yet\./i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/link this task to a parent goal if you want it to appear inside a goal tree\./i)
+    ).toBeInTheDocument();
   });
 });

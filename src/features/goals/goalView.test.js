@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import GoalView from "./goalView";
 import { fetchCategories } from "../categories/categoryService";
 import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
+import { fetchTasks } from "../tasks/taskService";
 
 jest.mock("../categories/categoryService", () => ({
   fetchCategories: jest.fn()
@@ -13,6 +14,10 @@ jest.mock("./goalService", () => ({
   deleteGoal: jest.fn(),
   fetchGoals: jest.fn(),
   updateGoal: jest.fn()
+}));
+
+jest.mock("../tasks/taskService", () => ({
+  fetchTasks: jest.fn()
 }));
 
 jest.mock("../../components/DateTimePicker", () => {
@@ -57,6 +62,17 @@ const buildGoal = (overrides = {}) => ({
   ...overrides
 });
 
+const buildTask = (overrides = {}) => ({
+  _id: "task-1",
+  title: "Practice reading drills",
+  estimatedCompletionTime: 2,
+  timeSpent: 0.5,
+  isComplete: false,
+  targetCompletionDate: "2026-12-08T10:00:00.000Z",
+  parentGoalId: "goal-child",
+  ...overrides
+});
+
 const waitForEditFormReady = async () => {
   await waitFor(() => expect(fetchGoals).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(fetchCategories).toHaveBeenCalledTimes(1));
@@ -79,6 +95,7 @@ describe("GoalView", () => {
       { _id: "cat-1", title: "Strategy" },
       { _id: "cat-2", title: "Delivery" }
     ]);
+    fetchTasks.mockResolvedValue([]);
     updateGoal.mockResolvedValue({});
     deleteGoal.mockResolvedValue({});
   });
@@ -131,7 +148,9 @@ describe("GoalView", () => {
       })
     );
 
-    expect(await screen.findByText("Launch the public roadmap")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Launch the public roadmap" })
+    ).toBeInTheDocument();
     expect(screen.getByText(/delivery - dec 12, 2026/i)).toBeInTheDocument();
   });
 
@@ -198,5 +217,65 @@ describe("GoalView", () => {
       await screen.findByText(/sub-goals cannot have a target completion date later than the parent goal\./i)
     ).toBeInTheDocument();
     expect(updateGoal).not.toHaveBeenCalled();
+  });
+
+  test("shows goal tree context with the current goal highlighted", async () => {
+    const rootGoal = buildGoal({
+      _id: "goal-root",
+      title: "Launch Program",
+      category: { title: "Work" },
+      parentGoalId: null
+    });
+    const siblingGoal = buildGoal({
+      _id: "goal-sibling",
+      title: "Messaging",
+      category: { title: "Work" },
+      parentGoalId: "goal-root"
+    });
+    const currentGoal = buildGoal({
+      _id: "goal-child",
+      title: "QA Pass",
+      category: { title: "Work" },
+      parentGoalId: "goal-root"
+    });
+    const childGoal = buildGoal({
+      _id: "goal-grandchild",
+      title: "Regression sweep",
+      category: { title: "Work" },
+      parentGoalId: "goal-child"
+    });
+    const currentGoalTask = buildTask({
+      _id: "task-child",
+      title: "Take mock listening test",
+      parentGoalId: "goal-child"
+    });
+
+    fetchGoals.mockResolvedValue([rootGoal, siblingGoal, currentGoal, childGoal]);
+    fetchTasks.mockResolvedValue([currentGoalTask]);
+
+    renderGoalView(currentGoal);
+
+    const panel = await screen.findByRole("region", { name: /goal tree context/i });
+
+    expect(within(panel).getByText(/viewing the tree rooted at launch program\./i)).toBeInTheDocument();
+    expect(within(panel).getByText("Current")).toBeInTheDocument();
+    expect(within(panel).getByText("Top-level")).toBeInTheDocument();
+    expect(within(panel).getByText("Messaging")).toBeInTheDocument();
+    expect(within(panel).getByText("Regression sweep")).toBeInTheDocument();
+    expect(within(panel).getByText("Take mock listening test")).toBeInTheDocument();
+    expect(within(panel).getByText("Task")).toBeInTheDocument();
+    expect(within(panel).getAllByText("Goal").length).toBeGreaterThan(0);
+    expect(within(panel).getByRole("link", { name: /launch program/i })).toHaveAttribute(
+      "href",
+      "/goals/goal-root"
+    );
+    expect(within(panel).getByRole("link", { name: /qa pass/i })).toHaveAttribute(
+      "href",
+      "/goals/goal-child"
+    );
+    expect(within(panel).getByRole("link", { name: /take mock listening test/i })).toHaveAttribute(
+      "href",
+      "/tasks/task-child"
+    );
   });
 });
