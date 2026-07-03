@@ -11,11 +11,11 @@
 - Completed: Move the goal-form helper text about top-level goals closer to the `Parent Goal` dropdown so the relationship is clearer while filling out the form.
 - Completed: Include goal tree context inside the goal detail view, with the current goal highlighted so users can keep orientation while navigating related goals.
 - Completed: Include goal tree context inside the task detail view, with the current task highlighted so task pages keep the same goal-tree orientation as goal pages.
+- Completed: Make the goal detail page editable in place, so the main detail view now handles title, description, estimate, category, parent, date, and status updates without a separate sidebar editor.
 
 ## Potential
 - Consider post-create actions that return task/goal creation flows to the originating list, goal, or tree view after saving.
 - When a goal is created, consider offering immediate next actions such as creating subgoals directly from that saved goal.
-- Allow inline editing of estimated time directly in the goal details view, so users can adjust the estimate without opening the full goal edit form.
 - Add CRUD operations to the goal tree view for tasks and goals, such as creating child goals/tasks from a node, editing key fields inline, moving items, and deleting items with confirmation.
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.
 - Add a Google Calendar sync status indicator in the site header so users can see whether calendar sync is connected, pending, or failing.

@@ -88,6 +88,30 @@ describe("GoalForm", () => {
     );
   });
 
+  test("blocks creating a goal with a past target date", async () => {
+    const onSubmit = jest.fn().mockResolvedValue({});
+
+    renderGoalForm(<GoalForm onSubmit={onSubmit} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /create goal/i })).not.toBeDisabled()
+    );
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Past-dated goal" }
+    });
+    fireEvent.change(screen.getByLabelText(/target completion date/i), {
+      target: { value: "2000-01-01T10:00:00.000Z" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /create goal/i }));
+
+    expect(
+      await screen.findByText(/target completion date cannot be earlier than the current time\./i)
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   test("inherits the parent goal category and omits category from the submitted payload", async () => {
     const onSubmit = jest.fn().mockResolvedValue({});
     const parentGoal = {
@@ -171,5 +195,38 @@ describe("GoalForm", () => {
       await screen.findByText(/sub-goals cannot have a target completion date later than the parent goal/i)
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  test("allows editing an overdue goal without changing its existing past target date", async () => {
+    const onSubmit = jest.fn().mockResolvedValue({});
+    const goal = {
+      _id: "goal-1",
+      title: "Existing overdue goal",
+      description: "Original description",
+      category: { title: "Growth" },
+      estimatedHours: 5,
+      targetCompletionDate: "2000-01-01T10:00:00.000Z",
+      parentGoalId: null
+    };
+
+    renderGoalForm(<GoalForm goal={goal} isEditing onSubmit={onSubmit} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update goal/i })).not.toBeDisabled()
+    );
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Existing overdue goal updated" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /update goal/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Existing overdue goal updated",
+        targetCompletionDate: expect.any(Date)
+      })
+    );
   });
 });

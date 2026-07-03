@@ -217,12 +217,20 @@ const GoalTreeContextPanel = ({ currentGoal, currentTask, goals = [], tasks = []
     );
   };
 
-  const renderGoalNode = (nodeId) => {
-    const goal = goalsById.get(String(nodeId));
+  const renderGoalNode = (nodeId, visitedGoalIds = new Set()) => {
+    const goalId = String(nodeId);
+    if (visitedGoalIds.has(goalId)) {
+      return null;
+    }
+
+    const goal = goalsById.get(goalId);
     if (!goal) return null;
 
-    const children = goalsByParent.get(String(nodeId)) || [];
-    const goalTasks = tasksByGoal.get(String(nodeId)) || [];
+    const nextVisitedGoalIds = new Set(visitedGoalIds);
+    nextVisitedGoalIds.add(goalId);
+
+    const children = goalsByParent.get(goalId) || [];
+    const goalTasks = tasksByGoal.get(goalId) || [];
     const isSelectedGoal = String(goal._id) === selectedGoalId;
     const isRootGoal = !goal.parentGoalId;
 
@@ -287,7 +295,7 @@ const GoalTreeContextPanel = ({ currentGoal, currentTask, goals = [], tasks = []
         {(children.length > 0 || goalTasks.length > 0) && (
           <Box sx={{ ml: 1.5, pl: 1.75, borderLeft: "1px solid", borderColor: "divider" }}>
             <Stack spacing={1.1}>
-              {children.map((child) => renderGoalNode(child._id))}
+              {children.map((child) => renderGoalNode(child._id, nextVisitedGoalIds))}
               {goalTasks.map((task) => renderTaskNode(task))}
             </Stack>
           </Box>

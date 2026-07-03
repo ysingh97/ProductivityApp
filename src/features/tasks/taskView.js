@@ -10,7 +10,7 @@ import {
   Divider,
   FormControl,
   FormControlLabel,
-  InputLabel,
+  IconButton,
   MenuItem,
   Paper,
   Select,
@@ -19,6 +19,8 @@ import {
   TextField,
   Typography
 } from "@mui/material";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DateTimePicker from "../../components/DateTimePicker";
 import TaskCompletionBar from "./taskCompletionBar";
 import GoalTreeContextPanel from "../goals/GoalTreeContextPanel";
@@ -36,10 +38,10 @@ import {
 } from "./taskService";
 import {
   getTaskEstimateHoursError,
+  getTaskTargetCompletionDateMinDateTime,
   getTaskTargetCompletionDateError,
   getTimeEntryDurationHours,
-  getTimeEntryRangeError,
-  parseTaskEstimateHours
+  getTimeEntryRangeError
 } from "./taskValidation";
 
 const getCategoryValue = (value) => {
@@ -128,12 +130,6 @@ const TaskView = ({ task }) => {
   const [deletingTask, setDeletingTask] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(task));
-  const [estimateEditOpen, setEstimateEditOpen] = useState(false);
-  const [estimateEditValue, setEstimateEditValue] = useState(
-    task?.estimatedCompletionTime !== undefined ? String(task.estimatedCompletionTime) : "0"
-  );
-  const [estimateEditSaving, setEstimateEditSaving] = useState(false);
-  const [estimateEditError, setEstimateEditError] = useState("");
   const [timeEntryValues, setTimeEntryValues] = useState(buildDefaultTimeEntryValues);
   const [timeEntrySaving, setTimeEntrySaving] = useState(false);
   const [timeEntryError, setTimeEntryError] = useState("");
@@ -151,11 +147,6 @@ const TaskView = ({ task }) => {
   useEffect(() => {
     setCurrentTask(task);
     setFormValues(buildFormValues(task));
-    setEstimateEditOpen(false);
-    setEstimateEditValue(
-      task?.estimatedCompletionTime !== undefined ? String(task.estimatedCompletionTime) : "0"
-    );
-    setEstimateEditError("");
     setTimeEntryValues(buildDefaultTimeEntryValues());
     setTimeEntryError("");
     setTimeEntrySuccess("");
@@ -288,11 +279,21 @@ const TaskView = ({ task }) => {
     const targetDateError = getTaskTargetCompletionDateError({
       targetCompletionDate: formValues.targetCompletionDate,
       now,
-      parentDeadline
+      parentDeadline,
+      originalTargetCompletionDate: currentTask.targetCompletionDate
+        ? dayjs(currentTask.targetCompletionDate)
+        : null,
+      allowUnchangedPastDate: true
     });
 
     if (targetDateError) {
       setSaveError(targetDateError);
+      return;
+    }
+
+    const estimateError = getTaskEstimateHoursError(formValues.estimatedCompletionTime);
+    if (estimateError) {
+      setSaveError(estimateError);
       return;
     }
 
@@ -325,63 +326,16 @@ const TaskView = ({ task }) => {
     }
   };
 
+  const handleStartEdit = () => {
+    setFormValues(buildFormValues(currentTask));
+    setSaveError("");
+    setEditOpen(true);
+  };
+
   const handleCancel = () => {
     setFormValues(buildFormValues(currentTask));
     setEditOpen(false);
     setSaveError("");
-  };
-
-  const handleStartEstimateEdit = () => {
-    setEstimateEditOpen(true);
-    setEstimateEditValue(
-      currentTask?.estimatedCompletionTime !== undefined
-        ? String(currentTask.estimatedCompletionTime)
-        : "0"
-    );
-    setEstimateEditError("");
-  };
-
-  const handleCancelEstimateEdit = () => {
-    setEstimateEditOpen(false);
-    setEstimateEditValue(
-      currentTask?.estimatedCompletionTime !== undefined
-        ? String(currentTask.estimatedCompletionTime)
-        : "0"
-    );
-    setEstimateEditError("");
-  };
-
-  const handleSaveEstimate = async () => {
-    if (!currentTask) return;
-
-    const estimateError = getTaskEstimateHoursError(estimateEditValue);
-    if (estimateError) {
-      setEstimateEditError(estimateError);
-      return;
-    }
-
-    const nextEstimate = parseTaskEstimateHours(estimateEditValue);
-
-    setEstimateEditSaving(true);
-    setEstimateEditError("");
-    try {
-      const updatedTask = await updateTask(currentTask._id, {
-        estimatedCompletionTime: nextEstimate
-      });
-      setCurrentTask(updatedTask);
-      setFormValues(buildFormValues(updatedTask));
-      setEstimateEditValue(
-        updatedTask?.estimatedCompletionTime !== undefined
-          ? String(updatedTask.estimatedCompletionTime)
-          : "0"
-      );
-      setEstimateEditOpen(false);
-    } catch (err) {
-      console.error(err);
-      setEstimateEditError("Unable to update estimated hours right now.");
-    } finally {
-      setEstimateEditSaving(false);
-    }
   };
 
   const handleDeleteTask = async () => {
@@ -548,7 +502,6 @@ const TaskView = ({ task }) => {
 
   const dueDate = parseDate(currentTask.targetCompletionDate);
   const dueLabel = dueDate ? dateFormatter.format(dueDate) : "No deadline";
-  const isOverdue = dueDate && dueDate < startOfToday && !currentTask.isComplete;
   const categoryLabel = getCategoryLabel(currentTask.category);
   const parentGoal = currentTask.parentGoalId
     ? parentGoals.find((pg) => String(pg._id) === String(currentTask.parentGoalId))
@@ -561,9 +514,38 @@ const TaskView = ({ task }) => {
   const selectedParentGoalForEdit = formValues.parentGoalId
     ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
     : null;
+  const selectedListForEdit = formValues.listId
+    ? lists.find((item) => String(item._id) === String(formValues.listId))
+    : null;
   const parentDeadlineForEdit = selectedParentGoalForEdit?.targetCompletionDate
     ? dayjs(selectedParentGoalForEdit.targetCompletionDate)
     : null;
+  const now = dayjs();
+  const originalTargetCompletionDate = currentTask.targetCompletionDate
+    ? dayjs(currentTask.targetCompletionDate)
+    : null;
+  const minimumTargetCompletionDate = getTaskTargetCompletionDateMinDateTime({
+    now,
+    originalTargetCompletionDate,
+    allowUnchangedPastDate: true
+  });
+  const displayedDueDate = editOpen
+    ? formValues.targetCompletionDate?.toDate() || null
+    : dueDate;
+  const displayedDueLabel = displayedDueDate
+    ? dateFormatter.format(displayedDueDate)
+    : "No deadline";
+  const displayedCategoryLabel = editOpen
+    ? getCategoryLabel(
+        formValues.parentGoalId ? selectedParentGoalForEdit?.category : formValues.category
+      )
+    : categoryLabel;
+  const displayedIsComplete = editOpen ? formValues.isComplete : currentTask.isComplete;
+  const displayedIsOverdue =
+    displayedDueDate && displayedDueDate < startOfToday && !displayedIsComplete;
+  const displayedListLabel = editOpen
+    ? selectedListForEdit?.title || "None"
+    : list ? list.title : "None";
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
@@ -587,25 +569,65 @@ const TaskView = ({ task }) => {
                 }}
               >
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="h4" fontWeight={700} gutterBottom>
-                    {currentTask.title}
-                  </Typography>
+                  {editOpen ? (
+                    <TextField
+                      label="Title"
+                      value={formValues.title}
+                      onChange={(event) =>
+                        setFormValues((prev) => ({ ...prev, title: event.target.value }))
+                      }
+                      size="small"
+                      fullWidth
+                    />
+                  ) : (
+                    <Typography variant="h4" fontWeight={700} gutterBottom>
+                      {currentTask.title}
+                    </Typography>
+                  )}
                   <Typography variant="body2" color="text.secondary">
-                    {categoryLabel} - {dueLabel}
+                    {displayedCategoryLabel} - {displayedDueLabel}
                   </Typography>
                 </Box>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
                   <Chip
-                    label={currentTask.isComplete ? "Complete" : "In progress"}
-                    color={currentTask.isComplete ? "success" : "warning"}
+                    label={displayedIsComplete ? "Complete" : "In progress"}
+                    color={displayedIsComplete ? "success" : "warning"}
                     size="small"
                   />
-                  {isOverdue && <Chip label="Overdue" color="error" size="small" />}
+                  {displayedIsOverdue && <Chip label="Overdue" color="error" size="small" />}
+                  <IconButton
+                    onClick={editOpen ? handleCancel : handleStartEdit}
+                    aria-label={editOpen ? "Cancel task summary editing" : "Edit task summary"}
+                    size="small"
+                  >
+                    {editOpen ? (
+                      <CloseOutlinedIcon fontSize="small" />
+                    ) : (
+                      <EditOutlinedIcon fontSize="small" />
+                    )}
+                  </IconButton>
                 </Stack>
               </Box>
-              <Typography variant="body1" color="text.secondary">
-                {currentTask.description || "No description yet."}
-              </Typography>
+              {editOpen ? (
+                <TextField
+                  label="Description"
+                  value={formValues.description}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      description: event.target.value
+                    }))
+                  }
+                  size="small"
+                  multiline
+                  minRows={3}
+                  fullWidth
+                />
+              ) : (
+                <Typography variant="body1" color="text.secondary">
+                  {currentTask.description || "No description yet."}
+                </Typography>
+              )}
             </Stack>
           </Paper>
 
@@ -692,13 +714,30 @@ const TaskView = ({ task }) => {
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Task details
-            </Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}
+            >
+              <Typography variant="h6" fontWeight={700}>
+                Task details
+              </Typography>
+              <IconButton
+                onClick={editOpen ? handleCancel : handleStartEdit}
+                aria-label={editOpen ? "Cancel task detail editing" : "Edit task details"}
+                size="small"
+              >
+                {editOpen ? (
+                  <CloseOutlinedIcon fontSize="small" />
+                ) : (
+                  <EditOutlinedIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Stack>
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" },
                 gap: 2
               }}
             >
@@ -706,74 +745,147 @@ const TaskView = ({ task }) => {
                 <Typography variant="caption" color="text.secondary">
                   Category
                 </Typography>
-                <Typography>{categoryLabel}</Typography>
+                {editOpen ? (
+                  <TextField
+                    value={formValues.category}
+                    onChange={(event) =>
+                      setFormValues((prev) => ({
+                        ...prev,
+                        category: event.target.value
+                      }))
+                    }
+                    size="small"
+                    disabled={isCategoryLocked}
+                    inputProps={{
+                      "aria-label": "Category",
+                      list: "task-category-options"
+                    }}
+                    helperText={
+                      isCategoryLocked
+                        ? "Category is inherited from the parent goal."
+                        : "Select or type a category."
+                    }
+                    fullWidth
+                    sx={{ mt: 0.5 }}
+                  />
+                ) : (
+                  <Typography>{categoryLabel}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Target date
                 </Typography>
-                <Typography>{dueLabel}</Typography>
+                {editOpen ? (
+                  <Box sx={{ mt: 0.5 }}>
+                    <DateTimePicker
+                      label=""
+                      value={formValues.targetCompletionDate}
+                      onChange={(value) =>
+                        setFormValues((prev) => ({ ...prev, targetCompletionDate: value }))
+                      }
+                      minDateTime={minimumTargetCompletionDate}
+                      maxDateTime={parentDeadlineForEdit || undefined}
+                      textFieldProps={{
+                        fullWidth: true,
+                        size: "small",
+                        inputProps: {
+                          "aria-label": "Target Completion Date"
+                        },
+                        helperText: parentDeadlineForEdit
+                          ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
+                          : originalTargetCompletionDate?.isBefore(now)
+                            ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+                            : "Choose a future target date."
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Typography>{dueLabel}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Parent goal
                 </Typography>
-                <Typography>{parentGoal ? parentGoal.title : "None"}</Typography>
+                {editOpen ? (
+                  <FormControl size="small" disabled={loadingMeta} fullWidth sx={{ mt: 0.5 }}>
+                    <Select
+                      value={formValues.parentGoalId}
+                      inputProps={{ "aria-label": "Parent goal" }}
+                      onChange={(event) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          parentGoalId: event.target.value
+                        }))
+                      }
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {parentGoals.map((option) => (
+                        <MenuItem key={option._id} value={option._id}>
+                          {option.title}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Typography>{parentGoal ? parentGoal.title : "None"}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   List
                 </Typography>
-                <Typography>{list ? list.title : "None"}</Typography>
+                {editOpen ? (
+                  <FormControl size="small" disabled={loadingMeta} fullWidth sx={{ mt: 0.5 }}>
+                    <Select
+                      value={formValues.listId}
+                      inputProps={{ "aria-label": "List" }}
+                      onChange={(event) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          listId: event.target.value
+                        }))
+                      }
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {lists.map((option) => (
+                        <MenuItem key={option._id} value={option._id}>
+                          {option.title}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Typography>{displayedListLabel}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Estimated hours
                 </Typography>
-                {estimateEditOpen ? (
-                  <Stack spacing={1} sx={{ mt: 0.5 }}>
-                    <TextField
-                      value={estimateEditValue}
-                      onChange={(event) => setEstimateEditValue(event.target.value)}
-                      type="number"
-                      size="small"
-                      inputProps={{ min: 0, step: "0.25" }}
-                    />
-                    {estimateEditError && (
-                      <Typography variant="caption" color="error" role="alert">
-                        {estimateEditError}
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={handleSaveEstimate}
-                        disabled={estimateEditSaving}
-                      >
-                        {estimateEditSaving ? "Saving..." : "Save"}
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={handleCancelEstimateEdit}
-                        disabled={estimateEditSaving}
-                      >
-                        Cancel
-                      </Button>
-                    </Stack>
-                  </Stack>
+                {editOpen ? (
+                  <TextField
+                    value={formValues.estimatedCompletionTime}
+                    onChange={(event) =>
+                      setFormValues((prev) => ({
+                        ...prev,
+                        estimatedCompletionTime: event.target.value
+                      }))
+                    }
+                    type="number"
+                    size="small"
+                    inputProps={{
+                      "aria-label": "Estimated completion time (hours)",
+                      min: 0,
+                      step: "0.25"
+                    }}
+                    helperText="Used to track progress and remaining time for this task."
+                    fullWidth
+                    sx={{ mt: 0.5 }}
+                  />
                 ) : (
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
-                    <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
-                    <Button
-                      size="small"
-                      onClick={handleStartEstimateEdit}
-                      aria-label="Edit task estimated hours"
-                    >
-                      Edit
-                    </Button>
-                  </Stack>
+                  <Typography>{currentTask.estimatedCompletionTime || 0}</Typography>
                 )}
               </Box>
               <Box>
@@ -783,6 +895,45 @@ const TaskView = ({ task }) => {
                 <Typography>{currentTask.timeSpent || 0}</Typography>
               </Box>
             </Box>
+            {editOpen && (
+              <>
+                <datalist id="task-category-options">
+                  {categories.map((category) => (
+                    <option key={category._id} value={category.title} />
+                  ))}
+                </datalist>
+                <Box sx={{ mt: 3 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formValues.isComplete}
+                        onChange={(event) =>
+                          setFormValues((prev) => ({
+                            ...prev,
+                            isComplete: event.target.checked
+                          }))
+                        }
+                      />
+                    }
+                    label="Mark complete"
+                  />
+                  {saveError && (
+                    <Typography color="error" role="alert" sx={{ mt: 1 }}>
+                      {saveError}
+                    </Typography>
+                  )}
+                  <Divider sx={{ my: 2 }} />
+                  <Stack direction="row" spacing={1}>
+                    <Button variant="contained" onClick={handleSave} disabled={saving}>
+                      {saving ? "Saving..." : "Save changes"}
+                    </Button>
+                    <Button variant="outlined" onClick={handleCancel} disabled={saving}>
+                      Cancel
+                    </Button>
+                  </Stack>
+                </Box>
+              </>
+            )}
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
@@ -941,12 +1092,6 @@ const TaskView = ({ task }) => {
               Actions
             </Typography>
             <Stack spacing={1.5} sx={{ mt: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => setEditOpen((prev) => !prev)}
-              >
-                {editOpen ? "Close edit" : "Edit details"}
-              </Button>
               {parentGoal && (
                 <Button variant="outlined" component={Link} to={`/goals/${parentGoal._id}`}>
                   Open parent goal
@@ -984,166 +1129,6 @@ const TaskView = ({ task }) => {
                 </Stack>
               )}
             </Stack>
-          </Paper>
-
-          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-            <Typography variant="subtitle1" fontWeight={700}>
-              Edit task
-            </Typography>
-            {!editOpen ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Turn on edit mode to update this task.
-              </Typography>
-            ) : (
-              <Stack spacing={2} sx={{ mt: 2 }}>
-                <TextField
-                  label="Title"
-                  value={formValues.title}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({ ...prev, title: event.target.value }))
-                  }
-                  size="small"
-                  fullWidth
-                />
-                <TextField
-                  label="Description"
-                  value={formValues.description}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      description: event.target.value
-                    }))
-                  }
-                  size="small"
-                  multiline
-                  minRows={3}
-                  fullWidth
-                />
-                <TextField
-                  label="Category"
-                  value={formValues.category}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      category: event.target.value
-                    }))
-                  }
-                  size="small"
-                  disabled={isCategoryLocked}
-                  inputProps={{ list: "task-category-options" }}
-                  helperText={
-                    isCategoryLocked
-                      ? "Category is inherited from the parent goal."
-                      : "Select or type a category."
-                  }
-                  fullWidth
-                />
-                <datalist id="task-category-options">
-                  {categories.map((category) => (
-                    <option key={category._id} value={category.title} />
-                  ))}
-                </datalist>
-                <FormControl size="small" disabled={loadingMeta} fullWidth>
-                  <InputLabel id="parent-goal-label">Parent goal</InputLabel>
-                  <Select
-                    labelId="parent-goal-label"
-                    label="Parent goal"
-                    value={formValues.parentGoalId}
-                    onChange={(event) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        parentGoalId: event.target.value
-                      }))
-                    }
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {parentGoals.map((option) => (
-                      <MenuItem key={option._id} value={option._id}>
-                        {option.title}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" disabled={loadingMeta} fullWidth>
-                  <InputLabel id="list-label">List</InputLabel>
-                  <Select
-                    labelId="list-label"
-                    label="List"
-                    value={formValues.listId}
-                    onChange={(event) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        listId: event.target.value
-                      }))
-                    }
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {lists.map((option) => (
-                      <MenuItem key={option._id} value={option._id}>
-                        {option.title}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField
-                  label="Estimated completion time (hours)"
-                  type="number"
-                  value={formValues.estimatedCompletionTime}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      estimatedCompletionTime: event.target.value
-                    }))
-                  }
-                  size="small"
-                  inputProps={{ min: 0, step: 0.25 }}
-                  fullWidth
-                />
-                <DateTimePicker
-                  value={formValues.targetCompletionDate}
-                  onChange={(value) =>
-                    setFormValues((prev) => ({ ...prev, targetCompletionDate: value }))
-                  }
-                  minDateTime={dayjs()}
-                  maxDateTime={parentDeadlineForEdit || undefined}
-                  textFieldProps={{
-                    fullWidth: true,
-                    size: "small",
-                    helperText: parentDeadlineForEdit
-                      ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
-                      : "Choose a future target date."
-                  }}
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formValues.isComplete}
-                      onChange={(event) =>
-                        setFormValues((prev) => ({
-                          ...prev,
-                          isComplete: event.target.checked
-                        }))
-                      }
-                    />
-                  }
-                  label="Mark complete"
-                />
-                {saveError && (
-                  <Typography color="error" role="alert">
-                    {saveError}
-                  </Typography>
-                )}
-                <Divider />
-                <Stack direction="row" spacing={1}>
-                  <Button variant="contained" onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : "Save changes"}
-                  </Button>
-                  <Button variant="outlined" onClick={handleCancel} disabled={saving}>
-                    Cancel
-                  </Button>
-                </Stack>
-              </Stack>
-            )}
           </Paper>
         </Stack>
       </Box>

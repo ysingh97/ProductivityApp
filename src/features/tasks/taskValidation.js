@@ -3,9 +3,18 @@ import dayjs from "dayjs";
 export const getTaskTargetCompletionDateError = ({
   targetCompletionDate,
   now,
-  parentDeadline
+  parentDeadline,
+  originalTargetCompletionDate = null,
+  allowUnchangedPastDate = false
 }) => {
-  if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+  const isKeepingExistingPastDate =
+    Boolean(allowUnchangedPastDate) &&
+    Boolean(targetCompletionDate) &&
+    Boolean(originalTargetCompletionDate) &&
+    targetCompletionDate.isBefore(now) &&
+    targetCompletionDate.isSame(originalTargetCompletionDate);
+
+  if (targetCompletionDate && targetCompletionDate.isBefore(now) && !isKeepingExistingPastDate) {
     return "Target completion date cannot be earlier than the current time.";
   }
 
@@ -14,6 +23,22 @@ export const getTaskTargetCompletionDateError = ({
   }
 
   return null;
+};
+
+export const getTaskTargetCompletionDateMinDateTime = ({
+  now,
+  originalTargetCompletionDate = null,
+  allowUnchangedPastDate = false
+}) => {
+  if (
+    allowUnchangedPastDate &&
+    originalTargetCompletionDate &&
+    originalTargetCompletionDate.isBefore(now)
+  ) {
+    return originalTargetCompletionDate;
+  }
+
+  return now;
 };
 
 export const getTaskEstimateHoursError = (value) => {

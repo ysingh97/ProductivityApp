@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Autocomplete,
@@ -17,7 +17,10 @@ import { fetchCategories } from "../categories/categoryService";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
 import DateTimePicker from "../../components/DateTimePicker";
-import { getTaskTargetCompletionDateError } from "./taskValidation";
+import {
+  getTaskTargetCompletionDateError,
+  getTaskTargetCompletionDateMinDateTime
+} from "./taskValidation";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -57,6 +60,9 @@ const TaskForm = ({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const originalTargetCompletionDate = task?.targetCompletionDate
+    ? dayjs(task.targetCompletionDate)
+    : null;
 
   useEffect(() => {
     const loadListsAndGoals = async () => {
@@ -139,7 +145,9 @@ const TaskForm = ({
     const targetDateError = getTaskTargetCompletionDateError({
       targetCompletionDate,
       now,
-      parentDeadline
+      parentDeadline,
+      originalTargetCompletionDate,
+      allowUnchangedPastDate: isEditing
     });
 
     if (targetDateError) {
@@ -191,6 +199,15 @@ const TaskForm = ({
   const parentDeadline = selectedParentGoal?.targetCompletionDate
     ? dayjs(selectedParentGoal.targetCompletionDate)
     : null;
+  const minimumTargetCompletionDate = useMemo(
+    () =>
+      getTaskTargetCompletionDateMinDateTime({
+        now,
+        originalTargetCompletionDate,
+        allowUnchangedPastDate: isEditing
+      }),
+    [isEditing, now, originalTargetCompletionDate]
+  );
 
   return (
     <Paper
@@ -327,14 +344,16 @@ const TaskForm = ({
               <DateTimePicker
                 value={targetCompletionDate}
                 onChange={setTargetCompletionDate}
-                minDateTime={now}
+                minDateTime={minimumTargetCompletionDate}
                 maxDateTime={parentDeadline || undefined}
                 textFieldProps={{
                   fullWidth: true,
                   size: "small",
                   helperText: parentDeadline
                     ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
-                    : "Choose a future target date."
+                    : isEditing && originalTargetCompletionDate?.isBefore(now)
+                      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+                      : "Choose a future target date."
                 }}
               />
             </Box>

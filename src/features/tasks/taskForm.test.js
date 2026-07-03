@@ -198,4 +198,40 @@ describe("TaskForm", () => {
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  test("allows editing an overdue task without changing its existing past target date", async () => {
+    const onSubmit = jest.fn().mockResolvedValue({});
+
+    render(
+      <TaskForm
+        onSubmit={onSubmit}
+        isEditing
+        task={{
+          title: "Existing overdue task",
+          description: "Original details",
+          category: { title: "Focus" },
+          estimatedCompletionTime: 2,
+          targetCompletionDate: "2000-01-01T10:00:00.000Z"
+        }}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update task/i })).not.toBeDisabled()
+    );
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Existing overdue task updated" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /update task/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Existing overdue task updated",
+        targetCompletionDate: expect.any(Date)
+      })
+    );
+  });
 });

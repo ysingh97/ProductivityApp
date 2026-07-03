@@ -26,11 +26,15 @@ jest.mock("../../components/DateTimePicker", () => {
   return function MockDateTimePicker({
     label = "Target Completion Date",
     value,
-    onChange
+    onChange,
+    textFieldProps
   }) {
+    const inputAriaLabel =
+      textFieldProps?.inputProps?.["aria-label"] || label || "Target Completion Date";
+
     return (
       <input
-        aria-label={label}
+        aria-label={inputAriaLabel}
         value={value ? value.toISOString() : ""}
         onChange={(event) => onChange(event.target.value ? dayjs(event.target.value) : null)}
       />
@@ -73,10 +77,10 @@ const buildTask = (overrides = {}) => ({
   ...overrides
 });
 
-const waitForEditFormReady = async () => {
+const openInlineEditMode = async () => {
   await waitFor(() => expect(fetchGoals).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(fetchCategories).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: /edit details/i }));
+  fireEvent.click(screen.getByRole("button", { name: /edit goal summary/i }));
   expect(await screen.findByRole("combobox", { name: /parent goal/i })).toBeInTheDocument();
 };
 
@@ -115,7 +119,7 @@ describe("GoalView", () => {
 
     renderGoalView(goal);
 
-    await waitForEditFormReady();
+    await openInlineEditMode();
 
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: "Launch the public roadmap" }
@@ -176,7 +180,7 @@ describe("GoalView", () => {
 
     renderGoalView(currentGoal);
 
-    await waitForEditFormReady();
+    await openInlineEditMode();
 
     await setParentGoal("Company launch");
 
@@ -207,7 +211,7 @@ describe("GoalView", () => {
 
     renderGoalView(currentGoal);
 
-    await waitForEditFormReady();
+    await openInlineEditMode();
 
     await setParentGoal("Q4 launch");
 
@@ -217,6 +221,93 @@ describe("GoalView", () => {
       await screen.findByText(/sub-goals cannot have a target completion date later than the parent goal\./i)
     ).toBeInTheDocument();
     expect(updateGoal).not.toHaveBeenCalled();
+  });
+
+  test("allows saving other edits on an overdue goal without changing its past target date", async () => {
+    const overdueGoal = buildGoal({
+      _id: "goal-overdue",
+      title: "Old roadmap",
+      targetCompletionDate: "2000-01-10T10:00:00.000Z"
+    });
+    const updatedGoal = buildGoal({
+      _id: "goal-overdue",
+      title: "Old roadmap updated",
+      targetCompletionDate: "2000-01-10T10:00:00.000Z"
+    });
+
+    updateGoal.mockResolvedValue(updatedGoal);
+
+    renderGoalView(overdueGoal);
+
+    await openInlineEditMode();
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Old roadmap updated" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(updateGoal).toHaveBeenCalledWith(
+        "goal-overdue",
+        expect.objectContaining({
+          title: "Old roadmap updated",
+          targetCompletionDate: expect.any(Date)
+        })
+      )
+    );
+  });
+
+  test("still blocks changing an overdue goal to a different past target date", async () => {
+    const overdueGoal = buildGoal({
+      _id: "goal-overdue",
+      targetCompletionDate: "2000-01-10T10:00:00.000Z"
+    });
+
+    renderGoalView(overdueGoal);
+
+    await openInlineEditMode();
+
+    fireEvent.change(screen.getByLabelText(/target completion date/i), {
+      target: { value: "2000-01-11T10:00:00.000Z" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(
+      await screen.findByText(/target completion date cannot be earlier than the current time\./i)
+    ).toBeInTheDocument();
+    expect(updateGoal).not.toHaveBeenCalled();
+  });
+
+  test("does not offer descendant goals as parent options", async () => {
+    const currentGoal = buildGoal({
+      _id: "goal-root",
+      title: "Program root"
+    });
+    const childGoal = buildGoal({
+      _id: "goal-child",
+      title: "Nested child",
+      parentGoalId: "goal-root"
+    });
+    const siblingGoal = buildGoal({
+      _id: "goal-sibling",
+      title: "Valid sibling parent",
+      parentGoalId: null
+    });
+
+    fetchGoals.mockResolvedValue([currentGoal, childGoal, siblingGoal]);
+
+    renderGoalView(currentGoal);
+
+    await openInlineEditMode();
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: /parent goal/i }));
+    const listbox = await screen.findByRole("listbox");
+
+    expect(within(listbox).getByText("None")).toBeInTheDocument();
+    expect(within(listbox).getByText("Valid sibling parent")).toBeInTheDocument();
+    expect(within(listbox).queryByText("Nested child")).not.toBeInTheDocument();
   });
 
   test("shows goal tree context with the current goal highlighted", async () => {
@@ -277,5 +368,59 @@ describe("GoalView", () => {
       "href",
       "/tasks/task-child"
     );
+  });
+
+  test("goal tree context does not recurse forever when cyclic goal data exists", async () => {
+    const currentGoal = buildGoal({
+      _id: "goal-a",
+      title: "Cycle A",
+      parentGoalId: "goal-b"
+    });
+    const parentGoal = buildGoal({
+      _id: "goal-b",
+      title: "Cycle B",
+      parentGoalId: "goal-a"
+    });
+
+    fetchGoals.mockResolvedValue([currentGoal, parentGoal]);
+
+    renderGoalView(currentGoal);
+
+    const panel = await screen.findByRole("region", { name: /goal tree context/i });
+
+    expect(within(panel).getByRole("link", { name: /cycle a/i })).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /cycle b/i })).toBeInTheDocument();
+  });
+
+  test("canceling edit mode restores the original goal detail values", async () => {
+    const goal = buildGoal();
+
+    renderGoalView(goal);
+
+    await openInlineEditMode();
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Draft launch message" }
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "Temporary unsaved description." }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.getByRole("heading", { name: "Launch the roadmap" })).toBeInTheDocument();
+    expect(screen.getByText("Align deliverables for launch.")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Draft launch message")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Temporary unsaved description.")).not.toBeInTheDocument();
+  });
+
+  test("edit mode uses a single visible label for inline detail fields", async () => {
+    renderGoalView(buildGoal());
+
+    await openInlineEditMode();
+
+    expect(screen.getAllByText(/^Estimated hours$/i)).toHaveLength(1);
+    expect(screen.getAllByText(/^Category$/i)).toHaveLength(1);
+    expect(screen.getAllByText(/^Parent goal$/i)).toHaveLength(1);
   });
 });

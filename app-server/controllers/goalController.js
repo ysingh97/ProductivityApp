@@ -325,6 +325,13 @@ const updateGoal = async (req, res) => {
             if (!parentGoal) {
                 return res.status(400).json({ message: "Invalid parentGoal ID" });
             }
+            const descendantGoalIds = await collectDescendantGoalIds(existingGoal._id, req.user.id);
+            const descendantGoalIdSet = new Set(descendantGoalIds.map((goalId) => String(goalId)));
+            if (descendantGoalIdSet.has(nextParentIdString)) {
+                return res.status(400).json({
+                    message: "Goal cannot be moved under one of its descendants"
+                });
+            }
         }
 
         const previousCategoryId = existingGoal.category || null;
