@@ -84,6 +84,13 @@ const GoogleCalendarSettings = () => {
   const blockedConfigurationReasonLabel = getGoogleCalendarSyncSummaryReasonLabel(
     syncSummary?.configurationIssue
   );
+  const selectedCalendar = calendarOptions.find(
+    (calendar) => calendar.value === selectedCalendarId
+  );
+  const hasUnsavedSyncSettingChanges =
+    Boolean(status?.connected) &&
+    (status?.selectedCalendarId !== selectedCalendarId ||
+      Boolean(status?.syncEnabled) !== Boolean(syncEnabled));
 
   const loadStatus = async () => {
     setLoadingStatus(true);
@@ -157,10 +164,6 @@ const GoogleCalendarSettings = () => {
   };
 
   const handleSave = async () => {
-    const selectedCalendar = calendarOptions.find(
-      (calendar) => calendar.value === selectedCalendarId
-    );
-
     setSaving(true);
     setError("");
     setFeedback("");
@@ -186,9 +189,19 @@ const GoogleCalendarSettings = () => {
     setError("");
     setFeedback("");
     try {
-      await syncGoogleCalendarNow();
-      setFeedback("Google Calendar sync queued.");
-      await loadStatus();
+      if (hasUnsavedSyncSettingChanges) {
+        const nextStatus = await saveGoogleCalendarSettings({
+          selectedCalendarId,
+          selectedCalendarSummary: selectedCalendar?.label || selectedCalendarId,
+          syncEnabled
+        });
+        setStatus((prev) => ({ ...prev, ...nextStatus }));
+        setFeedback("Google Calendar settings saved. A full resync has been queued.");
+      } else {
+        await syncGoogleCalendarNow();
+        setFeedback("Google Calendar sync queued.");
+        await loadStatus();
+      }
     } catch (err) {
       console.error(err);
       setError(getApiErrorMessage(err, "Unable to queue a Google Calendar sync."));
@@ -370,7 +383,7 @@ const GoogleCalendarSettings = () => {
                       variant="contained"
                       startIcon={<CalendarMonthOutlinedIcon />}
                       onClick={handleSave}
-                      disabled={saving || loadingCalendars || !selectedCalendarId}
+                      disabled={saving || syncingNow || loadingCalendars || !selectedCalendarId}
                     >
                       {saving ? "Saving..." : "Save settings"}
                     </Button>
@@ -378,7 +391,7 @@ const GoogleCalendarSettings = () => {
                       variant="outlined"
                       startIcon={<SyncOutlinedIcon />}
                       onClick={handleSyncNow}
-                      disabled={syncingNow || !selectedCalendarId}
+                      disabled={saving || syncingNow || !selectedCalendarId}
                     >
                       {syncingNow ? "Queueing..." : "Sync now"}
                     </Button>

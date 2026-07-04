@@ -259,6 +259,36 @@ describe("GoogleCalendarSettings", () => {
     expect(screen.queryByText(/sync settings/i)).not.toBeInTheDocument();
   });
 
+  test("sync now saves changed settings before queueing when the calendar selection changed", async () => {
+    fetchGoogleCalendarStatus.mockResolvedValue({ ...connectedStatus });
+    saveGoogleCalendarSettings.mockResolvedValue({
+      ...connectedStatus,
+      selectedCalendarId: "calendar-team",
+      selectedCalendarSummary: "Team Calendar",
+      syncEnabled: true
+    });
+
+    renderGoogleCalendarSettings();
+
+    expect(await screen.findByText(/connected as sync@example\.test/i)).toBeInTheDocument();
+
+    await openCalendarOption("Team Calendar");
+    fireEvent.click(screen.getByRole("button", { name: /sync now/i }));
+
+    await waitFor(() =>
+      expect(saveGoogleCalendarSettings).toHaveBeenCalledWith({
+        selectedCalendarId: "calendar-team",
+        selectedCalendarSummary: "Team Calendar",
+        syncEnabled: true
+      })
+    );
+    expect(syncGoogleCalendarNow).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/google calendar settings saved\. a full resync has been queued\./i)
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Team Calendar").length).toBeGreaterThan(0);
+  });
+
   test("shows the backend error when loading calendars fails after a successful connection", async () => {
     fetchGoogleCalendarStatus.mockResolvedValue({ ...connectedStatus });
     fetchGoogleCalendars.mockRejectedValue({
