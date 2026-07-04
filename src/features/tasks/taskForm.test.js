@@ -5,6 +5,7 @@ import TaskForm from "./taskForm";
 import { fetchCategories } from "../categories/categoryService";
 import { fetchGoals } from "../goals/goalService";
 import { fetchLists } from "../lists/listService";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 jest.mock("../categories/categoryService", () => ({
   fetchCategories: jest.fn()
@@ -18,16 +19,26 @@ jest.mock("../lists/listService", () => ({
   fetchLists: jest.fn()
 }));
 
+jest.mock("../integrations/useGoogleCalendarStatus", () => jest.fn());
+
 jest.mock("../../components/DateTimePicker", () => {
   const dayjs = require("dayjs");
 
-  return function MockDateTimePicker({ label = "Target Completion Date", value, onChange }) {
+  return function MockDateTimePicker({
+    label = "Target Completion Date",
+    value,
+    onChange,
+    textFieldProps
+  }) {
     return (
-      <input
-        aria-label={label}
-        value={value ? value.toISOString() : ""}
-        onChange={(event) => onChange(event.target.value ? dayjs(event.target.value) : null)}
-      />
+      <div>
+        <input
+          aria-label={label}
+          value={value ? value.toISOString() : ""}
+          onChange={(event) => onChange(event.target.value ? dayjs(event.target.value) : null)}
+        />
+        {textFieldProps?.helperText ? <span>{textFieldProps.helperText}</span> : null}
+      </div>
     );
   };
 });
@@ -42,6 +53,10 @@ describe("TaskForm", () => {
       { _id: "cat-1", title: "Focus" },
       { _id: "cat-2", title: "Deep Work" }
     ]);
+    useGoogleCalendarStatus.mockReturnValue({
+      status: null,
+      loading: false
+    });
   });
 
   test("submits standalone task data with its own category", async () => {
@@ -233,5 +248,18 @@ describe("TaskForm", () => {
         targetCompletionDate: expect.any(Date)
       })
     );
+  });
+
+  test("shows a Google Calendar warning when the task is undated and sync is connected", async () => {
+    useGoogleCalendarStatus.mockReturnValue({
+      status: { connected: true },
+      loading: false
+    });
+
+    render(<TaskForm onSubmit={jest.fn()} />);
+
+    expect(
+      await screen.findByText(/without a target date, this item will not sync to google calendar\./i)
+    ).toBeInTheDocument();
   });
 });

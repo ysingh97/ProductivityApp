@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -14,6 +15,7 @@ import {
   MenuItem,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Switch,
   TextField,
@@ -43,6 +45,13 @@ import {
   getTimeEntryDurationHours,
   getTimeEntryRangeError
 } from "./taskValidation";
+import {
+  getGoogleCalendarDateRemovedToastText,
+  getGoogleCalendarItemSyncState,
+  getGoogleCalendarNoDateWarningText,
+  wasTargetDateRemoved
+} from "../integrations/googleCalendarSync";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -143,6 +152,9 @@ const TaskView = ({ task }) => {
   const [editingTimeEntryError, setEditingTimeEntryError] = useState("");
   const [editingTimeEntrySaving, setEditingTimeEntrySaving] = useState(false);
   const timeEntryRequestInFlightRef = useRef(false);
+  const [dateRemovedToastOpen, setDateRemovedToastOpen] = useState(false);
+  const { status: googleCalendarStatus, loading: googleCalendarStatusLoading } =
+    useGoogleCalendarStatus();
 
   useEffect(() => {
     setCurrentTask(task);
@@ -161,6 +173,7 @@ const TaskView = ({ task }) => {
     setDeletingTask(false);
     setDeleteError("");
     setEditOpen(false);
+    setDateRemovedToastOpen(false);
   }, [task]);
 
   useEffect(() => {
@@ -300,6 +313,13 @@ const TaskView = ({ task }) => {
     setSaving(true);
     setSaveError("");
     try {
+      const nextTargetCompletionDate = formValues.targetCompletionDate
+        ? formValues.targetCompletionDate.toDate()
+        : null;
+      const removedTargetDate = wasTargetDateRemoved({
+        previousTargetCompletionDate: currentTask.targetCompletionDate,
+        nextTargetCompletionDate
+      });
       const updates = {
         title: formValues.title.trim(),
         description: formValues.description,
@@ -307,9 +327,7 @@ const TaskView = ({ task }) => {
         parentGoalId: formValues.parentGoalId || null,
         estimatedCompletionTime: parseNumber(formValues.estimatedCompletionTime),
         isComplete: formValues.isComplete,
-        targetCompletionDate: formValues.targetCompletionDate
-          ? formValues.targetCompletionDate.toDate()
-          : null
+        targetCompletionDate: nextTargetCompletionDate
       };
       if (!formValues.parentGoalId) {
         updates.category = formValues.category;
@@ -318,6 +336,9 @@ const TaskView = ({ task }) => {
       setCurrentTask(updatedTask);
       setFormValues(buildFormValues(updatedTask));
       setEditOpen(false);
+      if (removedTargetDate && googleCalendarStatus?.connected) {
+        setDateRemovedToastOpen(true);
+      }
     } catch (err) {
       console.error(err);
       setSaveError("Unable to save changes right now.");
@@ -543,12 +564,29 @@ const TaskView = ({ task }) => {
   const displayedIsComplete = editOpen ? formValues.isComplete : currentTask.isComplete;
   const displayedIsOverdue =
     displayedDueDate && displayedDueDate < startOfToday && !displayedIsComplete;
+  const targetDateHelperText = parentDeadlineForEdit
+    ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
+    : originalTargetCompletionDate?.isBefore(now)
+      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+      : !formValues.targetCompletionDate && googleCalendarStatus?.connected
+        ? getGoogleCalendarNoDateWarningText()
+        : "Choose a future target date.";
   const displayedListLabel = editOpen
     ? selectedListForEdit?.title || "None"
     : list ? list.title : "None";
+  const googleCalendarSyncState = getGoogleCalendarItemSyncState({
+    item: {
+      ...currentTask,
+      isComplete: displayedIsComplete,
+      targetCompletionDate: displayedDueDate
+    },
+    status: googleCalendarStatus,
+    loading: googleCalendarStatusLoading
+  });
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
+    <>
+      <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
       <Box
         sx={{
           display: "grid",
@@ -792,11 +830,7 @@ const TaskView = ({ task }) => {
                         inputProps: {
                           "aria-label": "Target Completion Date"
                         },
-                        helperText: parentDeadlineForEdit
-                          ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
-                          : originalTargetCompletionDate?.isBefore(now)
-                            ? "Existing overdue dates can stay as-is, but any new date must be current or future."
-                            : "Choose a future target date."
+                        helperText: targetDateHelperText
                       }}
                     />
                   </Box>
@@ -893,6 +927,15 @@ const TaskView = ({ task }) => {
                   Total time spent
                 </Typography>
                 <Typography>{currentTask.timeSpent || 0}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Google Calendar sync
+                </Typography>
+                <Typography>{googleCalendarSyncState.label}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {googleCalendarSyncState.detail}
+                </Typography>
               </Box>
             </Box>
             {editOpen && (
@@ -1132,7 +1175,22 @@ const TaskView = ({ task }) => {
           </Paper>
         </Stack>
       </Box>
-    </Container>
+      </Container>
+      <Snackbar
+        open={dateRemovedToastOpen}
+        autoHideDuration={6000}
+        onClose={() => setDateRemovedToastOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="info"
+          onClose={() => setDateRemovedToastOpen(false)}
+          sx={{ width: "100%" }}
+        >
+          {getGoogleCalendarDateRemovedToastText("Task")}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

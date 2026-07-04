@@ -21,6 +21,10 @@ import {
   getTaskTargetCompletionDateError,
   getTaskTargetCompletionDateMinDateTime
 } from "./taskValidation";
+import {
+  getGoogleCalendarNoDateWarningText
+} from "../integrations/googleCalendarSync";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -43,6 +47,7 @@ const TaskForm = ({
   const [parentGoals, setParentGoals] = useState([]);
   const [categories, setCategories] = useState([]);
   const now = dayjs();
+  const { status: googleCalendarStatus } = useGoogleCalendarStatus();
 
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -208,6 +213,13 @@ const TaskForm = ({
       }),
     [isEditing, now, originalTargetCompletionDate]
   );
+  const targetDateHelperText = parentDeadline
+    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+    : isEditing && originalTargetCompletionDate?.isBefore(now)
+      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+      : !targetCompletionDate && googleCalendarStatus?.connected
+        ? getGoogleCalendarNoDateWarningText()
+        : "Choose a future target date.";
 
   return (
     <Paper
@@ -349,11 +361,7 @@ const TaskForm = ({
                 textFieldProps={{
                   fullWidth: true,
                   size: "small",
-                  helperText: parentDeadline
-                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
-                    : isEditing && originalTargetCompletionDate?.isBefore(now)
-                      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
-                      : "Choose a future target date."
+                  helperText: targetDateHelperText
                 }}
               />
             </Box>

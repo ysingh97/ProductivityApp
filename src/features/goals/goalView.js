@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -15,6 +16,7 @@ import {
   MenuItem,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Switch,
   TextField,
@@ -38,6 +40,13 @@ import {
   mergeGoalsById
 } from "./goalHierarchy";
 import GoalTreeContextPanel from "./GoalTreeContextPanel";
+import {
+  getGoogleCalendarDateRemovedToastText,
+  getGoogleCalendarItemSyncState,
+  getGoogleCalendarNoDateWarningText,
+  wasTargetDateRemoved
+} from "../integrations/googleCalendarSync";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -83,6 +92,9 @@ const GoalView = ({ goal }) => {
   const [deletingGoal, setDeletingGoal] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(goal));
+  const [dateRemovedToastOpen, setDateRemovedToastOpen] = useState(false);
+  const { status: googleCalendarStatus, loading: googleCalendarStatusLoading } =
+    useGoogleCalendarStatus();
 
   useEffect(() => {
     setCurrentGoal(goal);
@@ -92,6 +104,7 @@ const GoalView = ({ goal }) => {
     setDeletingGoal(false);
     setDeleteError("");
     setEditOpen(false);
+    setDateRemovedToastOpen(false);
   }, [goal]);
 
   useEffect(() => {
@@ -208,14 +221,19 @@ const GoalView = ({ goal }) => {
     setSaving(true);
     setSaveError("");
     try {
+      const nextTargetCompletionDate = formValues.targetCompletionDate
+        ? formValues.targetCompletionDate.toDate()
+        : null;
+      const removedTargetDate = wasTargetDateRemoved({
+        previousTargetCompletionDate: currentGoal.targetCompletionDate,
+        nextTargetCompletionDate
+      });
       const updates = {
         title: formValues.title.trim(),
         description: formValues.description,
         estimatedHours,
         parentGoalId: formValues.parentGoalId || null,
-        targetCompletionDate: formValues.targetCompletionDate
-          ? formValues.targetCompletionDate.toDate()
-          : null,
+        targetCompletionDate: nextTargetCompletionDate,
         isComplete: formValues.isComplete
       };
       if (!formValues.parentGoalId) {
@@ -225,6 +243,9 @@ const GoalView = ({ goal }) => {
       setCurrentGoal(updatedGoal);
       setFormValues(buildFormValues(updatedGoal));
       setEditOpen(false);
+      if (removedTargetDate && googleCalendarStatus?.connected) {
+        setDateRemovedToastOpen(true);
+      }
     } catch (err) {
       console.error(err);
       setSaveError(
@@ -320,14 +341,31 @@ const GoalView = ({ goal }) => {
   const displayedIsComplete = editOpen ? formValues.isComplete : currentGoal.isComplete;
   const displayedIsOverdue =
     displayedDueDate && displayedDueDate < startOfToday && !displayedIsComplete;
+  const targetDateHelperText = parentDeadlineForEdit
+    ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
+    : originalTargetCompletionDate?.isBefore(now)
+      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+      : !formValues.targetCompletionDate && googleCalendarStatus?.connected
+        ? getGoogleCalendarNoDateWarningText()
+        : "Choose a future target date.";
   const estimatedHours = Number(currentGoal.estimatedHours) || 0;
   const timeSpent = Number(currentGoal.timeSpent) || 0;
   const timeLeft = Number(currentGoal.timeLeft) || 0;
   const progressValue =
     estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
+  const googleCalendarSyncState = getGoogleCalendarItemSyncState({
+    item: {
+      ...currentGoal,
+      isComplete: displayedIsComplete,
+      targetCompletionDate: displayedDueDate
+    },
+    status: googleCalendarStatus,
+    loading: googleCalendarStatusLoading
+  });
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
+    <>
+      <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
       <Box
         sx={{
           display: "grid",
@@ -563,11 +601,7 @@ const GoalView = ({ goal }) => {
                         inputProps: {
                           "aria-label": "Target Completion Date"
                         },
-                        helperText: parentDeadlineForEdit
-                          ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
-                          : originalTargetCompletionDate?.isBefore(now)
-                            ? "Existing overdue dates can stay as-is, but any new date must be current or future."
-                            : "Choose a future target date."
+                        helperText: targetDateHelperText
                       }}
                     />
                   </Box>
@@ -620,6 +654,15 @@ const GoalView = ({ goal }) => {
                   Created
                 </Typography>
                 <Typography>{createdDate ? dateFormatter.format(createdDate) : "Unknown"}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Google Calendar sync
+                </Typography>
+                <Typography>{googleCalendarSyncState.label}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {googleCalendarSyncState.detail}
+                </Typography>
               </Box>
             </Box>
             {editOpen && (
@@ -740,7 +783,22 @@ const GoalView = ({ goal }) => {
           </Paper>
         </Stack>
       </Box>
-    </Container>
+      </Container>
+      <Snackbar
+        open={dateRemovedToastOpen}
+        autoHideDuration={6000}
+        onClose={() => setDateRemovedToastOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="info"
+          onClose={() => setDateRemovedToastOpen(false)}
+          sx={{ width: "100%" }}
+        >
+          {getGoogleCalendarDateRemovedToastText("Goal")}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

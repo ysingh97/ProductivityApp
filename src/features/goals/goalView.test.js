@@ -5,6 +5,7 @@ import GoalView from "./goalView";
 import { fetchCategories } from "../categories/categoryService";
 import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
 import { fetchTasks } from "../tasks/taskService";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 jest.mock("../categories/categoryService", () => ({
   fetchCategories: jest.fn()
@@ -19,6 +20,8 @@ jest.mock("./goalService", () => ({
 jest.mock("../tasks/taskService", () => ({
   fetchTasks: jest.fn()
 }));
+
+jest.mock("../integrations/useGoogleCalendarStatus", () => jest.fn());
 
 jest.mock("../../components/DateTimePicker", () => {
   const dayjs = require("dayjs");
@@ -100,6 +103,10 @@ describe("GoalView", () => {
       { _id: "cat-2", title: "Delivery" }
     ]);
     fetchTasks.mockResolvedValue([]);
+    useGoogleCalendarStatus.mockReturnValue({
+      status: null,
+      loading: false
+    });
     updateGoal.mockResolvedValue({});
     deleteGoal.mockResolvedValue({});
   });
@@ -422,5 +429,53 @@ describe("GoalView", () => {
     expect(screen.getAllByText(/^Estimated hours$/i)).toHaveLength(1);
     expect(screen.getAllByText(/^Category$/i)).toHaveLength(1);
     expect(screen.getAllByText(/^Parent goal$/i)).toHaveLength(1);
+  });
+
+  test("shows Google Calendar sync state and a toast when a goal date is removed", async () => {
+    useGoogleCalendarStatus.mockReturnValue({
+      status: {
+        connected: true,
+        selectedCalendarId: "calendar-primary",
+        selectedCalendarSummary: "Primary Calendar",
+        syncEnabled: true
+      },
+      loading: false
+    });
+
+    const updatedGoal = buildGoal({
+      targetCompletionDate: null
+    });
+
+    updateGoal.mockResolvedValue(updatedGoal);
+
+    renderGoalView(buildGoal());
+
+    expect(screen.getByText(/eligible to sync/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/dated, incomplete items sync to primary calendar\./i)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /edit goal details/i }));
+    fireEvent.change(screen.getByLabelText(/target completion date/i), {
+      target: { value: "" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(updateGoal).toHaveBeenCalledWith(
+        "goal-1",
+        expect.objectContaining({
+          targetCompletionDate: null
+        })
+      )
+    );
+
+    expect(await screen.findByText("No deadline")).toBeInTheDocument();
+    expect(
+      screen.getByText(/items without a target date do not sync to google calendar\./i)
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/goal target date removed\. its google calendar event will also be removed\./i)
+    ).toBeInTheDocument();
   });
 });

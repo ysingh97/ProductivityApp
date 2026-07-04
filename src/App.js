@@ -15,6 +15,7 @@ import GoalTreeView from './pages/GoalTreeView';
 import CalendarView from './pages/CalendarView';
 import Visualizations from './pages/Visualizations';
 import GoogleCalendarSettings from './pages/GoogleCalendarSettings';
+import GoogleCalendarSyncItemsPage from './pages/GoogleCalendarSyncItemsPage';
 import RequireAuth from './components/RequireAuth';
 import AppShell from './components/AppShell';
 import { AuthProvider } from './context/AuthContext';
@@ -170,6 +171,10 @@ function App() {
                   <Route path="/calendar" element={<CalendarView />} />
                   <Route path="/visualizations" element={<Visualizations />} />
                   <Route path="/settings/google-calendar" element={<GoogleCalendarSettings />} />
+                  <Route
+                    path="/settings/google-calendar/items/:reasonSlug"
+                    element={<GoogleCalendarSyncItemsPage />}
+                  />
                 </Route>
               </Route>
             </Routes>

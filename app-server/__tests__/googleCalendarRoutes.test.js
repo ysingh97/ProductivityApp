@@ -17,7 +17,8 @@ jest.mock('../services/googleCalendarService', () => ({
 }));
 
 jest.mock('../services/calendarSyncService', () => ({
-  enqueueGoogleSyncForUser: jest.fn()
+  enqueueGoogleSyncForUser: jest.fn(),
+  getGoogleCalendarSyncSummary: jest.fn()
 }));
 
 const express = require('express');
@@ -33,6 +34,7 @@ const {
 } = require('../services/googleOAuthService');
 const { listAvailableCalendars } = require('../services/googleCalendarService');
 const { enqueueGoogleSyncForUser } = require('../services/calendarSyncService');
+const { getGoogleCalendarSyncSummary } = require('../services/calendarSyncService');
 
 jest.setTimeout(60000);
 
@@ -120,12 +122,29 @@ test('callback redirects to the error state when OAuth completion fails', async 
 });
 
 test('status reports disconnected when no Google Calendar connection exists', async () => {
+  getGoogleCalendarSyncSummary.mockResolvedValue({
+    eligibleToSyncCount: 3,
+    blockedByConfigurationCount: 3,
+    activelySyncingCount: 0,
+    missingTargetDateCount: 4,
+    completedCount: 2,
+    configurationIssue: 'disconnected'
+  });
+
   await request(app)
     .get('/api/integrations/google-calendar/status')
     .set('x-user-id', '111111111111111111111111')
     .expect(200)
     .expect({
-      connected: false
+      connected: false,
+      syncSummary: {
+        eligibleToSyncCount: 3,
+        blockedByConfigurationCount: 3,
+        activelySyncingCount: 0,
+        missingTargetDateCount: 4,
+        completedCount: 2,
+        configurationIssue: 'disconnected'
+      }
     });
 });
 
@@ -141,6 +160,14 @@ test('status reports the saved Google Calendar connection details', async () => 
     lastSyncAt: new Date('2026-01-12T18:00:00.000Z'),
     lastSyncError: 'previous failure'
   });
+  getGoogleCalendarSyncSummary.mockResolvedValue({
+    eligibleToSyncCount: 2,
+    blockedByConfigurationCount: 2,
+    activelySyncingCount: 0,
+    missingTargetDateCount: 5,
+    completedCount: 1,
+    configurationIssue: 'syncPaused'
+  });
 
   await request(app)
     .get('/api/integrations/google-calendar/status')
@@ -153,7 +180,15 @@ test('status reports the saved Google Calendar connection details', async () => 
         selectedCalendarId: 'primary',
         selectedCalendarSummary: 'Primary Calendar',
         syncEnabled: false,
-        lastSyncError: 'previous failure'
+        lastSyncError: 'previous failure',
+        syncSummary: {
+          eligibleToSyncCount: 2,
+          blockedByConfigurationCount: 2,
+          activelySyncingCount: 0,
+          missingTargetDateCount: 5,
+          completedCount: 1,
+          configurationIssue: 'syncPaused'
+        }
       });
       expect(body.lastSyncAt).toBe('2026-01-12T18:00:00.000Z');
     });
@@ -200,6 +235,37 @@ test('calendars returns the available calendars for the saved connection', async
   );
 });
 
+test('calendars preserves detailed Google API failures', async () => {
+  await GoogleCalendarConnection.create({
+    userId: new mongoose.Types.ObjectId('111111111111111111111111'),
+    googleEmail: 'calendar@example.com',
+    googleSub: 'google-sub',
+    refreshTokenEncrypted: 'encrypted-token',
+    selectedCalendarId: 'primary',
+    selectedCalendarSummary: 'Primary Calendar',
+    syncEnabled: true
+  });
+
+  listAvailableCalendars.mockRejectedValue({
+    response: {
+      data: {
+        error: {
+          message:
+            'Google Calendar API has not been used in project 123 before or it is disabled.'
+        }
+      }
+    }
+  });
+
+  await request(app)
+    .get('/api/integrations/google-calendar/calendars')
+    .set('x-user-id', '111111111111111111111111')
+    .expect(500)
+    .expect({
+      message: 'Google Calendar API has not been used in project 123 before or it is disabled.'
+    });
+});
+
 test('settings saves selected calendar state, clears sync errors, and queues a full resync', async () => {
   await GoogleCalendarConnection.create({
     userId: new mongoose.Types.ObjectId('111111111111111111111111'),
@@ -210,6 +276,14 @@ test('settings saves selected calendar state, clears sync errors, and queues a f
     selectedCalendarSummary: null,
     syncEnabled: false,
     lastSyncError: 'stale failure'
+  });
+  getGoogleCalendarSyncSummary.mockResolvedValue({
+    eligibleToSyncCount: 4,
+    blockedByConfigurationCount: 0,
+    activelySyncingCount: 4,
+    missingTargetDateCount: 2,
+    completedCount: 1,
+    configurationIssue: null
   });
 
   await request(app)
@@ -226,7 +300,15 @@ test('settings saves selected calendar state, clears sync errors, and queues a f
       googleEmail: 'calendar@example.com',
       selectedCalendarId: 'team-calendar',
       selectedCalendarSummary: 'Team Calendar',
-      syncEnabled: true
+      syncEnabled: true,
+      syncSummary: {
+        eligibleToSyncCount: 4,
+        blockedByConfigurationCount: 0,
+        activelySyncingCount: 4,
+        missingTargetDateCount: 2,
+        completedCount: 1,
+        configurationIssue: null
+      }
     });
 
   const persistedConnection = await GoogleCalendarConnection.findOne({

@@ -27,6 +27,10 @@ import {
   getBlockedParentGoalIds,
   mergeGoalsById
 } from "./goalHierarchy";
+import {
+  getGoogleCalendarNoDateWarningText
+} from "../integrations/googleCalendarSync";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -43,6 +47,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
   const [categories, setCategories] = useState([]);
   const isEditing = Boolean(isEditingProp || goal);
   const now = dayjs();
+  const { status: googleCalendarStatus } = useGoogleCalendarStatus();
 
   const location = useLocation();
   const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
@@ -251,6 +256,13 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
     originalTargetCompletionDate,
     allowUnchangedPastDate: isEditing
   });
+  const targetDateHelperText = parentDeadline
+    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+    : isEditing && originalTargetCompletionDate?.isBefore(now)
+      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+      : !targetCompletionDate && googleCalendarStatus?.connected
+        ? getGoogleCalendarNoDateWarningText()
+        : "Choose a future target date.";
   const parentGoalHelperText = isParentGoalFixed
     ? "Locked because you opened this from a parent goal."
     : selectedParentGoal
@@ -364,11 +376,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
                 textFieldProps={{
                   fullWidth: true,
                   size: "small",
-                  helperText: parentDeadline
-                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
-                    : isEditing && originalTargetCompletionDate?.isBefore(now)
-                      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
-                      : "Choose a future target date."
+                  helperText: targetDateHelperText
                 }}
               />
 

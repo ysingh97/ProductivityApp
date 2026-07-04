@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import TaskView from "./taskView";
 import { fetchCategories } from "../categories/categoryService";
 import { fetchGoals } from "../goals/goalService";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 import { fetchLists } from "../lists/listService";
 import {
   createTaskTimeEntry,
@@ -27,6 +28,8 @@ jest.mock("../goals/goalService", () => ({
 jest.mock("../lists/listService", () => ({
   fetchLists: jest.fn()
 }));
+
+jest.mock("../integrations/useGoogleCalendarStatus", () => jest.fn());
 
 jest.mock("./taskService", () => ({
   createTaskTimeEntry: jest.fn(),
@@ -126,6 +129,10 @@ describe("TaskView", () => {
     fetchTasks.mockResolvedValue([]);
     fetchLists.mockResolvedValue([]);
     fetchCategories.mockResolvedValue([]);
+    useGoogleCalendarStatus.mockReturnValue({
+      status: null,
+      loading: false
+    });
     fetchTaskTimeEntries.mockResolvedValue([]);
     createTaskTimeEntry.mockResolvedValue({});
     updateTaskTimeEntry.mockResolvedValue({});
@@ -304,6 +311,16 @@ describe("TaskView", () => {
   });
 
   test("clears an existing target date and persists null through save", async () => {
+    useGoogleCalendarStatus.mockReturnValue({
+      status: {
+        connected: true,
+        selectedCalendarId: "calendar-primary",
+        selectedCalendarSummary: "Primary Calendar",
+        syncEnabled: true
+      },
+      loading: false
+    });
+
     const updatedTask = buildTask({
       targetCompletionDate: null
     });
@@ -313,6 +330,10 @@ describe("TaskView", () => {
     renderTaskView(buildTask());
 
     await screen.findByText("Dec 1, 2026");
+    expect(screen.getByText(/eligible to sync/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/dated, incomplete items sync to primary calendar\./i)
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /edit task details/i }));
     setDateTimeValue("Target Completion Date", "");
@@ -332,6 +353,12 @@ describe("TaskView", () => {
     );
 
     expect(await screen.findByText("No deadline")).toBeInTheDocument();
+    expect(
+      screen.getByText(/items without a target date do not sync to google calendar\./i)
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/task target date removed\. its google calendar event will also be removed\./i)
+    ).toBeInTheDocument();
   });
 
   test("allows editing an overdue task without changing its existing past target date", async () => {
