@@ -12,10 +12,10 @@
 - Completed: Include goal tree context inside the goal detail view, with the current goal highlighted so users can keep orientation while navigating related goals.
 - Completed: Include goal tree context inside the task detail view, with the current task highlighted so task pages keep the same goal-tree orientation as goal pages.
 - Completed: Make the goal detail page editable in place, so the main detail view now handles title, description, estimate, category, parent, date, and status updates without a separate sidebar editor.
+- Completed: Make the option to mark a goal or task as complete more visible so it is available from the main detail view instead of being hidden behind the edit flow.
 
 ## Potential
 - Consider post-create actions that return task/goal creation flows to the originating list, goal, or tree view after saving.
-- Make the option to mark a goal or task as complete more visible so it is available from the main detail view instead of being hidden behind the edit flow.
 - Consider richer parent-goal relationships, including adding a parent to an existing goal after creation and evaluating the product, UX, and data-model implications of allowing multiple parents for a goal or task.
 - Add CRUD operations to the goal tree view for tasks and goals, such as creating child goals/tasks from a node, editing key fields inline, moving items, and deleting items with confirmation.
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.

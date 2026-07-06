@@ -361,6 +361,33 @@ describe("TaskView", () => {
     ).toBeInTheDocument();
   });
 
+  test("toggles a task complete directly from the summary card", async () => {
+    const completedTask = buildTask({
+      isComplete: true
+    });
+
+    updateTask.mockResolvedValue(completedTask);
+
+    renderTaskView(buildTask());
+
+    await screen.findByText(/no logged time yet for this task/i);
+
+    const completionToggle = screen.getByRole("switch", { name: /^complete$/i });
+
+    expect(completionToggle).not.toBeChecked();
+
+    fireEvent.click(completionToggle);
+
+    await waitFor(() =>
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        isComplete: true
+      })
+    );
+
+    await waitFor(() => expect(screen.getByRole("switch", { name: /^complete$/i })).toBeChecked());
+    expect(screen.queryByText("In progress")).not.toBeInTheDocument();
+  });
+
   test("allows editing an overdue task without changing its existing past target date", async () => {
     const overdueTask = buildTask({
       _id: "task-overdue",

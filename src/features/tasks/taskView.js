@@ -134,7 +134,9 @@ const TaskView = ({ task }) => {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [statusUpdateError, setStatusUpdateError] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingTask, setDeletingTask] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -169,6 +171,7 @@ const TaskView = ({ task }) => {
     setEditingTimeEntryValues(null);
     setEditingTimeEntryError("");
     setSaveError("");
+    setStatusUpdateError("");
     setDeleteConfirmOpen(false);
     setDeletingTask(false);
     setDeleteError("");
@@ -350,6 +353,7 @@ const TaskView = ({ task }) => {
   const handleStartEdit = () => {
     setFormValues(buildFormValues(currentTask));
     setSaveError("");
+    setStatusUpdateError("");
     setEditOpen(true);
   };
 
@@ -357,6 +361,30 @@ const TaskView = ({ task }) => {
     setFormValues(buildFormValues(currentTask));
     setEditOpen(false);
     setSaveError("");
+    setStatusUpdateError("");
+  };
+
+  const handleToggleComplete = async () => {
+    if (!currentTask?._id || editOpen) return;
+
+    setStatusUpdating(true);
+    setStatusUpdateError("");
+    try {
+      const updatedTask = await updateTask(currentTask._id, {
+        isComplete: !Boolean(currentTask.isComplete)
+      });
+      setCurrentTask(updatedTask);
+      setFormValues(buildFormValues(updatedTask));
+    } catch (err) {
+      console.error(err);
+      setStatusUpdateError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Unable to update completion status right now."
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
   };
 
   const handleDeleteTask = async () => {
@@ -633,6 +661,20 @@ const TaskView = ({ task }) => {
                     size="small"
                   />
                   {displayedIsOverdue && <Chip label="Overdue" color="error" size="small" />}
+                  {!editOpen && (
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          size="small"
+                          checked={displayedIsComplete}
+                          onChange={handleToggleComplete}
+                          disabled={saving || statusUpdating}
+                        />
+                      }
+                      label={statusUpdating ? "Updating..." : "Complete"}
+                    />
+                  )}
                   <IconButton
                     onClick={editOpen ? handleCancel : handleStartEdit}
                     aria-label={editOpen ? "Cancel task summary editing" : "Edit task summary"}
@@ -664,6 +706,11 @@ const TaskView = ({ task }) => {
               ) : (
                 <Typography variant="body1" color="text.secondary">
                   {currentTask.description || "No description yet."}
+                </Typography>
+              )}
+              {!editOpen && statusUpdateError && (
+                <Typography color="error" role="alert">
+                  {statusUpdateError}
                 </Typography>
               )}
             </Stack>

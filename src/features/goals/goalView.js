@@ -87,7 +87,9 @@ const GoalView = ({ goal }) => {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [statusUpdateError, setStatusUpdateError] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingGoal, setDeletingGoal] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -100,6 +102,7 @@ const GoalView = ({ goal }) => {
     setCurrentGoal(goal);
     setFormValues(buildFormValues(goal));
     setSaveError("");
+    setStatusUpdateError("");
     setDeleteConfirmOpen(false);
     setDeletingGoal(false);
     setDeleteError("");
@@ -268,6 +271,7 @@ const GoalView = ({ goal }) => {
     }
     setFormValues(nextFormValues);
     setSaveError("");
+    setStatusUpdateError("");
     setEditOpen(true);
   };
 
@@ -275,6 +279,30 @@ const GoalView = ({ goal }) => {
     setFormValues(buildFormValues(currentGoal));
     setEditOpen(false);
     setSaveError("");
+    setStatusUpdateError("");
+  };
+
+  const handleToggleComplete = async () => {
+    if (!currentGoal?._id || editOpen) return;
+
+    setStatusUpdating(true);
+    setStatusUpdateError("");
+    try {
+      const updatedGoal = await updateGoal(currentGoal._id, {
+        isComplete: !Boolean(currentGoal.isComplete)
+      });
+      setCurrentGoal(updatedGoal);
+      setFormValues(buildFormValues(updatedGoal));
+    } catch (err) {
+      console.error(err);
+      setStatusUpdateError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Unable to update completion status right now."
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
   };
 
   const handleDeleteGoal = async () => {
@@ -412,6 +440,20 @@ const GoalView = ({ goal }) => {
                     size="small"
                   />
                   {displayedIsOverdue && <Chip label="Overdue" color="error" size="small" />}
+                  {!editOpen && (
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          size="small"
+                          checked={displayedIsComplete}
+                          onChange={handleToggleComplete}
+                          disabled={saving || statusUpdating}
+                        />
+                      }
+                      label={statusUpdating ? "Updating..." : "Complete"}
+                    />
+                  )}
                   <IconButton
                     onClick={editOpen ? handleCancel : handleStartEdit}
                     aria-label={editOpen ? "Cancel goal summary editing" : "Edit goal summary"}
@@ -443,6 +485,11 @@ const GoalView = ({ goal }) => {
               ) : (
                 <Typography variant="body1" color="text.secondary">
                   {currentGoal.description || "No description yet."}
+                </Typography>
+              )}
+              {!editOpen && statusUpdateError && (
+                <Typography color="error" role="alert">
+                  {statusUpdateError}
                 </Typography>
               )}
             </Stack>

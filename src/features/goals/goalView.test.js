@@ -287,6 +287,31 @@ describe("GoalView", () => {
     expect(updateGoal).not.toHaveBeenCalled();
   });
 
+  test("toggles a goal complete directly from the summary card", async () => {
+    const completedGoal = buildGoal({
+      isComplete: true
+    });
+
+    updateGoal.mockResolvedValue(completedGoal);
+
+    renderGoalView(buildGoal());
+
+    const completionToggle = screen.getByRole("switch", { name: /^complete$/i });
+
+    expect(completionToggle).not.toBeChecked();
+
+    fireEvent.click(completionToggle);
+
+    await waitFor(() =>
+      expect(updateGoal).toHaveBeenCalledWith("goal-1", {
+        isComplete: true
+      })
+    );
+
+    await waitFor(() => expect(screen.getByRole("switch", { name: /^complete$/i })).toBeChecked());
+    expect(screen.queryByText("In progress")).not.toBeInTheDocument();
+  });
+
   test("does not offer descendant goals as parent options", async () => {
     const currentGoal = buildGoal({
       _id: "goal-root",
