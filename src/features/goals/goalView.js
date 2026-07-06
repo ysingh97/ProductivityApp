@@ -379,6 +379,7 @@ const GoalView = ({ goal }) => {
   const estimatedHours = Number(currentGoal.estimatedHours) || 0;
   const timeSpent = Number(currentGoal.timeSpent) || 0;
   const timeLeft = Number(currentGoal.timeLeft) || 0;
+  const hasMetEstimate = estimatedHours > 0 && timeSpent >= estimatedHours;
   const progressValue =
     estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
   const googleCalendarSyncState = getGoogleCalendarItemSyncState({
@@ -517,78 +518,85 @@ const GoalView = ({ goal }) => {
               </IconButton>
             </Stack>
             <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" color="text.secondary">
-                Goal progress
-              </Typography>
-              {estimatedHours > 0 ? (
-                <Stack spacing={1} sx={{ mt: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatHours(timeSpent)} / {formatHours(estimatedHours)} hrs
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={progressValue}
-                    sx={{ height: 8, borderRadius: 999 }}
-                  />
-                </Stack>
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Add an estimate to track remaining time for this goal.
-                </Typography>
-              )}
-            </Box>
-            <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" fontWeight={700} gutterBottom>
                 Time tracking
               </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
-                  gap: 2
-                }}
-              >
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Estimated hours
-                  </Typography>
-                  {editOpen ? (
-                    <TextField
-                      value={formValues.estimatedHours}
-                      onChange={(event) =>
-                        setFormValues((prev) => ({
-                          ...prev,
-                          estimatedHours: event.target.value
-                        }))
-                      }
-                      type="number"
-                      size="small"
-                      inputProps={{
-                        "aria-label": "Estimated hours",
-                        min: 0,
-                        step: "0.25"
+              <Stack spacing={2}>
+                {estimatedHours > 0 ? (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {`Progress: ${formatHours(timeSpent)} / ${formatHours(estimatedHours)} hrs`}
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={progressValue}
+                      sx={{
+                        height: 10,
+                        borderRadius: 999,
+                        bgcolor: hasMetEstimate
+                          ? "rgba(34, 197, 94, 0.2)"
+                          : "rgba(239, 68, 68, 0.28)",
+                        "& .MuiLinearProgress-bar": {
+                          borderRadius: 999,
+                          bgcolor: hasMetEstimate ? "#22c55e" : "#f59e0b"
+                        }
                       }}
-                      helperText="Used to track time spent and remaining time."
-                      fullWidth
-                      sx={{ mt: 0.5 }}
                     />
-                  ) : (
-                    <Typography sx={{ mt: 0.5 }}>{formatHours(estimatedHours)}</Typography>
-                  )}
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Time spent
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Add an estimate to track remaining time for this goal.
                   </Typography>
-                  <Typography>{formatHours(timeSpent)}</Typography>
+                )}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                    gap: 2
+                  }}
+                >
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Estimated hours
+                    </Typography>
+                    {editOpen ? (
+                      <TextField
+                        value={formValues.estimatedHours}
+                        onChange={(event) =>
+                          setFormValues((prev) => ({
+                            ...prev,
+                            estimatedHours: event.target.value
+                          }))
+                        }
+                        type="number"
+                        size="small"
+                        inputProps={{
+                          "aria-label": "Estimated hours",
+                          min: 0,
+                          step: "0.25"
+                        }}
+                        helperText="Used to track time spent and remaining time."
+                        fullWidth
+                        sx={{ mt: 0.5 }}
+                      />
+                    ) : (
+                      <Typography sx={{ mt: 0.5 }}>{formatHours(estimatedHours)}</Typography>
+                    )}
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Time spent
+                    </Typography>
+                    <Typography>{formatHours(timeSpent)}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Time left
+                    </Typography>
+                    <Typography>{formatHours(timeLeft)}</Typography>
+                  </Box>
                 </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Time left
-                  </Typography>
-                  <Typography>{formatHours(timeLeft)}</Typography>
-                </Box>
-              </Box>
+              </Stack>
             </Box>
             <Box
               sx={{

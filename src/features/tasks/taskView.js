@@ -718,22 +718,6 @@ const TaskView = ({ task }) => {
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
             <Typography variant="h6" fontWeight={700} gutterBottom>
-              Progress
-            </Typography>
-            {hasEstimate ? (
-              <TaskCompletionBar
-                timeSpent={currentTask.timeSpent}
-                estimatedCompletionTime={currentTask.estimatedCompletionTime}
-              />
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No estimate set yet.
-              </Typography>
-            )}
-          </Paper>
-
-          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
               Log time
             </Typography>
             <Stack spacing={2}>
@@ -819,6 +803,21 @@ const TaskView = ({ task }) => {
                 )}
               </IconButton>
             </Stack>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                Time tracking
+              </Typography>
+              {hasEstimate ? (
+                <TaskCompletionBar
+                  timeSpent={currentTask.timeSpent}
+                  estimatedCompletionTime={currentTask.estimatedCompletionTime}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No estimate set yet.
+                </Typography>
+              )}
+            </Box>
             <Box
               sx={{
                 display: "grid",
