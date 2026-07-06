@@ -78,6 +78,32 @@ const formatHours = (value) => {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 };
 
+const summaryTitleFieldSx = {
+  width: "100%",
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2
+  },
+  "& .MuiOutlinedInput-input": {
+    fontSize: (theme) => theme.typography.h4.fontSize,
+    fontWeight: 700,
+    lineHeight: (theme) => theme.typography.h4.lineHeight,
+    py: 1
+  }
+};
+
+const summaryDescriptionFieldSx = {
+  width: "100%",
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2,
+    alignItems: "flex-start"
+  },
+  "& .MuiOutlinedInput-input": {
+    fontSize: (theme) => theme.typography.body1.fontSize,
+    lineHeight: (theme) => theme.typography.body1.lineHeight,
+    color: (theme) => theme.palette.text.secondary
+  }
+};
+
 const GoalView = ({ goal }) => {
   const navigate = useNavigate();
   const [currentGoal, setCurrentGoal] = useState(goal);
@@ -414,16 +440,18 @@ const GoalView = ({ goal }) => {
                   flexWrap: "wrap"
                 }}
               >
-                <Box sx={{ minWidth: 0 }}>
+                <Box sx={{ minWidth: 0, flex: "1 1 360px" }}>
                   {editOpen ? (
                     <TextField
-                      label="Title"
                       value={formValues.title}
                       onChange={(event) =>
                         setFormValues((prev) => ({ ...prev, title: event.target.value }))
                       }
-                      size="small"
+                      placeholder="Title"
+                      variant="outlined"
+                      inputProps={{ "aria-label": "Title" }}
                       fullWidth
+                      sx={summaryTitleFieldSx}
                     />
                   ) : (
                     <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -434,7 +462,11 @@ const GoalView = ({ goal }) => {
                     {displayedCategoryLabel} - {displayedDueLabel}
                   </Typography>
                 </Box>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ flexWrap: "wrap", alignItems: "center", flexShrink: 0 }}
+                >
                   <Chip
                     label={displayedIsComplete ? "Complete" : "In progress"}
                     color={displayedIsComplete ? "success" : "warning"}
@@ -470,7 +502,6 @@ const GoalView = ({ goal }) => {
               </Box>
               {editOpen ? (
                 <TextField
-                  label="Description"
                   value={formValues.description}
                   onChange={(event) =>
                     setFormValues((prev) => ({
@@ -478,10 +509,13 @@ const GoalView = ({ goal }) => {
                       description: event.target.value
                     }))
                   }
-                  size="small"
+                  placeholder="Description"
+                  variant="outlined"
+                  inputProps={{ "aria-label": "Description" }}
                   multiline
                   minRows={3}
                   fullWidth
+                  sx={summaryDescriptionFieldSx}
                 />
               ) : (
                 <Typography variant="body1" color="text.secondary">
