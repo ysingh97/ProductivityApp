@@ -66,7 +66,7 @@ export const getGoogleCalendarItemSyncState = ({ item, status, loading = false }
   }
 
   return {
-    label: "Eligible to sync",
+    label: "Sync active",
     detail: status.selectedCalendarSummary
       ? `Dated, incomplete items sync to ${status.selectedCalendarSummary}.`
       : "Dated, incomplete items sync to the selected Google Calendar."

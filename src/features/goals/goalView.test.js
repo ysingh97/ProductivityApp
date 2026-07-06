@@ -475,10 +475,7 @@ describe("GoalView", () => {
 
     renderGoalView(buildGoal());
 
-    expect(screen.getByText(/eligible to sync/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/dated, incomplete items sync to primary calendar\./i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/sync active/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /edit goal details/i }));
     fireEvent.change(screen.getByLabelText(/target completion date/i), {
@@ -496,9 +493,7 @@ describe("GoalView", () => {
     );
 
     expect(await screen.findByText("No deadline")).toBeInTheDocument();
-    expect(
-      screen.getByText(/items without a target date do not sync to google calendar\./i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/^not syncing$/i)).toBeInTheDocument();
     expect(
       await screen.findByText(/goal target date removed\. its google calendar event will also be removed\./i)
     ).toBeInTheDocument();

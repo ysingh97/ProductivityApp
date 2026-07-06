@@ -1013,9 +1013,6 @@ const TaskView = ({ task }) => {
                   Google Calendar sync
                 </Typography>
                 <Typography>{googleCalendarSyncState.label}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {googleCalendarSyncState.detail}
-                </Typography>
               </Box>
             </Box>
             {editOpen && (

@@ -330,10 +330,7 @@ describe("TaskView", () => {
     renderTaskView(buildTask());
 
     await screen.findByText("Dec 1, 2026");
-    expect(screen.getByText(/eligible to sync/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/dated, incomplete items sync to primary calendar\./i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/sync active/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /edit task details/i }));
     setDateTimeValue("Target Completion Date", "");
@@ -353,9 +350,7 @@ describe("TaskView", () => {
     );
 
     expect(await screen.findByText("No deadline")).toBeInTheDocument();
-    expect(
-      screen.getByText(/items without a target date do not sync to google calendar\./i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/^not syncing$/i)).toBeInTheDocument();
     expect(
       await screen.findByText(/task target date removed\. its google calendar event will also be removed\./i)
     ).toBeInTheDocument();
