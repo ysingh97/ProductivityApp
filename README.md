@@ -1,4 +1,4 @@
-# Productivity App
+# Branchwork
 
 ## Repository layout
 This repo is an npm-workspaces monorepo:
@@ -14,7 +14,7 @@ This repo is an npm-workspaces monorepo:
 - Start backend: `cd app-server && npm run dev` (development). Start frontend: `npm start`.
 - Sign-in: browse to `/` and sign in with Google; all tasks/lists/goals are scoped to the signed-in user.
 - Quick test: create a task/list/goal, sign out, sign in with another Google account and confirm data isolation.
-- Calendar (upcoming): Google Calendar sync will plug in after auth; placeholder CTA is shown on the sign-in screen.
+- Calendar: Google Calendar sync can be connected after sign-in from the in-app settings menu.
 
 # Getting Started with Create React App
 

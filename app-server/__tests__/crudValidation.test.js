@@ -102,6 +102,37 @@ test('goal update rejects self-parenting', async () => {
     .expect({ message: 'Goal cannot be its own parent' });
 });
 
+test('goal update rejects using a descendant as the new parent', async () => {
+  const { user, categories } = await seedMockCategories('basic');
+  const workCategory = categories.find((category) => category.title === 'Work');
+
+  const rootGoal = await Goal.create({
+    title: 'Root goal',
+    userId: user._id,
+    category: workCategory._id,
+    estimatedHours: 4,
+    timeSpent: 0,
+    timeLeft: 4
+  });
+
+  const childGoal = await Goal.create({
+    title: 'Child goal',
+    userId: user._id,
+    category: workCategory._id,
+    parentGoalId: rootGoal._id,
+    estimatedHours: 2,
+    timeSpent: 0,
+    timeLeft: 2
+  });
+
+  await request(app)
+    .put(`/api/goals/${rootGoal._id}`)
+    .set('Authorization', 'Bearer test:basic')
+    .send({ parentGoalId: String(childGoal._id) })
+    .expect(400)
+    .expect({ message: 'Goal cannot be moved under one of its descendants' });
+});
+
 test('task routes reject malformed task ids and malformed relationship ids', async () => {
   const { categories } = await seedMockCategories('basic');
   const workCategory = categories.find((category) => category.title === 'Work');

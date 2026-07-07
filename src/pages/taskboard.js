@@ -6,6 +6,8 @@ import { Link } from "react-router-dom";
 import DashboardCalendar from "../components/DashboardCalendar";
 
 import {
+  Alert,
+  Collapse,
   Container,
   Box,
   Typography,
@@ -13,14 +15,31 @@ import {
   Paper,
   Chip,
   Stack,
-  CircularProgress
+  CircularProgress,
+  IconButton
 } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+
+const TASK_SECTION_SCROLL_THRESHOLD = 5;
+const GOAL_SECTION_SCROLL_THRESHOLD = 4;
+
+const getScrollableSectionSx = (itemCount, threshold) =>
+  itemCount > threshold
+    ? {
+        maxHeight: { xs: 320, md: 380 },
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+        pr: 0.5,
+        mr: -0.5
+      }
+    : {};
 
 const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
   const [goals, setGoals] = useState([]);
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showGoalsInFocusInfo, setShowGoalsInFocusInfo] = useState(false);
 
   const dateFormatter = useMemo(
     () =>
@@ -222,7 +241,7 @@ const TaskBoard = () => {
     if (!goal.dueDate) {
       return "No target date";
     }
-    if (goal.dueDate < startOfToday) {
+    if (!goal.isComplete && goal.dueDate < startOfToday) {
       return `Overdue · ${dateFormatter.format(goal.dueDate)}`;
     }
     if (goal.dueDate < startOfTomorrow) {
@@ -230,6 +249,12 @@ const TaskBoard = () => {
     }
     return `Target: ${dateFormatter.format(goal.dueDate)}`;
   };
+
+  const isGoalOverdue = (goal) =>
+    Boolean(goal.dueDate) && !goal.isComplete && goal.dueDate < startOfToday;
+
+  const isTaskOverdue = (task) =>
+    Boolean(task.dueDate) && !task.isComplete && task.dueDate < startOfToday;
 
   const renderTaskList = (items, emptyText) => {
     if (!items.length) {
@@ -241,47 +266,55 @@ const TaskBoard = () => {
     }
 
     return (
-      <Stack spacing={1.5}>
-        {items.map((task) => {
-          const meta = getTaskMeta(task);
-          const chip = getDueChip(task);
-          return (
-            <Paper
-              key={task._id}
-              component={Link}
-              to={`/tasks/${task._id}`}
-              variant="outlined"
-              sx={{
-                p: 1.5,
-                textDecoration: "none",
-                color: "inherit",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 2,
-                borderRadius: 2,
-                transition: "0.2s",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  backgroundColor: "rgba(25, 118, 210, 0.04)"
-                }
-              }}
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography fontWeight={600} noWrap>
-                  {task.title}
-                </Typography>
-                {meta && (
-                  <Typography variant="body2" color="text.secondary" noWrap>
-                    {meta}
+      <Box sx={getScrollableSectionSx(items.length, TASK_SECTION_SCROLL_THRESHOLD)}>
+        <Stack spacing={1.5}>
+          {items.map((task) => {
+            const meta = getTaskMeta(task);
+            const chip = getDueChip(task);
+            const overdue = isTaskOverdue(task);
+            return (
+              <Paper
+                key={task._id}
+                component={Link}
+                to={`/tasks/${task._id}`}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  textDecoration: "none",
+                  color: "inherit",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 2,
+                  borderRadius: 2,
+                  borderColor: overdue ? "error.main" : "divider",
+                  backgroundColor: overdue ? "rgba(211, 47, 47, 0.08)" : "transparent",
+                  boxShadow: overdue ? "inset 4px 0 0 rgba(211, 47, 47, 0.8)" : "none",
+                  transition: "0.2s",
+                  "&:hover": {
+                    borderColor: overdue ? "error.dark" : "primary.main",
+                    backgroundColor: overdue
+                      ? "rgba(211, 47, 47, 0.12)"
+                      : "rgba(25, 118, 210, 0.04)"
+                  }
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography fontWeight={600} noWrap>
+                    {task.title}
                   </Typography>
-                )}
-              </Box>
-              <Chip label={chip.label} color={chip.color} size="small" />
-            </Paper>
-          );
-        })}
-      </Stack>
+                  {meta && (
+                    <Typography variant="body2" color="text.secondary" noWrap>
+                      {meta}
+                    </Typography>
+                  )}
+                </Box>
+                <Chip label={chip.label} color={chip.color} size="small" />
+              </Paper>
+            );
+          })}
+        </Stack>
+      </Box>
     );
   };
 
@@ -355,12 +388,37 @@ const TaskBoard = () => {
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Goals in Focus
-            </Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: "center", justifyContent: "space-between", mb: 1.5 }}
+            >
+              <Typography variant="h6" fontWeight={700}>
+                Goals in Focus
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label={
+                  showGoalsInFocusInfo
+                    ? "Hide Goals in Focus explanation"
+                    : "Show Goals in Focus explanation"
+                }
+                onClick={() => setShowGoalsInFocusInfo((prev) => !prev)}
+              >
+                <InfoOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+            <Collapse in={showGoalsInFocusInfo} unmountOnExit>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Shows up to four top-level goals ranked by the earliest due incomplete direct
+                child task, then the goal&apos;s own target date. Work nested only under
+                subgoals is not included here.
+              </Alert>
+            </Collapse>
             {goalsInFocus.length ? (
-              <Stack spacing={2}>
-                {goalsInFocus.map((goal) => (
+              <Box sx={getScrollableSectionSx(goalsInFocus.length, GOAL_SECTION_SCROLL_THRESHOLD)}>
+                <Stack spacing={2}>
+                  {goalsInFocus.map((goal) => (
                   <Box
                     key={goal._id}
                     component={Link}
@@ -370,11 +428,20 @@ const TaskBoard = () => {
                       color: "inherit",
                       borderRadius: 2,
                       p: 1.5,
-                      border: "1px solid rgba(0, 0, 0, 0.08)",
+                      border: "1px solid",
+                      borderColor: isGoalOverdue(goal) ? "error.main" : "rgba(0, 0, 0, 0.08)",
+                      backgroundColor: isGoalOverdue(goal)
+                        ? "rgba(211, 47, 47, 0.08)"
+                        : "transparent",
+                      boxShadow: isGoalOverdue(goal)
+                        ? "inset 4px 0 0 rgba(211, 47, 47, 0.8)"
+                        : "none",
                       transition: "0.2s",
                       "&:hover": {
-                        borderColor: "primary.main",
-                        backgroundColor: "rgba(25, 118, 210, 0.04)"
+                        borderColor: isGoalOverdue(goal) ? "error.dark" : "primary.main",
+                        backgroundColor: isGoalOverdue(goal)
+                          ? "rgba(211, 47, 47, 0.12)"
+                          : "rgba(25, 118, 210, 0.04)"
                       }
                     }}
                   >
@@ -385,12 +452,17 @@ const TaskBoard = () => {
                         ? ` · Next: ${goal.nextTask.title}`
                         : " · No upcoming tasks"}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color={isGoalOverdue(goal) ? "error.main" : "text.secondary"}
+                      fontWeight={isGoalOverdue(goal) ? 600 : 400}
+                    >
                       {getGoalDueLabel(goal)}
                     </Typography>
                   </Box>
-                ))}
-              </Stack>
+                  ))}
+                </Stack>
+              </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 No goals yet. Create one to start tracking progress.
@@ -403,8 +475,9 @@ const TaskBoard = () => {
               Upcoming Goal Deadlines (30 Days)
             </Typography>
             {upcomingGoals.length ? (
-              <Stack spacing={1.5}>
-                {upcomingGoals.map((goal) => (
+              <Box sx={getScrollableSectionSx(upcomingGoals.length, GOAL_SECTION_SCROLL_THRESHOLD)}>
+                <Stack spacing={1.5}>
+                  {upcomingGoals.map((goal) => (
                   <Box
                     key={goal._id}
                     component={Link}
@@ -435,8 +508,9 @@ const TaskBoard = () => {
                       color="default"
                     />
                   </Box>
-                ))}
-              </Stack>
+                  ))}
+                </Stack>
+              </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 No goals due in the next 30 days.

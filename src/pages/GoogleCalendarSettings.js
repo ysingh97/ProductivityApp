@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -30,6 +30,7 @@ import {
   saveGoogleCalendarSettings,
   syncGoogleCalendarNow
 } from "../features/integrations/googleCalendarService";
+import { getGoogleCalendarSyncSummaryReasonLabel } from "../features/integrations/googleCalendarSync";
 
 const formatDateTime = (value) => {
   if (!value) return "Never";
@@ -43,6 +44,12 @@ const formatDateTime = (value) => {
     minute: "2-digit"
   }).format(parsed);
 };
+
+const getApiErrorMessage = (err, fallback) =>
+  err?.response?.data?.message ||
+  err?.response?.data?.error?.message ||
+  err?.message ||
+  fallback;
 
 const GoogleCalendarSettings = () => {
   const navigate = useNavigate();
@@ -68,6 +75,22 @@ const GoogleCalendarSettings = () => {
       })),
     [calendars]
   );
+  const resolvedSelectedCalendarId = calendarOptions.some(
+    (calendar) => calendar.value === selectedCalendarId
+  )
+    ? selectedCalendarId
+    : "";
+  const syncSummary = status?.syncSummary || null;
+  const blockedConfigurationReasonLabel = getGoogleCalendarSyncSummaryReasonLabel(
+    syncSummary?.configurationIssue
+  );
+  const selectedCalendar = calendarOptions.find(
+    (calendar) => calendar.value === selectedCalendarId
+  );
+  const hasUnsavedSyncSettingChanges =
+    Boolean(status?.connected) &&
+    (status?.selectedCalendarId !== selectedCalendarId ||
+      Boolean(status?.syncEnabled) !== Boolean(syncEnabled));
 
   const loadStatus = async () => {
     setLoadingStatus(true);
@@ -79,7 +102,7 @@ const GoogleCalendarSettings = () => {
       return nextStatus;
     } catch (err) {
       console.error(err);
-      setError("Unable to load Google Calendar connection status.");
+      setError(getApiErrorMessage(err, "Unable to load Google Calendar connection status."));
       return null;
     } finally {
       setLoadingStatus(false);
@@ -93,7 +116,7 @@ const GoogleCalendarSettings = () => {
       setCalendars(nextCalendars);
     } catch (err) {
       console.error(err);
-      setError("Unable to load available Google calendars.");
+      setError(getApiErrorMessage(err, "Unable to load available Google calendars."));
     } finally {
       setLoadingCalendars(false);
     }
@@ -135,16 +158,12 @@ const GoogleCalendarSettings = () => {
       window.location.assign(url);
     } catch (err) {
       console.error(err);
-      setError("Unable to start the Google Calendar connection flow.");
+      setError(getApiErrorMessage(err, "Unable to start the Google Calendar connection flow."));
       setConnecting(false);
     }
   };
 
   const handleSave = async () => {
-    const selectedCalendar = calendarOptions.find(
-      (calendar) => calendar.value === selectedCalendarId
-    );
-
     setSaving(true);
     setError("");
     setFeedback("");
@@ -159,7 +178,7 @@ const GoogleCalendarSettings = () => {
       setFeedback("Google Calendar settings saved. A full resync has been queued.");
     } catch (err) {
       console.error(err);
-      setError("Unable to save Google Calendar settings.");
+      setError(getApiErrorMessage(err, "Unable to save Google Calendar settings."));
     } finally {
       setSaving(false);
     }
@@ -170,12 +189,22 @@ const GoogleCalendarSettings = () => {
     setError("");
     setFeedback("");
     try {
-      await syncGoogleCalendarNow();
-      setFeedback("Google Calendar sync queued.");
-      await loadStatus();
+      if (hasUnsavedSyncSettingChanges) {
+        const nextStatus = await saveGoogleCalendarSettings({
+          selectedCalendarId,
+          selectedCalendarSummary: selectedCalendar?.label || selectedCalendarId,
+          syncEnabled
+        });
+        setStatus((prev) => ({ ...prev, ...nextStatus }));
+        setFeedback("Google Calendar settings saved. A full resync has been queued.");
+      } else {
+        await syncGoogleCalendarNow();
+        setFeedback("Google Calendar sync queued.");
+        await loadStatus();
+      }
     } catch (err) {
       console.error(err);
-      setError("Unable to queue a Google Calendar sync.");
+      setError(getApiErrorMessage(err, "Unable to queue a Google Calendar sync."));
     } finally {
       setSyncingNow(false);
     }
@@ -194,7 +223,7 @@ const GoogleCalendarSettings = () => {
       setFeedback("Google Calendar disconnected.");
     } catch (err) {
       console.error(err);
-      setError("Unable to disconnect Google Calendar.");
+      setError(getApiErrorMessage(err, "Unable to disconnect Google Calendar."));
     } finally {
       setDisconnecting(false);
     }
@@ -208,7 +237,8 @@ const GoogleCalendarSettings = () => {
             Google Calendar
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Connect one Google calendar and keep dated goals and tasks synced from the app.
+            Connect one Google calendar and keep dated, incomplete goals and tasks synced from
+            the app. Items without a target date stay only in Branchwork.
           </Typography>
         </Box>
 
@@ -326,7 +356,7 @@ const GoogleCalendarSettings = () => {
                     <InputLabel id="google-calendar-select-label">Destination calendar</InputLabel>
                     <Select
                       labelId="google-calendar-select-label"
-                      value={selectedCalendarId}
+                      value={resolvedSelectedCalendarId}
                       label="Destination calendar"
                       onChange={(event) => setSelectedCalendarId(event.target.value)}
                     >
@@ -353,7 +383,7 @@ const GoogleCalendarSettings = () => {
                       variant="contained"
                       startIcon={<CalendarMonthOutlinedIcon />}
                       onClick={handleSave}
-                      disabled={saving || loadingCalendars || !selectedCalendarId}
+                      disabled={saving || syncingNow || loadingCalendars || !selectedCalendarId}
                     >
                       {saving ? "Saving..." : "Save settings"}
                     </Button>
@@ -361,7 +391,7 @@ const GoogleCalendarSettings = () => {
                       variant="outlined"
                       startIcon={<SyncOutlinedIcon />}
                       onClick={handleSyncNow}
-                      disabled={syncingNow || !selectedCalendarId}
+                      disabled={saving || syncingNow || !selectedCalendarId}
                     >
                       {syncingNow ? "Queueing..." : "Sync now"}
                     </Button>
@@ -389,6 +419,99 @@ const GoogleCalendarSettings = () => {
                   </Typography>
                 </Stack>
               </Paper>
+
+              {syncSummary && (
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 4 }}>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="h6" fontWeight={700}>
+                        Unsynced items
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        These counts show why items are currently excluded from Google Calendar
+                        sync.
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))" },
+                        gap: 2
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Eligible right now
+                        </Typography>
+                        <Typography variant="h4">{syncSummary.activelySyncingCount}</Typography>
+                      </Box>
+                      <Box
+                        component={Link}
+                        to="/settings/google-calendar/items/missing-target-date"
+                        aria-label={`View ${syncSummary.missingTargetDateCount} items without target dates`}
+                        sx={{
+                          display: "block",
+                          textDecoration: "none",
+                          color: "inherit",
+                          borderRadius: 2,
+                          p: 1.25,
+                          mx: -1.25,
+                          my: -1.25,
+                          transition: "0.2s",
+                          "&:hover": {
+                            backgroundColor: "action.hover"
+                          }
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          No target date
+                        </Typography>
+                        <Typography variant="h4">{syncSummary.missingTargetDateCount}</Typography>
+                      </Box>
+                      <Box
+                        component={Link}
+                        to="/settings/google-calendar/items/completed"
+                        aria-label={`View ${syncSummary.completedCount} completed items excluded from sync`}
+                        sx={{
+                          display: "block",
+                          textDecoration: "none",
+                          color: "inherit",
+                          borderRadius: 2,
+                          p: 1.25,
+                          mx: -1.25,
+                          my: -1.25,
+                          transition: "0.2s",
+                          "&:hover": {
+                            backgroundColor: "action.hover"
+                          }
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Completed
+                        </Typography>
+                        <Typography variant="h4">{syncSummary.completedCount}</Typography>
+                      </Box>
+                    </Box>
+                    {syncSummary.blockedByConfigurationCount > 0 && (
+                      <>
+                        <Divider />
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {blockedConfigurationReasonLabel}
+                          </Typography>
+                          <Typography variant="h4">
+                            {syncSummary.blockedByConfigurationCount}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            These items are dated and incomplete, but current Google Calendar
+                            settings prevent them from syncing.
+                          </Typography>
+                        </Box>
+                      </>
+                    )}
+                  </Stack>
+                </Paper>
+              )}
 
               <Paper variant="outlined" sx={{ p: 3, borderRadius: 4 }}>
                 <Stack spacing={2}>

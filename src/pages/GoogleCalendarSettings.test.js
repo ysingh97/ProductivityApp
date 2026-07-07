@@ -34,7 +34,15 @@ const connectedStatus = {
   selectedCalendarSummary: "Primary Calendar (Primary)",
   syncEnabled: true,
   lastSyncAt: null,
-  lastSyncError: ""
+  lastSyncError: "",
+  syncSummary: {
+    eligibleToSyncCount: 6,
+    blockedByConfigurationCount: 0,
+    activelySyncingCount: 6,
+    missingTargetDateCount: 3,
+    completedCount: 2,
+    configurationIssue: null
+  }
 };
 
 const calendarsResponse = [
@@ -127,7 +135,15 @@ describe("GoogleCalendarSettings", () => {
     saveGoogleCalendarSettings.mockResolvedValue({
       selectedCalendarId: "calendar-team",
       selectedCalendarSummary: "Team Calendar",
-      syncEnabled: false
+      syncEnabled: false,
+      syncSummary: {
+        eligibleToSyncCount: 6,
+        blockedByConfigurationCount: 6,
+        activelySyncingCount: 0,
+        missingTargetDateCount: 3,
+        completedCount: 2,
+        configurationIssue: "syncPaused"
+      }
     });
     syncGoogleCalendarNow.mockResolvedValue({});
     disconnectGoogleCalendar.mockResolvedValue({});
@@ -179,7 +195,21 @@ describe("GoogleCalendarSettings", () => {
     renderGoogleCalendarSettings();
 
     expect(await screen.findByText(/connected as sync@example\.test/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /connect one google calendar and keep dated, incomplete goals and tasks synced from the app\./i
+      )
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Primary Calendar (Primary)").length).toBeGreaterThan(0);
+    expect(screen.getByText("6")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /view 3 items without target dates/i })
+    ).toHaveAttribute("href", "/settings/google-calendar/items/missing-target-date");
+    expect(
+      screen.getByRole("link", { name: /view 2 completed items excluded from sync/i })
+    ).toHaveAttribute("href", "/settings/google-calendar/items/completed");
     expect(fetchGoogleCalendars).toHaveBeenCalledTimes(1);
 
     await openCalendarOption("Team Calendar");
@@ -200,6 +230,7 @@ describe("GoogleCalendarSettings", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText("Team Calendar").length).toBeGreaterThan(0);
     expect(screen.getByText("Sync paused")).toBeInTheDocument();
+    expect(screen.getByText(/automatic sync paused/i)).toBeInTheDocument();
   });
 
   test("queues a sync and disconnects an existing connection", async () => {
@@ -226,5 +257,60 @@ describe("GoogleCalendarSettings", () => {
     expect(await screen.findByText(/google calendar disconnected\./i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /connect google calendar/i })).toBeInTheDocument();
     expect(screen.queryByText(/sync settings/i)).not.toBeInTheDocument();
+  });
+
+  test("sync now saves changed settings before queueing when the calendar selection changed", async () => {
+    fetchGoogleCalendarStatus.mockResolvedValue({ ...connectedStatus });
+    saveGoogleCalendarSettings.mockResolvedValue({
+      ...connectedStatus,
+      selectedCalendarId: "calendar-team",
+      selectedCalendarSummary: "Team Calendar",
+      syncEnabled: true
+    });
+
+    renderGoogleCalendarSettings();
+
+    expect(await screen.findByText(/connected as sync@example\.test/i)).toBeInTheDocument();
+
+    await openCalendarOption("Team Calendar");
+    fireEvent.click(screen.getByRole("button", { name: /sync now/i }));
+
+    await waitFor(() =>
+      expect(saveGoogleCalendarSettings).toHaveBeenCalledWith({
+        selectedCalendarId: "calendar-team",
+        selectedCalendarSummary: "Team Calendar",
+        syncEnabled: true
+      })
+    );
+    expect(syncGoogleCalendarNow).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/google calendar settings saved\. a full resync has been queued\./i)
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Team Calendar").length).toBeGreaterThan(0);
+  });
+
+  test("shows the backend error when loading calendars fails after a successful connection", async () => {
+    fetchGoogleCalendarStatus.mockResolvedValue({ ...connectedStatus });
+    fetchGoogleCalendars.mockRejectedValue({
+      response: {
+        data: {
+          message: "Google Calendar API has not been used in project 123 before or it is disabled."
+        }
+      }
+    });
+
+    renderGoogleCalendarSettings("/settings/google-calendar?googleCalendar=connected");
+
+    expect(await screen.findByText(/connected as sync@example\.test/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        /google calendar api has not been used in project 123 before or it is disabled\./i
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /google calendar connected\. choose a calendar and save your sync settings\./i
+      )
+    ).toBeInTheDocument();
   });
 });

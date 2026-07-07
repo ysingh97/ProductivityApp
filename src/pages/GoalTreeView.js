@@ -170,12 +170,20 @@ const GoalTreeView = () => {
   const rootGoal = rootGoalId ? goalsById.get(rootGoalId) : null;
 
   // TODO: Make tree nodes expandable/collapsible.
-  const renderGoalNode = (nodeId, depth = 0) => {
-    const goal = goalsById.get(String(nodeId));
+  const renderGoalNode = (nodeId, depth = 0, visitedGoalIds = new Set()) => {
+    const normalizedNodeId = String(nodeId);
+    if (visitedGoalIds.has(normalizedNodeId)) {
+      return null;
+    }
+
+    const goal = goalsById.get(normalizedNodeId);
     if (!goal) return null;
 
-    const children = goalsByParent.get(String(nodeId)) || [];
-    const goalTasks = tasksByGoal.get(String(nodeId)) || [];
+    const nextVisitedGoalIds = new Set(visitedGoalIds);
+    nextVisitedGoalIds.add(normalizedNodeId);
+
+    const children = goalsByParent.get(normalizedNodeId) || [];
+    const goalTasks = tasksByGoal.get(normalizedNodeId) || [];
     const dueLabel = goal.dueDate ? dateFormatter.format(goal.dueDate) : "No deadline";
     const isSelectedGoal = String(goal._id) === String(goalId);
     const isTopLevelGoal = !goal.parentGoalId;
@@ -339,7 +347,7 @@ const GoalTreeView = () => {
             </Stack>
           )}
 
-          {children.map((child) => renderGoalNode(child._id, depth + 1))}
+          {children.map((child) => renderGoalNode(child._id, depth + 1, nextVisitedGoalIds))}
         </Stack>
       </Box>
     );

@@ -1,5 +1,6 @@
 export {
   getTaskTargetCompletionDateError,
+  getTaskTargetCompletionDateMinDateTime,
   getTaskEstimateHoursError,
   parseTaskEstimateHours,
   getTimeEntryRangeError,

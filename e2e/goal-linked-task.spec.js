@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const { createGoalFixture, createListFixture, futureIso, uniqueSuffix } = require("./support/api");
 const { seedTestAuth } = require("./support/auth");
-const { fillDateTimeField } = require("./support/datetime");
+const { fillDateTimeField, fillDateTimeGroup } = require("./support/datetime");
 
 const selectComboboxOption = async (page, label, optionLabel) => {
   await page.getByRole("combobox", { name: label }).click();
@@ -69,17 +69,25 @@ test("creates a goal-linked task with inherited rules and updates it from the ta
 
   await expect(page).toHaveURL(/\/tasks\/[a-f0-9]{24}$/);
   await expect(page.getByRole("heading", { name: createdTaskTitle })).toBeVisible();
-  await expect(page.getByText(parentGoal.title, { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByText("Parent goal", { exact: true })
+      .locator("..")
+      .getByText(parentGoal.title, { exact: true })
+  ).toBeVisible();
   await expect(page.getByText("Delivery", { exact: true }).first()).toBeVisible();
 
-  await page.getByRole("button", { name: /edit details/i }).click();
+  await page.getByRole("button", { name: /edit task details/i }).click();
   await expect(page.getByRole("button", { name: /save changes/i })).toBeVisible();
 
   await page.getByLabel("Title").fill(editedTaskTitle);
   await page.getByLabel("Description").fill("Edited from the task detail page.");
   await selectComboboxOption(page, /list/i, list.title);
   await page.getByLabel(/estimated completion time \(hours\)/i).fill("4");
-  await fillDateTimeField(page, "Target Completion Date", editedTaskDate);
+  await fillDateTimeGroup(
+    page.getByText("Target date", { exact: true }).locator("..").getByRole("group").first(),
+    editedTaskDate
+  );
   await page.getByRole("switch", { name: /mark complete/i }).click();
   await page.getByRole("button", { name: /save changes/i }).click();
 

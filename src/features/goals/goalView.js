@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -10,24 +11,42 @@ import {
   Divider,
   FormControl,
   FormControlLabel,
-  InputLabel,
+  IconButton,
   LinearProgress,
   MenuItem,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Switch,
   TextField,
   Typography
 } from "@mui/material";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DateTimePicker from "../../components/DateTimePicker";
 import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
 import { fetchCategories } from "../categories/categoryService";
+import { fetchTasks } from "../tasks/taskService";
 import {
   getGoalEstimateHoursError,
+  getGoalTargetCompletionDateMinDateTime,
   getGoalTargetCompletionDateError,
   parseGoalEstimateHours
 } from "./goalValidation";
+import {
+  filterEligibleParentGoals,
+  getBlockedParentGoalIds,
+  mergeGoalsById
+} from "./goalHierarchy";
+import GoalTreeContextPanel from "./GoalTreeContextPanel";
+import {
+  getGoogleCalendarDateRemovedToastText,
+  getGoogleCalendarItemSyncState,
+  getGoogleCalendarNoDateWarningText,
+  wasTargetDateRemoved
+} from "../integrations/googleCalendarSync";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 const getCategoryValue = (value) => {
   if (!value) return "";
@@ -59,37 +78,62 @@ const formatHours = (value) => {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 };
 
+const summaryTitleFieldSx = {
+  width: "100%",
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2
+  },
+  "& .MuiOutlinedInput-input": {
+    fontSize: (theme) => theme.typography.h4.fontSize,
+    fontWeight: 700,
+    lineHeight: (theme) => theme.typography.h4.lineHeight,
+    py: 1
+  }
+};
+
+const summaryDescriptionFieldSx = {
+  width: "100%",
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2,
+    alignItems: "flex-start"
+  },
+  "& .MuiOutlinedInput-input": {
+    fontSize: (theme) => theme.typography.body1.fontSize,
+    lineHeight: (theme) => theme.typography.body1.lineHeight,
+    color: (theme) => theme.palette.text.secondary
+  }
+};
+
 const GoalView = ({ goal }) => {
   const navigate = useNavigate();
   const [currentGoal, setCurrentGoal] = useState(goal);
   const [parentGoals, setParentGoals] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [statusUpdateError, setStatusUpdateError] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingGoal, setDeletingGoal] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [formValues, setFormValues] = useState(buildFormValues(goal));
-  const [estimatedHoursEditOpen, setEstimatedHoursEditOpen] = useState(false);
-  const [estimatedHoursEditValue, setEstimatedHoursEditValue] = useState(
-    goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0"
-  );
-  const [estimatedHoursEditSaving, setEstimatedHoursEditSaving] = useState(false);
-  const [estimatedHoursEditError, setEstimatedHoursEditError] = useState("");
+  const [dateRemovedToastOpen, setDateRemovedToastOpen] = useState(false);
+  const { status: googleCalendarStatus, loading: googleCalendarStatusLoading } =
+    useGoogleCalendarStatus();
 
   useEffect(() => {
     setCurrentGoal(goal);
     setFormValues(buildFormValues(goal));
-    setEstimatedHoursEditOpen(false);
-    setEstimatedHoursEditValue(goal?.estimatedHours !== undefined ? String(goal.estimatedHours) : "0");
-    setEstimatedHoursEditError("");
     setSaveError("");
+    setStatusUpdateError("");
     setDeleteConfirmOpen(false);
     setDeletingGoal(false);
     setDeleteError("");
     setEditOpen(false);
+    setDateRemovedToastOpen(false);
   }, [goal]);
 
   useEffect(() => {
@@ -98,13 +142,15 @@ const GoalView = ({ goal }) => {
     const loadMeta = async () => {
       setLoadingMeta(true);
       try {
-        const [goalData, categoryData] = await Promise.all([
+        const [goalData, categoryData, taskData] = await Promise.all([
           fetchGoals(),
-          fetchCategories()
+          fetchCategories(),
+          fetchTasks()
         ]);
         if (isActive) {
           setParentGoals(goalData);
           setCategories(categoryData);
+          setTasks(taskData);
         }
       } catch (err) {
         console.error(err);
@@ -145,6 +191,19 @@ const GoalView = ({ goal }) => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
+  const now = dayjs();
+  const allKnownGoals = useMemo(
+    () => mergeGoalsById(parentGoals, currentGoal),
+    [currentGoal, parentGoals]
+  );
+  const blockedParentGoalIds = useMemo(
+    () => getBlockedParentGoalIds(allKnownGoals, currentGoal?._id),
+    [allKnownGoals, currentGoal?._id]
+  );
+  const parentGoalOptions = useMemo(
+    () => (currentGoal ? filterEligibleParentGoals(allKnownGoals, currentGoal._id) : []),
+    [allKnownGoals, currentGoal]
+  );
 
   const parseDate = (value) => {
     if (!value) return null;
@@ -155,7 +214,11 @@ const GoalView = ({ goal }) => {
   const handleSave = async () => {
     if (!currentGoal) return;
 
-    const now = dayjs();
+    if (formValues.parentGoalId && blockedParentGoalIds.has(String(formValues.parentGoalId))) {
+      setSaveError("A goal cannot be moved under one of its descendants.");
+      return;
+    }
+
     const estimatedHours = parseGoalEstimateHours(formValues.estimatedHours);
     const selectedParentGoal = formValues.parentGoalId
       ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
@@ -167,7 +230,11 @@ const GoalView = ({ goal }) => {
     const targetDateError = getGoalTargetCompletionDateError({
       targetCompletionDate: formValues.targetCompletionDate,
       now,
-      parentDeadline
+      parentDeadline,
+      originalTargetCompletionDate: currentGoal.targetCompletionDate
+        ? dayjs(currentGoal.targetCompletionDate)
+        : null,
+      allowUnchangedPastDate: true
     });
     if (targetDateError) {
       setSaveError(targetDateError);
@@ -183,14 +250,19 @@ const GoalView = ({ goal }) => {
     setSaving(true);
     setSaveError("");
     try {
+      const nextTargetCompletionDate = formValues.targetCompletionDate
+        ? formValues.targetCompletionDate.toDate()
+        : null;
+      const removedTargetDate = wasTargetDateRemoved({
+        previousTargetCompletionDate: currentGoal.targetCompletionDate,
+        nextTargetCompletionDate
+      });
       const updates = {
         title: formValues.title.trim(),
         description: formValues.description,
         estimatedHours,
         parentGoalId: formValues.parentGoalId || null,
-        targetCompletionDate: formValues.targetCompletionDate
-          ? formValues.targetCompletionDate.toDate()
-          : null,
+        targetCompletionDate: nextTargetCompletionDate,
         isComplete: formValues.isComplete
       };
       if (!formValues.parentGoalId) {
@@ -200,64 +272,62 @@ const GoalView = ({ goal }) => {
       setCurrentGoal(updatedGoal);
       setFormValues(buildFormValues(updatedGoal));
       setEditOpen(false);
+      if (removedTargetDate && googleCalendarStatus?.connected) {
+        setDateRemovedToastOpen(true);
+      }
     } catch (err) {
       console.error(err);
-      setSaveError("Unable to save changes right now.");
+      setSaveError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Unable to save changes right now."
+      );
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleStartEdit = () => {
+    const nextFormValues = buildFormValues(currentGoal);
+    if (
+      nextFormValues.parentGoalId &&
+      blockedParentGoalIds.has(String(nextFormValues.parentGoalId))
+    ) {
+      nextFormValues.parentGoalId = "";
+    }
+    setFormValues(nextFormValues);
+    setSaveError("");
+    setStatusUpdateError("");
+    setEditOpen(true);
   };
 
   const handleCancel = () => {
     setFormValues(buildFormValues(currentGoal));
     setEditOpen(false);
     setSaveError("");
+    setStatusUpdateError("");
   };
 
-  const handleStartEstimatedHoursEdit = () => {
-    setEstimatedHoursEditOpen(true);
-    setEstimatedHoursEditValue(
-      currentGoal?.estimatedHours !== undefined ? String(currentGoal.estimatedHours) : "0"
-    );
-    setEstimatedHoursEditError("");
-  };
+  const handleToggleComplete = async () => {
+    if (!currentGoal?._id || editOpen) return;
 
-  const handleCancelEstimatedHoursEdit = () => {
-    setEstimatedHoursEditOpen(false);
-    setEstimatedHoursEditValue(
-      currentGoal?.estimatedHours !== undefined ? String(currentGoal.estimatedHours) : "0"
-    );
-    setEstimatedHoursEditError("");
-  };
-
-  const handleSaveEstimatedHours = async () => {
-    if (!currentGoal) return;
-
-    const estimateError = getGoalEstimateHoursError(estimatedHoursEditValue);
-    if (estimateError) {
-      setEstimatedHoursEditError(estimateError);
-      return;
-    }
-
-    const nextEstimatedHours = parseGoalEstimateHours(estimatedHoursEditValue);
-
-    setEstimatedHoursEditSaving(true);
-    setEstimatedHoursEditError("");
+    setStatusUpdating(true);
+    setStatusUpdateError("");
     try {
       const updatedGoal = await updateGoal(currentGoal._id, {
-        estimatedHours: nextEstimatedHours
+        isComplete: !Boolean(currentGoal.isComplete)
       });
       setCurrentGoal(updatedGoal);
       setFormValues(buildFormValues(updatedGoal));
-      setEstimatedHoursEditValue(
-        updatedGoal?.estimatedHours !== undefined ? String(updatedGoal.estimatedHours) : "0"
-      );
-      setEstimatedHoursEditOpen(false);
     } catch (err) {
       console.error(err);
-      setEstimatedHoursEditError("Unable to update estimated hours right now.");
+      setStatusUpdateError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Unable to update completion status right now."
+      );
     } finally {
-      setEstimatedHoursEditSaving(false);
+      setStatusUpdating(false);
     }
   };
 
@@ -292,29 +362,65 @@ const GoalView = ({ goal }) => {
   const dueDate = parseDate(currentGoal.targetCompletionDate);
   const createdDate = parseDate(currentGoal.createdAt);
   const dueLabel = dueDate ? dateFormatter.format(dueDate) : "No deadline";
-  const isOverdue = dueDate && dueDate < startOfToday && !currentGoal.isComplete;
   const categoryLabel = getCategoryLabel(currentGoal.category);
   const parentGoal = currentGoal.parentGoalId
-    ? parentGoals.find((pg) => String(pg._id) === String(currentGoal.parentGoalId))
+    ? allKnownGoals.find((pg) => String(pg._id) === String(currentGoal.parentGoalId))
     : null;
   const isCategoryLocked = Boolean(formValues.parentGoalId);
-  const parentGoalOptions = parentGoals.filter(
-    (pg) => String(pg._id) !== String(currentGoal._id)
-  );
   const selectedParentGoalForEdit = formValues.parentGoalId
-    ? parentGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
+    ? allKnownGoals.find((pg) => String(pg._id) === String(formValues.parentGoalId))
     : null;
   const parentDeadlineForEdit = selectedParentGoalForEdit?.targetCompletionDate
     ? dayjs(selectedParentGoalForEdit.targetCompletionDate)
     : null;
+  const originalTargetCompletionDate = currentGoal.targetCompletionDate
+    ? dayjs(currentGoal.targetCompletionDate)
+    : null;
+  const minimumTargetCompletionDate = getGoalTargetCompletionDateMinDateTime({
+    now,
+    originalTargetCompletionDate,
+    allowUnchangedPastDate: true
+  });
+  const displayedDueDate = editOpen
+    ? formValues.targetCompletionDate?.toDate() || null
+    : dueDate;
+  const displayedDueLabel = displayedDueDate
+    ? dateFormatter.format(displayedDueDate)
+    : "No deadline";
+  const displayedCategoryLabel = editOpen
+    ? getCategoryLabel(
+        formValues.parentGoalId ? selectedParentGoalForEdit?.category : formValues.category
+      )
+    : categoryLabel;
+  const displayedIsComplete = editOpen ? formValues.isComplete : currentGoal.isComplete;
+  const displayedIsOverdue =
+    displayedDueDate && displayedDueDate < startOfToday && !displayedIsComplete;
+  const targetDateHelperText = parentDeadlineForEdit
+    ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
+    : originalTargetCompletionDate?.isBefore(now)
+      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+      : !formValues.targetCompletionDate && googleCalendarStatus?.connected
+        ? getGoogleCalendarNoDateWarningText()
+        : "Choose a future target date.";
   const estimatedHours = Number(currentGoal.estimatedHours) || 0;
   const timeSpent = Number(currentGoal.timeSpent) || 0;
   const timeLeft = Number(currentGoal.timeLeft) || 0;
+  const hasMetEstimate = estimatedHours > 0 && timeSpent >= estimatedHours;
   const progressValue =
     estimatedHours > 0 ? Math.min((timeSpent / estimatedHours) * 100, 100) : 0;
+  const googleCalendarSyncState = getGoogleCalendarItemSyncState({
+    item: {
+      ...currentGoal,
+      isComplete: displayedIsComplete,
+      targetCompletionDate: displayedDueDate
+    },
+    status: googleCalendarStatus,
+    loading: googleCalendarStatusLoading
+  });
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
+    <>
+      <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
       <Box
         sx={{
           display: "grid",
@@ -334,133 +440,202 @@ const GoalView = ({ goal }) => {
                   flexWrap: "wrap"
                 }}
               >
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="h4" fontWeight={700} gutterBottom>
-                    {currentGoal.title}
-                  </Typography>
+                <Box sx={{ minWidth: 0, flex: "1 1 360px" }}>
+                  {editOpen ? (
+                    <TextField
+                      value={formValues.title}
+                      onChange={(event) =>
+                        setFormValues((prev) => ({ ...prev, title: event.target.value }))
+                      }
+                      placeholder="Title"
+                      variant="outlined"
+                      inputProps={{ "aria-label": "Title" }}
+                      fullWidth
+                      sx={summaryTitleFieldSx}
+                    />
+                  ) : (
+                    <Typography variant="h4" fontWeight={700} gutterBottom>
+                      {currentGoal.title}
+                    </Typography>
+                  )}
                   <Typography variant="body2" color="text.secondary">
-                    {categoryLabel} - {dueLabel}
+                    {displayedCategoryLabel} - {displayedDueLabel}
                   </Typography>
                 </Box>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ flexWrap: "wrap", alignItems: "center", flexShrink: 0 }}
+                >
                   <Chip
-                    label={currentGoal.isComplete ? "Complete" : "In progress"}
-                    color={currentGoal.isComplete ? "success" : "warning"}
+                    label={displayedIsComplete ? "Complete" : "In progress"}
+                    color={displayedIsComplete ? "success" : "warning"}
                     size="small"
                   />
-                  {isOverdue && <Chip label="Overdue" color="error" size="small" />}
+                  {displayedIsOverdue && <Chip label="Overdue" color="error" size="small" />}
+                  {!editOpen && (
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          size="small"
+                          checked={displayedIsComplete}
+                          onChange={handleToggleComplete}
+                          disabled={saving || statusUpdating}
+                        />
+                      }
+                      label={statusUpdating ? "Updating..." : "Complete"}
+                    />
+                  )}
+                  <IconButton
+                    onClick={editOpen ? handleCancel : handleStartEdit}
+                    aria-label={editOpen ? "Cancel goal summary editing" : "Edit goal summary"}
+                    size="small"
+                  >
+                    {editOpen ? (
+                      <CloseOutlinedIcon fontSize="small" />
+                    ) : (
+                      <EditOutlinedIcon fontSize="small" />
+                    )}
+                  </IconButton>
                 </Stack>
               </Box>
-              <Typography variant="body1" color="text.secondary">
-                {currentGoal.description || "No description yet."}
-              </Typography>
+              {editOpen ? (
+                <TextField
+                  value={formValues.description}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      description: event.target.value
+                    }))
+                  }
+                  placeholder="Description"
+                  variant="outlined"
+                  inputProps={{ "aria-label": "Description" }}
+                  multiline
+                  minRows={3}
+                  fullWidth
+                  sx={summaryDescriptionFieldSx}
+                />
+              ) : (
+                <Typography variant="body1" color="text.secondary">
+                  {currentGoal.description || "No description yet."}
+                </Typography>
+              )}
+              {!editOpen && statusUpdateError && (
+                <Typography color="error" role="alert">
+                  {statusUpdateError}
+                </Typography>
+              )}
             </Stack>
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Goal details
-            </Typography>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" color="text.secondary">
-                Goal progress
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}
+            >
+              <Typography variant="h6" fontWeight={700}>
+                Goal details
               </Typography>
-              {estimatedHours > 0 ? (
-                <Stack spacing={1} sx={{ mt: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatHours(timeSpent)} / {formatHours(estimatedHours)} hrs
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={progressValue}
-                    sx={{ height: 8, borderRadius: 999 }}
-                  />
-                </Stack>
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Add an estimate to track remaining time for this goal.
-                </Typography>
-              )}
-            </Box>
+              <IconButton
+                onClick={editOpen ? handleCancel : handleStartEdit}
+                aria-label={editOpen ? "Cancel goal detail editing" : "Edit goal details"}
+                size="small"
+              >
+                {editOpen ? (
+                  <CloseOutlinedIcon fontSize="small" />
+                ) : (
+                  <EditOutlinedIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Stack>
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" fontWeight={700} gutterBottom>
                 Time tracking
               </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
-                  gap: 2
-                }}
-              >
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Estimated hours
+              <Stack spacing={2}>
+                {estimatedHours > 0 ? (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {`Progress: ${formatHours(timeSpent)} / ${formatHours(estimatedHours)} hrs`}
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={progressValue}
+                      sx={{
+                        height: 10,
+                        borderRadius: 999,
+                        bgcolor: hasMetEstimate
+                          ? "rgba(34, 197, 94, 0.2)"
+                          : "rgba(239, 68, 68, 0.28)",
+                        "& .MuiLinearProgress-bar": {
+                          borderRadius: 999,
+                          bgcolor: hasMetEstimate ? "#22c55e" : "#f59e0b"
+                        }
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Add an estimate to track remaining time for this goal.
                   </Typography>
-                  {estimatedHoursEditOpen ? (
-                    <Stack spacing={1} sx={{ mt: 0.5 }}>
+                )}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                    gap: 2
+                  }}
+                >
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Estimated hours
+                    </Typography>
+                    {editOpen ? (
                       <TextField
-                        value={estimatedHoursEditValue}
-                        onChange={(event) => setEstimatedHoursEditValue(event.target.value)}
+                        value={formValues.estimatedHours}
+                        onChange={(event) =>
+                          setFormValues((prev) => ({
+                            ...prev,
+                            estimatedHours: event.target.value
+                          }))
+                        }
                         type="number"
                         size="small"
-                        inputProps={{ min: 0, step: "0.25" }}
+                        inputProps={{
+                          "aria-label": "Estimated hours",
+                          min: 0,
+                          step: "0.25"
+                        }}
+                        helperText="Used to track time spent and remaining time."
+                        fullWidth
+                        sx={{ mt: 0.5 }}
                       />
-                      {estimatedHoursEditError && (
-                        <Typography variant="caption" color="error" role="alert">
-                          {estimatedHoursEditError}
-                        </Typography>
-                      )}
-                      <Stack direction="row" spacing={1}>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={handleSaveEstimatedHours}
-                          disabled={estimatedHoursEditSaving}
-                        >
-                          {estimatedHoursEditSaving ? "Saving..." : "Save"}
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={handleCancelEstimatedHoursEdit}
-                          disabled={estimatedHoursEditSaving}
-                        >
-                          Cancel
-                        </Button>
-                      </Stack>
-                    </Stack>
-                  ) : (
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
-                      <Typography>{formatHours(estimatedHours)}</Typography>
-                      <Button
-                        size="small"
-                        onClick={handleStartEstimatedHoursEdit}
-                        aria-label="Edit goal estimated hours"
-                      >
-                        Edit
-                      </Button>
-                    </Stack>
-                  )}
+                    ) : (
+                      <Typography sx={{ mt: 0.5 }}>{formatHours(estimatedHours)}</Typography>
+                    )}
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Time spent
+                    </Typography>
+                    <Typography>{formatHours(timeSpent)}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Time left
+                    </Typography>
+                    <Typography>{formatHours(timeLeft)}</Typography>
+                  </Box>
                 </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Time spent
-                  </Typography>
-                  <Typography>{formatHours(timeSpent)}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Time left
-                  </Typography>
-                  <Typography>{formatHours(timeLeft)}</Typography>
-                </Box>
-              </Box>
+              </Stack>
             </Box>
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" },
                 gap: 2
               }}
             >
@@ -468,19 +643,88 @@ const GoalView = ({ goal }) => {
                 <Typography variant="caption" color="text.secondary">
                   Category
                 </Typography>
-                <Typography>{categoryLabel}</Typography>
+                {editOpen ? (
+                  <TextField
+                    value={formValues.category}
+                    onChange={(event) =>
+                      setFormValues((prev) => ({
+                        ...prev,
+                        category: event.target.value
+                      }))
+                    }
+                    size="small"
+                    disabled={isCategoryLocked}
+                    inputProps={{
+                      "aria-label": "Category",
+                      list: "goal-category-options"
+                    }}
+                    helperText={
+                      isCategoryLocked
+                        ? "Category is inherited from the parent goal."
+                        : "Select or type a category."
+                    }
+                    fullWidth
+                    sx={{ mt: 0.5 }}
+                  />
+                ) : (
+                  <Typography>{categoryLabel}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Target date
                 </Typography>
-                <Typography>{dueLabel}</Typography>
+                {editOpen ? (
+                  <Box sx={{ mt: 0.5 }}>
+                    <DateTimePicker
+                      label=""
+                      value={formValues.targetCompletionDate}
+                      onChange={(value) =>
+                        setFormValues((prev) => ({ ...prev, targetCompletionDate: value }))
+                      }
+                      minDateTime={minimumTargetCompletionDate}
+                      maxDateTime={parentDeadlineForEdit || undefined}
+                      textFieldProps={{
+                        fullWidth: true,
+                        size: "small",
+                        inputProps: {
+                          "aria-label": "Target Completion Date"
+                        },
+                        helperText: targetDateHelperText
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Typography>{dueLabel}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Parent goal
                 </Typography>
-                <Typography>{parentGoal ? parentGoal.title : "None"}</Typography>
+                {editOpen ? (
+                  <FormControl size="small" disabled={loadingMeta} fullWidth sx={{ mt: 0.5 }}>
+                    <Select
+                      value={formValues.parentGoalId}
+                      inputProps={{ "aria-label": "Parent goal" }}
+                      onChange={(event) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          parentGoalId: event.target.value
+                        }))
+                      }
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {parentGoalOptions.map((option) => (
+                        <MenuItem key={option._id} value={option._id}>
+                          {option.title}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Typography>{parentGoal ? parentGoal.title : "None"}</Typography>
+                )}
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
@@ -500,22 +744,74 @@ const GoalView = ({ goal }) => {
                 </Typography>
                 <Typography>{createdDate ? dateFormatter.format(createdDate) : "Unknown"}</Typography>
               </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Google Calendar sync
+                </Typography>
+                <Typography>{googleCalendarSyncState.label}</Typography>
+              </Box>
             </Box>
+            {editOpen && (
+              <>
+                <datalist id="goal-category-options">
+                  {categories.map((category) => (
+                    <option key={category._id} value={category.title} />
+                  ))}
+                </datalist>
+                <Box sx={{ mt: 3 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formValues.isComplete}
+                        onChange={(event) =>
+                          setFormValues((prev) => ({
+                            ...prev,
+                            isComplete: event.target.checked
+                          }))
+                        }
+                      />
+                    }
+                    label="Mark complete"
+                  />
+                  {saveError && (
+                    <Typography color="error" role="alert" sx={{ mt: 1 }}>
+                      {saveError}
+                    </Typography>
+                  )}
+                  <Divider sx={{ my: 2 }} />
+                  <Stack direction="row" spacing={1}>
+                    <Button variant="contained" onClick={handleSave} disabled={saving}>
+                      {saving ? "Saving..." : "Save changes"}
+                    </Button>
+                    <Button variant="outlined" onClick={handleCancel} disabled={saving}>
+                      Cancel
+                    </Button>
+                  </Stack>
+                </Box>
+              </>
+            )}
           </Paper>
         </Stack>
 
         <Stack spacing={3}>
+          {loadingMeta ? (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+              <Stack spacing={1.5} sx={{ alignItems: "center" }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading goal context
+                </Typography>
+              </Stack>
+            </Paper>
+          ) : (
+            <GoalTreeContextPanel currentGoal={currentGoal} goals={parentGoals} tasks={tasks} />
+          )}
+
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
             <Typography variant="subtitle1" fontWeight={700}>
               Actions
             </Typography>
             <Stack spacing={1.5} sx={{ mt: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => setEditOpen((prev) => !prev)}
-              >
-                {editOpen ? "Close edit" : "Edit details"}
-              </Button>
               <Button
                 variant="outlined"
                 component={Link}
@@ -571,149 +867,24 @@ const GoalView = ({ goal }) => {
               )}
             </Stack>
           </Paper>
-
-          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-            <Typography variant="subtitle1" fontWeight={700}>
-              Edit goal
-            </Typography>
-            {!editOpen ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Turn on edit mode to update this goal.
-              </Typography>
-            ) : (
-              <Stack spacing={2} sx={{ mt: 2 }}>
-                <TextField
-                  label="Title"
-                  value={formValues.title}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({ ...prev, title: event.target.value }))
-                  }
-                  size="small"
-                  fullWidth
-                />
-                <TextField
-                  label="Description"
-                  value={formValues.description}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      description: event.target.value
-                    }))
-                  }
-                  size="small"
-                  multiline
-                  minRows={3}
-                  fullWidth
-                />
-                <TextField
-                  label="Category"
-                  value={formValues.category}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      category: event.target.value
-                    }))
-                  }
-                  size="small"
-                  disabled={isCategoryLocked}
-                  inputProps={{ list: "goal-category-options" }}
-                  helperText={
-                    isCategoryLocked
-                      ? "Category is inherited from the parent goal."
-                      : "Select or type a category."
-                  }
-                  fullWidth
-                />
-                <TextField
-                  label="Estimated hours"
-                  value={formValues.estimatedHours}
-                  onChange={(event) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      estimatedHours: event.target.value
-                    }))
-                  }
-                  type="number"
-                  size="small"
-                  inputProps={{ min: 0, step: "0.25" }}
-                  helperText="Used to track time spent and remaining time."
-                  fullWidth
-                />
-                <datalist id="goal-category-options">
-                  {categories.map((category) => (
-                    <option key={category._id} value={category.title} />
-                  ))}
-                </datalist>
-                <FormControl size="small" disabled={loadingMeta} fullWidth>
-                  <InputLabel id="parent-goal-label">Parent goal</InputLabel>
-                  <Select
-                    labelId="parent-goal-label"
-                    label="Parent goal"
-                    value={formValues.parentGoalId}
-                    onChange={(event) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        parentGoalId: event.target.value
-                      }))
-                    }
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {parentGoalOptions.map((option) => (
-                      <MenuItem key={option._id} value={option._id}>
-                        {option.title}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <DateTimePicker
-                  value={formValues.targetCompletionDate}
-                  onChange={(value) =>
-                    setFormValues((prev) => ({ ...prev, targetCompletionDate: value }))
-                  }
-                  minDateTime={dayjs()}
-                  maxDateTime={parentDeadlineForEdit || undefined}
-                  textFieldProps={{
-                    fullWidth: true,
-                    size: "small",
-                    helperText: parentDeadlineForEdit
-                      ? `Must be on or before ${parentDeadlineForEdit.format("MMM D, YYYY h:mm A")}.`
-                      : "Choose a future target date."
-                  }}
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formValues.isComplete}
-                      onChange={(event) =>
-                        setFormValues((prev) => ({
-                          ...prev,
-                          isComplete: event.target.checked
-                        }))
-                      }
-                    />
-                  }
-                  label="Mark complete"
-                />
-                {saveError && (
-                  <Typography color="error" role="alert">
-                    {saveError}
-                  </Typography>
-                )}
-                <Divider />
-                <Stack direction="row" spacing={1}>
-                  <Button variant="contained" onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : "Save changes"}
-                  </Button>
-                  <Button variant="outlined" onClick={handleCancel} disabled={saving}>
-                    Cancel
-                  </Button>
-                </Stack>
-              </Stack>
-            )}
-          </Paper>
         </Stack>
       </Box>
-    </Container>
+      </Container>
+      <Snackbar
+        open={dateRemovedToastOpen}
+        autoHideDuration={6000}
+        onClose={() => setDateRemovedToastOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="info"
+          onClose={() => setDateRemovedToastOpen(false)}
+          sx={{ width: "100%" }}
+        >
+          {getGoogleCalendarDateRemovedToastText("Goal")}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

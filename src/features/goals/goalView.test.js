@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 import GoalView from "./goalView";
 import { fetchCategories } from "../categories/categoryService";
 import { deleteGoal, fetchGoals, updateGoal } from "./goalService";
+import { fetchTasks } from "../tasks/taskService";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 jest.mock("../categories/categoryService", () => ({
   fetchCategories: jest.fn()
@@ -15,17 +17,27 @@ jest.mock("./goalService", () => ({
   updateGoal: jest.fn()
 }));
 
+jest.mock("../tasks/taskService", () => ({
+  fetchTasks: jest.fn()
+}));
+
+jest.mock("../integrations/useGoogleCalendarStatus", () => jest.fn());
+
 jest.mock("../../components/DateTimePicker", () => {
   const dayjs = require("dayjs");
 
   return function MockDateTimePicker({
     label = "Target Completion Date",
     value,
-    onChange
+    onChange,
+    textFieldProps
   }) {
+    const inputAriaLabel =
+      textFieldProps?.inputProps?.["aria-label"] || label || "Target Completion Date";
+
     return (
       <input
-        aria-label={label}
+        aria-label={inputAriaLabel}
         value={value ? value.toISOString() : ""}
         onChange={(event) => onChange(event.target.value ? dayjs(event.target.value) : null)}
       />
@@ -57,10 +69,21 @@ const buildGoal = (overrides = {}) => ({
   ...overrides
 });
 
-const waitForEditFormReady = async () => {
+const buildTask = (overrides = {}) => ({
+  _id: "task-1",
+  title: "Practice reading drills",
+  estimatedCompletionTime: 2,
+  timeSpent: 0.5,
+  isComplete: false,
+  targetCompletionDate: "2026-12-08T10:00:00.000Z",
+  parentGoalId: "goal-child",
+  ...overrides
+});
+
+const openInlineEditMode = async () => {
   await waitFor(() => expect(fetchGoals).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(fetchCategories).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: /edit details/i }));
+  fireEvent.click(screen.getByRole("button", { name: /edit goal summary/i }));
   expect(await screen.findByRole("combobox", { name: /parent goal/i })).toBeInTheDocument();
 };
 
@@ -79,6 +102,11 @@ describe("GoalView", () => {
       { _id: "cat-1", title: "Strategy" },
       { _id: "cat-2", title: "Delivery" }
     ]);
+    fetchTasks.mockResolvedValue([]);
+    useGoogleCalendarStatus.mockReturnValue({
+      status: null,
+      loading: false
+    });
     updateGoal.mockResolvedValue({});
     deleteGoal.mockResolvedValue({});
   });
@@ -98,7 +126,7 @@ describe("GoalView", () => {
 
     renderGoalView(goal);
 
-    await waitForEditFormReady();
+    await openInlineEditMode();
 
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: "Launch the public roadmap" }
@@ -131,7 +159,9 @@ describe("GoalView", () => {
       })
     );
 
-    expect(await screen.findByText("Launch the public roadmap")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Launch the public roadmap" })
+    ).toBeInTheDocument();
     expect(screen.getByText(/delivery - dec 12, 2026/i)).toBeInTheDocument();
   });
 
@@ -157,7 +187,7 @@ describe("GoalView", () => {
 
     renderGoalView(currentGoal);
 
-    await waitForEditFormReady();
+    await openInlineEditMode();
 
     await setParentGoal("Company launch");
 
@@ -188,7 +218,7 @@ describe("GoalView", () => {
 
     renderGoalView(currentGoal);
 
-    await waitForEditFormReady();
+    await openInlineEditMode();
 
     await setParentGoal("Q4 launch");
 
@@ -198,5 +228,274 @@ describe("GoalView", () => {
       await screen.findByText(/sub-goals cannot have a target completion date later than the parent goal\./i)
     ).toBeInTheDocument();
     expect(updateGoal).not.toHaveBeenCalled();
+  });
+
+  test("allows saving other edits on an overdue goal without changing its past target date", async () => {
+    const overdueGoal = buildGoal({
+      _id: "goal-overdue",
+      title: "Old roadmap",
+      targetCompletionDate: "2000-01-10T10:00:00.000Z"
+    });
+    const updatedGoal = buildGoal({
+      _id: "goal-overdue",
+      title: "Old roadmap updated",
+      targetCompletionDate: "2000-01-10T10:00:00.000Z"
+    });
+
+    updateGoal.mockResolvedValue(updatedGoal);
+
+    renderGoalView(overdueGoal);
+
+    await openInlineEditMode();
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Old roadmap updated" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(updateGoal).toHaveBeenCalledWith(
+        "goal-overdue",
+        expect.objectContaining({
+          title: "Old roadmap updated",
+          targetCompletionDate: expect.any(Date)
+        })
+      )
+    );
+  });
+
+  test("still blocks changing an overdue goal to a different past target date", async () => {
+    const overdueGoal = buildGoal({
+      _id: "goal-overdue",
+      targetCompletionDate: "2000-01-10T10:00:00.000Z"
+    });
+
+    renderGoalView(overdueGoal);
+
+    await openInlineEditMode();
+
+    fireEvent.change(screen.getByLabelText(/target completion date/i), {
+      target: { value: "2000-01-11T10:00:00.000Z" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(
+      await screen.findByText(/target completion date cannot be earlier than the current time\./i)
+    ).toBeInTheDocument();
+    expect(updateGoal).not.toHaveBeenCalled();
+  });
+
+  test("toggles a goal complete directly from the summary card", async () => {
+    const completedGoal = buildGoal({
+      isComplete: true
+    });
+
+    updateGoal.mockResolvedValue(completedGoal);
+
+    renderGoalView(buildGoal());
+
+    const completionToggle = screen.getByRole("switch", { name: /^complete$/i });
+
+    expect(completionToggle).not.toBeChecked();
+
+    fireEvent.click(completionToggle);
+
+    await waitFor(() =>
+      expect(updateGoal).toHaveBeenCalledWith("goal-1", {
+        isComplete: true
+      })
+    );
+
+    await waitFor(() => expect(screen.getByRole("switch", { name: /^complete$/i })).toBeChecked());
+    expect(screen.queryByText("In progress")).not.toBeInTheDocument();
+  });
+
+  test("does not offer descendant goals as parent options", async () => {
+    const currentGoal = buildGoal({
+      _id: "goal-root",
+      title: "Program root"
+    });
+    const childGoal = buildGoal({
+      _id: "goal-child",
+      title: "Nested child",
+      parentGoalId: "goal-root"
+    });
+    const siblingGoal = buildGoal({
+      _id: "goal-sibling",
+      title: "Valid sibling parent",
+      parentGoalId: null
+    });
+
+    fetchGoals.mockResolvedValue([currentGoal, childGoal, siblingGoal]);
+
+    renderGoalView(currentGoal);
+
+    await openInlineEditMode();
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: /parent goal/i }));
+    const listbox = await screen.findByRole("listbox");
+
+    expect(within(listbox).getByText("None")).toBeInTheDocument();
+    expect(within(listbox).getByText("Valid sibling parent")).toBeInTheDocument();
+    expect(within(listbox).queryByText("Nested child")).not.toBeInTheDocument();
+  });
+
+  test("shows goal tree context with the current goal highlighted", async () => {
+    const rootGoal = buildGoal({
+      _id: "goal-root",
+      title: "Launch Program",
+      category: { title: "Work" },
+      parentGoalId: null
+    });
+    const siblingGoal = buildGoal({
+      _id: "goal-sibling",
+      title: "Messaging",
+      category: { title: "Work" },
+      parentGoalId: "goal-root"
+    });
+    const currentGoal = buildGoal({
+      _id: "goal-child",
+      title: "QA Pass",
+      category: { title: "Work" },
+      parentGoalId: "goal-root"
+    });
+    const childGoal = buildGoal({
+      _id: "goal-grandchild",
+      title: "Regression sweep",
+      category: { title: "Work" },
+      parentGoalId: "goal-child"
+    });
+    const currentGoalTask = buildTask({
+      _id: "task-child",
+      title: "Take mock listening test",
+      parentGoalId: "goal-child"
+    });
+
+    fetchGoals.mockResolvedValue([rootGoal, siblingGoal, currentGoal, childGoal]);
+    fetchTasks.mockResolvedValue([currentGoalTask]);
+
+    renderGoalView(currentGoal);
+
+    const panel = await screen.findByRole("region", { name: /goal tree context/i });
+
+    expect(within(panel).getByText(/viewing the tree rooted at launch program\./i)).toBeInTheDocument();
+    expect(within(panel).getByText("Current")).toBeInTheDocument();
+    expect(within(panel).getByText("Top-level")).toBeInTheDocument();
+    expect(within(panel).getByText("Messaging")).toBeInTheDocument();
+    expect(within(panel).getByText("Regression sweep")).toBeInTheDocument();
+    expect(within(panel).getByText("Take mock listening test")).toBeInTheDocument();
+    expect(within(panel).getByText("Task")).toBeInTheDocument();
+    expect(within(panel).getAllByText("Goal").length).toBeGreaterThan(0);
+    expect(within(panel).getByRole("link", { name: /launch program/i })).toHaveAttribute(
+      "href",
+      "/goals/goal-root"
+    );
+    expect(within(panel).getByRole("link", { name: /qa pass/i })).toHaveAttribute(
+      "href",
+      "/goals/goal-child"
+    );
+    expect(within(panel).getByRole("link", { name: /take mock listening test/i })).toHaveAttribute(
+      "href",
+      "/tasks/task-child"
+    );
+  });
+
+  test("goal tree context does not recurse forever when cyclic goal data exists", async () => {
+    const currentGoal = buildGoal({
+      _id: "goal-a",
+      title: "Cycle A",
+      parentGoalId: "goal-b"
+    });
+    const parentGoal = buildGoal({
+      _id: "goal-b",
+      title: "Cycle B",
+      parentGoalId: "goal-a"
+    });
+
+    fetchGoals.mockResolvedValue([currentGoal, parentGoal]);
+
+    renderGoalView(currentGoal);
+
+    const panel = await screen.findByRole("region", { name: /goal tree context/i });
+
+    expect(within(panel).getByRole("link", { name: /cycle a/i })).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /cycle b/i })).toBeInTheDocument();
+  });
+
+  test("canceling edit mode restores the original goal detail values", async () => {
+    const goal = buildGoal();
+
+    renderGoalView(goal);
+
+    await openInlineEditMode();
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Draft launch message" }
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "Temporary unsaved description." }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.getByRole("heading", { name: "Launch the roadmap" })).toBeInTheDocument();
+    expect(screen.getByText("Align deliverables for launch.")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Draft launch message")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Temporary unsaved description.")).not.toBeInTheDocument();
+  });
+
+  test("edit mode uses a single visible label for inline detail fields", async () => {
+    renderGoalView(buildGoal());
+
+    await openInlineEditMode();
+
+    expect(screen.getAllByText(/^Estimated hours$/i)).toHaveLength(1);
+    expect(screen.getAllByText(/^Category$/i)).toHaveLength(1);
+    expect(screen.getAllByText(/^Parent goal$/i)).toHaveLength(1);
+  });
+
+  test("shows Google Calendar sync state and a toast when a goal date is removed", async () => {
+    useGoogleCalendarStatus.mockReturnValue({
+      status: {
+        connected: true,
+        selectedCalendarId: "calendar-primary",
+        selectedCalendarSummary: "Primary Calendar",
+        syncEnabled: true
+      },
+      loading: false
+    });
+
+    const updatedGoal = buildGoal({
+      targetCompletionDate: null
+    });
+
+    updateGoal.mockResolvedValue(updatedGoal);
+
+    renderGoalView(buildGoal());
+
+    expect(screen.getByText(/sync active/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /edit goal details/i }));
+    fireEvent.change(screen.getByLabelText(/target completion date/i), {
+      target: { value: "" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(updateGoal).toHaveBeenCalledWith(
+        "goal-1",
+        expect.objectContaining({
+          targetCompletionDate: null
+        })
+      )
+    );
+
+    expect(await screen.findByText("No deadline")).toBeInTheDocument();
+    expect(screen.getByText(/^not syncing$/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/goal target date removed\. its google calendar event will also be removed\./i)
+    ).toBeInTheDocument();
   });
 });

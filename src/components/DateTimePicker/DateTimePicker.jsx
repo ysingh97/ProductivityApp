@@ -12,11 +12,17 @@ const normalizeToMinute = (value) => {
   return value.second(0).millisecond(0);
 };
 
-export default function MyDateTimePicker({ value, onChange, textFieldProps, ...pickerProps }) {
+export default function MyDateTimePicker({
+  label = "Target Completion Date",
+  value,
+  onChange,
+  textFieldProps,
+  ...pickerProps
+}) {
   return (
     <LocalizationProvider adapterLocale="en" dateAdapter={AdapterDayjs}>
       <DateTimePicker
-        label="Target Completion Date"
+        label={label}
         value={value}
         onChange={(nextValue) => onChange(normalizeToMinute(nextValue))}
         {...pickerProps}

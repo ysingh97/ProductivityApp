@@ -1,13 +1,41 @@
 const dayjs = require('dayjs');
 
-const getTaskTargetCompletionDateError = ({ targetCompletionDate, now, parentDeadline }) => {
-  if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+const getTaskTargetCompletionDateError = ({
+  targetCompletionDate,
+  now,
+  parentDeadline,
+  originalTargetCompletionDate = null,
+  allowUnchangedPastDate = false
+}) => {
+  const isKeepingExistingPastDate =
+    Boolean(allowUnchangedPastDate) &&
+    Boolean(targetCompletionDate) &&
+    Boolean(originalTargetCompletionDate) &&
+    targetCompletionDate.isBefore(now) &&
+    targetCompletionDate.isSame(originalTargetCompletionDate);
+
+  if (targetCompletionDate && targetCompletionDate.isBefore(now) && !isKeepingExistingPastDate) {
     return 'Target completion date cannot be earlier than the current time.';
   }
   if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
     return 'Subtasks cannot have a target completion date later than the parent goal.';
   }
   return null;
+};
+
+const getTaskTargetCompletionDateMinDateTime = ({
+  now,
+  originalTargetCompletionDate = null,
+  allowUnchangedPastDate = false
+}) => {
+  if (
+    allowUnchangedPastDate &&
+    originalTargetCompletionDate &&
+    originalTargetCompletionDate.isBefore(now)
+  ) {
+    return originalTargetCompletionDate;
+  }
+  return now;
 };
 
 const getTaskEstimateHoursError = (value) => {
@@ -49,14 +77,42 @@ const getTimeEntryDurationHours = ({ startedAt, endedAt }) => {
   return Math.round((endedAt.diff(startedAt, 'minute', true) / 60) * 100) / 100;
 };
 
-const getGoalTargetCompletionDateError = ({ targetCompletionDate, now, parentDeadline }) => {
-  if (targetCompletionDate && targetCompletionDate.isBefore(now)) {
+const getGoalTargetCompletionDateError = ({
+  targetCompletionDate,
+  now,
+  parentDeadline,
+  originalTargetCompletionDate = null,
+  allowUnchangedPastDate = false
+}) => {
+  const isKeepingExistingPastDate =
+    Boolean(allowUnchangedPastDate) &&
+    Boolean(targetCompletionDate) &&
+    Boolean(originalTargetCompletionDate) &&
+    targetCompletionDate.isBefore(now) &&
+    targetCompletionDate.isSame(originalTargetCompletionDate);
+
+  if (targetCompletionDate && targetCompletionDate.isBefore(now) && !isKeepingExistingPastDate) {
     return 'Target completion date cannot be earlier than the current time.';
   }
   if (targetCompletionDate && parentDeadline && targetCompletionDate.isAfter(parentDeadline)) {
     return 'Sub-goals cannot have a target completion date later than the parent goal.';
   }
   return null;
+};
+
+const getGoalTargetCompletionDateMinDateTime = ({
+  now,
+  originalTargetCompletionDate = null,
+  allowUnchangedPastDate = false
+}) => {
+  if (
+    allowUnchangedPastDate &&
+    originalTargetCompletionDate &&
+    originalTargetCompletionDate.isBefore(now)
+  ) {
+    return originalTargetCompletionDate;
+  }
+  return now;
 };
 
 const getGoalEstimateHoursError = (value) => {
@@ -74,11 +130,13 @@ const parseGoalEstimateHours = (value) => {
 
 module.exports = {
   getTaskTargetCompletionDateError,
+  getTaskTargetCompletionDateMinDateTime,
   getTaskEstimateHoursError,
   parseTaskEstimateHours,
   getTimeEntryRangeError,
   getTimeEntryDurationHours,
   getGoalTargetCompletionDateError,
+  getGoalTargetCompletionDateMinDateTime,
   getGoalEstimateHoursError,
   parseGoalEstimateHours
 };

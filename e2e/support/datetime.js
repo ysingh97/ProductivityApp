@@ -1,10 +1,6 @@
 const padNumber = (value) => String(value).padStart(2, "0");
 
-const fillDateTimeField = async (page, label, date) => {
-  const fieldGroup = page.getByRole("group", {
-    name: label,
-    exact: typeof label === "string"
-  });
+const fillDateTimeGroup = async (fieldGroup, date) => {
   const month = padNumber(date.getMonth() + 1);
   const day = padNumber(date.getDate());
   const year = String(date.getFullYear());
@@ -22,6 +18,16 @@ const fillDateTimeField = async (page, label, date) => {
   await fieldGroup.getByRole("spinbutton", { name: "Meridiem" }).press("Tab");
 };
 
+const fillDateTimeField = async (page, label, date) => {
+  const fieldGroup = page.getByRole("group", {
+    name: label,
+    exact: typeof label === "string"
+  });
+
+  await fillDateTimeGroup(fieldGroup, date);
+};
+
 module.exports = {
-  fillDateTimeField
+  fillDateTimeField,
+  fillDateTimeGroup
 };
