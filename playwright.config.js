@@ -2,6 +2,8 @@ const { defineConfig, devices } = require("@playwright/test");
 
 const frontendBaseUrl = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
 const apiBaseUrl = process.env.E2E_API_BASE_URL || "http://localhost:5000/api";
+const frontendApiUrl = process.env.REACT_APP_API_URL || apiBaseUrl;
+const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || "e2e-google-client-id";
 
 module.exports = defineConfig({
   testDir: "./e2e",
@@ -50,7 +52,9 @@ module.exports = defineConfig({
       stderr: "pipe",
       env: {
         ...process.env,
-        BROWSER: "none"
+        BROWSER: "none",
+        REACT_APP_API_URL: frontendApiUrl,
+        REACT_APP_GOOGLE_CLIENT_ID: googleClientId
       }
     }
   ],

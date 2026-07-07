@@ -4,14 +4,23 @@ const {
   completeGoogleCalendarOAuth
 } = require('../services/googleOAuthService');
 const { listAvailableCalendars } = require('../services/googleCalendarService');
-const { enqueueGoogleSyncForUser } = require('../services/calendarSyncService');
+const {
+  enqueueGoogleSyncForUser,
+  getGoogleCalendarSyncSummary
+} = require('../services/calendarSyncService');
+
+const getErrorMessage = (err, fallback = 'Unexpected Google Calendar error.') =>
+  err?.response?.data?.error?.message ||
+  err?.response?.data?.message ||
+  err?.message ||
+  fallback;
 
 const getGoogleCalendarConnectUrl = async (req, res) => {
   try {
     const url = buildGoogleCalendarConnectUrl({ userId: req.user.id });
     res.status(200).json({ url });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 };
 
@@ -34,9 +43,14 @@ const handleGoogleCalendarCallback = async (req, res) => {
 const getGoogleCalendarStatus = async (req, res) => {
   try {
     const connection = await GoogleCalendarConnection.findOne({ userId: req.user.id });
+    const syncSummary = await getGoogleCalendarSyncSummary({
+      userId: req.user.id,
+      connection
+    });
     if (!connection) {
       return res.status(200).json({
-        connected: false
+        connected: false,
+        syncSummary
       });
     }
 
@@ -47,10 +61,11 @@ const getGoogleCalendarStatus = async (req, res) => {
       selectedCalendarSummary: connection.selectedCalendarSummary,
       syncEnabled: connection.syncEnabled,
       lastSyncAt: connection.lastSyncAt,
-      lastSyncError: connection.lastSyncError
+      lastSyncError: connection.lastSyncError,
+      syncSummary
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 };
 
@@ -64,7 +79,8 @@ const getGoogleCalendars = async (req, res) => {
     const calendars = await listAvailableCalendars(connection);
     res.status(200).json(calendars);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Failed to load available Google calendars', err);
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 };
 
@@ -91,16 +107,21 @@ const saveGoogleCalendarSettings = async (req, res) => {
 
     // Changing sync settings or the selected calendar should enqueue a full user resync.
     await enqueueGoogleSyncForUser({ userId: req.user.id });
+    const syncSummary = await getGoogleCalendarSyncSummary({
+      userId: req.user.id,
+      connection
+    });
 
     res.status(200).json({
       connected: true,
       googleEmail: connection.googleEmail,
       selectedCalendarId: connection.selectedCalendarId,
       selectedCalendarSummary: connection.selectedCalendarSummary,
-      syncEnabled: connection.syncEnabled
+      syncEnabled: connection.syncEnabled,
+      syncSummary
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 };
 
@@ -109,7 +130,7 @@ const syncGoogleCalendarNow = async (req, res) => {
     await enqueueGoogleSyncForUser({ userId: req.user.id });
     res.status(202).json({ message: 'Google Calendar sync queued.' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 };
 
@@ -118,7 +139,7 @@ const disconnectGoogleCalendar = async (req, res) => {
     await GoogleCalendarConnection.deleteOne({ userId: req.user.id });
     res.status(200).json({ message: 'Google Calendar disconnected.' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 };
 

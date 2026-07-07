@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import GoalForm from "./goalForm";
 import { fetchCategories } from "../categories/categoryService";
 import { fetchGoals } from "./goalService";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 jest.mock("../categories/categoryService", () => ({
   fetchCategories: jest.fn()
@@ -14,16 +15,26 @@ jest.mock("./goalService", () => ({
   fetchGoals: jest.fn()
 }));
 
+jest.mock("../integrations/useGoogleCalendarStatus", () => jest.fn());
+
 jest.mock("../../components/DateTimePicker", () => {
   const dayjs = require("dayjs");
 
-  return function MockDateTimePicker({ label = "Target Completion Date", value, onChange }) {
+  return function MockDateTimePicker({
+    label = "Target Completion Date",
+    value,
+    onChange,
+    textFieldProps
+  }) {
     return (
-      <input
-        aria-label={label}
-        value={value ? value.toISOString() : ""}
-        onChange={(event) => onChange(event.target.value ? dayjs(event.target.value) : null)}
-      />
+      <div>
+        <input
+          aria-label={label}
+          value={value ? value.toISOString() : ""}
+          onChange={(event) => onChange(event.target.value ? dayjs(event.target.value) : null)}
+        />
+        {textFieldProps?.helperText ? <span>{textFieldProps.helperText}</span> : null}
+      </div>
     );
   };
 });
@@ -47,6 +58,10 @@ describe("GoalForm", () => {
       { _id: "cat-1", title: "Growth" },
       { _id: "cat-2", title: "Strategy" }
     ]);
+    useGoogleCalendarStatus.mockReturnValue({
+      status: null,
+      loading: false
+    });
   });
 
   test("submits top-level goal data with its own category and parsed estimate", async () => {
@@ -86,6 +101,30 @@ describe("GoalForm", () => {
         targetCompletionDate: expect.any(Date)
       })
     );
+  });
+
+  test("blocks creating a goal with a past target date", async () => {
+    const onSubmit = jest.fn().mockResolvedValue({});
+
+    renderGoalForm(<GoalForm onSubmit={onSubmit} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /create goal/i })).not.toBeDisabled()
+    );
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Past-dated goal" }
+    });
+    fireEvent.change(screen.getByLabelText(/target completion date/i), {
+      target: { value: "2000-01-01T10:00:00.000Z" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /create goal/i }));
+
+    expect(
+      await screen.findByText(/target completion date cannot be earlier than the current time\./i)
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   test("inherits the parent goal category and omits category from the submitted payload", async () => {
@@ -171,5 +210,51 @@ describe("GoalForm", () => {
       await screen.findByText(/sub-goals cannot have a target completion date later than the parent goal/i)
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  test("allows editing an overdue goal without changing its existing past target date", async () => {
+    const onSubmit = jest.fn().mockResolvedValue({});
+    const goal = {
+      _id: "goal-1",
+      title: "Existing overdue goal",
+      description: "Original description",
+      category: { title: "Growth" },
+      estimatedHours: 5,
+      targetCompletionDate: "2000-01-01T10:00:00.000Z",
+      parentGoalId: null
+    };
+
+    renderGoalForm(<GoalForm goal={goal} isEditing onSubmit={onSubmit} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update goal/i })).not.toBeDisabled()
+    );
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Existing overdue goal updated" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /update goal/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Existing overdue goal updated",
+        targetCompletionDate: expect.any(Date)
+      })
+    );
+  });
+
+  test("shows a Google Calendar warning when the goal is undated and sync is connected", async () => {
+    useGoogleCalendarStatus.mockReturnValue({
+      status: { connected: true },
+      loading: false
+    });
+
+    renderGoalForm(<GoalForm onSubmit={jest.fn()} />);
+
+    expect(
+      await screen.findByText(/without a target date, this item will not sync to google calendar\./i)
+    ).toBeInTheDocument();
   });
 });

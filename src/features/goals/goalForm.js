@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Autocomplete,
@@ -18,9 +18,19 @@ import DateTimePicker from "../../components/DateTimePicker";
 import { fetchGoals } from "./goalService";
 import {
   getGoalEstimateHoursError,
+  getGoalTargetCompletionDateMinDateTime,
   getGoalTargetCompletionDateError,
   parseGoalEstimateHours
 } from "./goalValidation";
+import {
+  filterEligibleParentGoals,
+  getBlockedParentGoalIds,
+  mergeGoalsById
+} from "./goalHierarchy";
+import {
+  getGoogleCalendarNoDateWarningText
+} from "../integrations/googleCalendarSync";
+import useGoogleCalendarStatus from "../integrations/useGoogleCalendarStatus";
 
 const getCategoryTitle = (value) => {
   if (!value) {
@@ -37,6 +47,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
   const [categories, setCategories] = useState([]);
   const isEditing = Boolean(isEditingProp || goal);
   const now = dayjs();
+  const { status: googleCalendarStatus } = useGoogleCalendarStatus();
 
   const location = useLocation();
   const parentGoal = !isEditing ? location.state?.parentGoal || null : null;
@@ -55,11 +66,19 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
   const [selectedParentGoal, setSelectedParentGoal] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const originalTargetCompletionDate = goal?.targetCompletionDate
+    ? dayjs(goal.targetCompletionDate)
+    : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     const parsedEstimatedHours = parseGoalEstimateHours(estimatedHours);
+
+    if (selectedParentGoal?.value && blockedParentGoalIds.has(String(selectedParentGoal.value))) {
+      setError("A goal cannot be moved under one of its descendants.");
+      return;
+    }
 
     const parentDeadline = selectedParentGoal?.targetCompletionDate
       ? dayjs(selectedParentGoal.targetCompletionDate)
@@ -68,7 +87,9 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
     const targetDateError = getGoalTargetCompletionDateError({
       targetCompletionDate,
       now,
-      parentDeadline
+      parentDeadline,
+      originalTargetCompletionDate,
+      allowUnchangedPastDate: isEditing
     });
     if (targetDateError) {
       setError(targetDateError);
@@ -161,10 +182,29 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
           console.error(err.message);
         } finally {
           setLoading(false);
-        }
-      };
-      loadData();
-    }, []);
+      }
+    };
+    loadData();
+  }, []);
+
+  const allKnownGoals = useMemo(
+    () => mergeGoalsById(parentGoals, goal),
+    [goal, parentGoals]
+  );
+  const blockedParentGoalIds = useMemo(
+    () => getBlockedParentGoalIds(allKnownGoals, goal?._id),
+    [allKnownGoals, goal?._id]
+  );
+  const selectedParentGoalOptions = useMemo(
+    () =>
+      filterEligibleParentGoals(allKnownGoals, goal?._id).map((parentGoalOption) => ({
+        value: parentGoalOption._id,
+        label: parentGoalOption.title,
+        categoryTitle: getCategoryTitle(parentGoalOption.category),
+        targetCompletionDate: parentGoalOption.targetCompletionDate || null
+      })),
+    [allKnownGoals, goal?._id]
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -177,16 +217,16 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
       const match = parentGoals.find(
         (pg) => String(pg._id) === String(goal.parentGoalId)
       );
-      setSelectedParentGoal(
-        match
-          ? {
-              value: match._id,
-              label: match.title,
-              categoryTitle: getCategoryTitle(match.category),
-              targetCompletionDate: match.targetCompletionDate || null
-            }
-          : null
-      );
+      if (!match || blockedParentGoalIds.has(String(match._id))) {
+        setSelectedParentGoal(null);
+        return;
+      }
+      setSelectedParentGoal({
+        value: match._id,
+        label: match.title,
+        categoryTitle: getCategoryTitle(match.category),
+        targetCompletionDate: match.targetCompletionDate || null
+      });
       return;
     }
 
@@ -200,25 +240,43 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
         }
       : null;
     setSelectedParentGoal(defaultParentGoal);
-  }, [loading, isEditing, goal, parentGoals, parentGoal, isParentGoalFixed]);
+  }, [blockedParentGoalIds, loading, isEditing, goal, parentGoals, parentGoal, isParentGoalFixed]);
 
   useEffect(() => {
     if (selectedParentGoal) {
       setCategory(selectedParentGoal.categoryTitle || "");
     }
   }, [selectedParentGoal]);
-
-  const selectedParentGoalOptions = parentGoals
-    .filter((pg) => !goal || String(pg._id) !== String(goal._id))
-    .map(parentGoal => ({
-      value: parentGoal._id,
-      label: parentGoal.title,
-      categoryTitle: getCategoryTitle(parentGoal.category),
-      targetCompletionDate: parentGoal.targetCompletionDate || null
-    }));
   const categoryOptions = categories.map((categoryOption) => categoryOption.title);
   const parentDeadline = selectedParentGoal?.targetCompletionDate
     ? dayjs(selectedParentGoal.targetCompletionDate)
+    : null;
+  const minimumTargetCompletionDate = getGoalTargetCompletionDateMinDateTime({
+    now,
+    originalTargetCompletionDate,
+    allowUnchangedPastDate: isEditing
+  });
+  const targetDateHelperText = parentDeadline
+    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+    : isEditing && originalTargetCompletionDate?.isBefore(now)
+      ? "Existing overdue dates can stay as-is, but any new date must be current or future."
+      : !targetCompletionDate && googleCalendarStatus?.connected
+        ? getGoogleCalendarNoDateWarningText()
+        : "Choose a future target date.";
+  const parentGoalHelperText = isParentGoalFixed
+    ? "Locked because you opened this from a parent goal."
+    : selectedParentGoal
+      ? parentDeadline
+        ? `Sub-goals inherit category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
+        : "Sub-goals automatically inherit their parent category."
+      : "Optional. No parent selected means this will be a top-level goal.";
+  const parentGoalStatusText = loading
+    ? (
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+          <CircularProgress size={12} />
+          Loading goal options
+        </Box>
+      )
     : null;
 
   return (
@@ -313,14 +371,12 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
               <DateTimePicker
                 value={targetCompletionDate}
                 onChange={setTargetCompletionDate}
-                minDateTime={now}
+                minDateTime={minimumTargetCompletionDate}
                 maxDateTime={parentDeadline || undefined}
                 textFieldProps={{
                   fullWidth: true,
                   size: "small",
-                  helperText: parentDeadline
-                    ? `Must be on or before ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
-                    : "Choose a future target date."
+                  helperText: targetDateHelperText
                 }}
               />
 
@@ -336,11 +392,7 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
                     {...params}
                     label="Parent goal"
                     size="small"
-                    helperText={
-                      isParentGoalFixed
-                        ? "Locked because you opened this from a parent goal."
-                        : "Optional. Leave empty to create a top-level goal."
-                    }
+                    helperText={parentGoalHelperText}
                   />
                 )}
               />
@@ -366,20 +418,11 @@ const GoalForm = ({ onSubmit, goal, isEditing: isEditingProp, submitting = false
                 pt: 0.5
               }}
             >
-              <Typography variant="caption" color="text.secondary">
-                {loading ? (
-                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={12} />
-                    Loading goal options
-                  </Box>
-                ) : selectedParentGoal ? (
-                  parentDeadline
-                    ? `Sub-goals inherit category and must finish by ${parentDeadline.format("MMM D, YYYY h:mm A")}.`
-                    : "Sub-goals automatically inherit their parent category."
-                ) : (
-                  "No parent selected means this will be a top-level goal."
-                )}
-              </Typography>
+              {parentGoalStatusText && (
+                <Typography variant="caption" color="text.secondary">
+                  {parentGoalStatusText}
+                </Typography>
+              )}
               <Button type="submit" variant="contained" size="large" disabled={loading || submitting}>
                 {submitting ? "Saving..." : isEditing ? "Update goal" : "Create goal"}
               </Button>

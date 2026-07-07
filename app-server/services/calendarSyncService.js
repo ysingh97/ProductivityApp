@@ -10,9 +10,65 @@ const {
   deleteCalendarEvent
 } = require('./googleCalendarService');
 
-const ACTIVE_SYNC_FILTER = {
-  targetCompletionDate: { $ne: null },
+const buildMissingTargetDateFilter = () => ({
+  $or: [{ targetCompletionDate: null }, { targetCompletionDate: { $exists: false } }]
+});
+
+const buildEligibleToSyncFilter = () => ({
+  targetCompletionDate: { $exists: true, $ne: null },
   isComplete: false
+});
+
+const getGoogleCalendarSyncSummary = async ({ userId, connection = null }) => {
+  const [goalCounts, taskCounts] = await Promise.all(
+    [Goal, Task].map(async (Model) => {
+      const [eligibleToSyncCount, missingTargetDateCount, completedCount] = await Promise.all([
+        Model.countDocuments({
+          userId,
+          ...buildEligibleToSyncFilter()
+        }),
+        Model.countDocuments({
+          userId,
+          isComplete: false,
+          ...buildMissingTargetDateFilter()
+        }),
+        Model.countDocuments({
+          userId,
+          isComplete: true
+        })
+      ]);
+
+      return {
+        eligibleToSyncCount,
+        missingTargetDateCount,
+        completedCount
+      };
+    })
+  );
+
+  const eligibleToSyncCount =
+    goalCounts.eligibleToSyncCount + taskCounts.eligibleToSyncCount;
+  const missingTargetDateCount =
+    goalCounts.missingTargetDateCount + taskCounts.missingTargetDateCount;
+  const completedCount = goalCounts.completedCount + taskCounts.completedCount;
+
+  let configurationIssue = null;
+  if (!connection) {
+    configurationIssue = 'disconnected';
+  } else if (!connection.selectedCalendarId) {
+    configurationIssue = 'calendarNotSelected';
+  } else if (!connection.syncEnabled) {
+    configurationIssue = 'syncPaused';
+  }
+
+  return {
+    eligibleToSyncCount,
+    blockedByConfigurationCount: configurationIssue ? eligibleToSyncCount : 0,
+    activelySyncingCount: configurationIssue ? 0 : eligibleToSyncCount,
+    missingTargetDateCount,
+    completedCount,
+    configurationIssue
+  };
 };
 
 const enqueueGoogleSync = async ({ userId, sourceType, sourceId }) => {
@@ -305,6 +361,7 @@ module.exports = {
   enqueueGoogleSync,
   enqueueGoogleSyncForUser,
   buildGoogleEventPayload,
+  getGoogleCalendarSyncSummary,
   processSyncJob,
   claimNextGoogleCalendarSyncJob,
   markSyncJobSucceeded,

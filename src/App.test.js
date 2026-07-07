@@ -61,7 +61,7 @@ test('renders the sign-in screen for unauthenticated users', () => {
   render(<App />);
 
   expect(screen.getByText(/welcome back/i)).toBeInTheDocument();
-  expect(screen.getByText(/productivity hub/i)).toBeInTheDocument();
+  expect(screen.getByText(/branchwork/i)).toBeInTheDocument();
 });
 
 test('shows the session-expired notice when auth is cleared', () => {

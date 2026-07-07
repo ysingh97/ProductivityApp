@@ -22,7 +22,10 @@ const TaskCard = ({ task }) => {
         <Typography variant="body2">
           {task.description}
         </Typography>
-        <TaskCompletionBar timeSpent={task.timeSpent} estimatedCompletionTime={task.estimatedCompletionTime}/>
+        <TaskCompletionBar
+          timeSpent={task.timeSpent}
+          estimatedCompletionTime={task.estimatedCompletionTime}
+        />
       </CardContent>
       <Link
           to={`/task/${task._id}/edit`}

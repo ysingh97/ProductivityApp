@@ -117,4 +117,26 @@ describe("GoalTreeView", () => {
     await waitFor(() => expect(fetchGoals).toHaveBeenCalledTimes(1));
     expect(screen.getByText(/the goal might have been removed or you may not have access\./i)).toBeInTheDocument();
   });
+
+  test("renders cyclic goal data without recursing forever", async () => {
+    fetchGoals.mockResolvedValue([
+      buildGoal({
+        _id: "goal-a",
+        title: "Cycle A",
+        parentGoalId: "goal-b"
+      }),
+      buildGoal({
+        _id: "goal-b",
+        title: "Cycle B",
+        parentGoalId: "goal-a"
+      })
+    ]);
+    fetchTasks.mockResolvedValue([]);
+
+    renderGoalTreeView("/goals/goal-a/tree");
+
+    expect(await screen.findByRole("heading", { name: /goal tree view/i })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /cycle a/i })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /cycle b/i })).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import {
   getTaskEstimateHoursError,
+  getTaskTargetCompletionDateMinDateTime,
   getTaskTargetCompletionDateError,
   getTimeEntryDurationHours,
   getTimeEntryRangeError,
@@ -53,6 +54,52 @@ describe("taskValidation", () => {
         parentDeadline: dayjs("2026-06-25T12:00:00Z")
       })
     ).toBeNull();
+  });
+
+  test("allows keeping an existing overdue target date during edit, but rejects a newly changed past date", () => {
+    const now = dayjs("2026-06-24T12:00:00Z");
+    const originalTargetCompletionDate = dayjs("2026-06-23T10:00:00Z");
+
+    expect(
+      getTaskTargetCompletionDateError({
+        targetCompletionDate: originalTargetCompletionDate,
+        now,
+        parentDeadline: null,
+        originalTargetCompletionDate,
+        allowUnchangedPastDate: true
+      })
+    ).toBeNull();
+
+    expect(
+      getTaskTargetCompletionDateError({
+        targetCompletionDate: dayjs("2026-06-23T11:00:00Z"),
+        now,
+        parentDeadline: null,
+        originalTargetCompletionDate,
+        allowUnchangedPastDate: true
+      })
+    ).toBe("Target completion date cannot be earlier than the current time.");
+  });
+
+  test("uses the existing overdue task date as the picker minimum during edit", () => {
+    const now = dayjs("2026-06-24T12:00:00Z");
+    const originalTargetCompletionDate = dayjs("2026-06-23T10:00:00Z");
+
+    expect(
+      getTaskTargetCompletionDateMinDateTime({
+        now,
+        originalTargetCompletionDate,
+        allowUnchangedPastDate: true
+      }).toISOString()
+    ).toBe(originalTargetCompletionDate.toISOString());
+
+    expect(
+      getTaskTargetCompletionDateMinDateTime({
+        now,
+        originalTargetCompletionDate: dayjs("2026-06-25T10:00:00Z"),
+        allowUnchangedPastDate: true
+      }).toISOString()
+    ).toBe(now.toISOString());
   });
 
   test("rejects invalid or negative estimate inputs", () => {

@@ -77,7 +77,7 @@ test("reparents goals and tasks across trees while keeping rollups and deadline 
   await page.goto(`/goals/${movedGoal._id}`);
   await expect(page.getByRole("heading", { name: movedGoal.title })).toBeVisible();
 
-  await page.getByRole("button", { name: /edit details/i }).click();
+  await page.getByRole("button", { name: /edit goal details/i }).click();
   await expect(page.getByRole("combobox", { name: /parent goal/i })).toBeEnabled();
 
   await selectParentGoal(page, tightGoal.title);
@@ -93,7 +93,12 @@ test("reparents goals and tasks across trees while keeping rollups and deadline 
   await page.getByRole("button", { name: /save changes/i }).click();
 
   await expect(page.getByRole("heading", { name: movedGoal.title })).toBeVisible();
-  await expect(page.getByText(targetRoot.title, { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByText("Parent goal", { exact: true })
+      .locator("..")
+      .getByText(targetRoot.title, { exact: true })
+  ).toBeVisible();
   await expect(page.getByText(/health - /i)).toBeVisible();
 
   await page.goto(`/goals/${sourceRoot._id}/tree`);
@@ -112,14 +117,19 @@ test("reparents goals and tasks across trees while keeping rollups and deadline 
   await page.goto(`/tasks/${movedTask._id}`);
   await expect(page.getByRole("heading", { name: movedTask.title })).toBeVisible();
 
-  await page.getByRole("button", { name: /edit details/i }).click();
+  await page.getByRole("button", { name: /edit task details/i }).click();
   await expect(page.getByRole("combobox", { name: /parent goal/i })).toBeEnabled();
 
   await selectParentGoal(page, targetRoot.title);
   await page.getByRole("button", { name: /save changes/i }).click();
 
   await expect(page.getByRole("heading", { name: movedTask.title })).toBeVisible();
-  await expect(page.getByText(targetRoot.title, { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByText("Parent goal", { exact: true })
+      .locator("..")
+      .getByText(targetRoot.title, { exact: true })
+  ).toBeVisible();
   await expect(page.getByText(/health - /i)).toBeVisible();
 
   await page.goto(`/goals/${sourceRoot._id}/tree`);

@@ -133,15 +133,38 @@ const CreateGoalPage = () => {
                 <Alert
                   severity="success"
                   action={
-                    <Button
-                      component={Link}
-                      to={`/goals/${savedGoal._id}`}
-                      color="inherit"
-                      size="small"
-                      endIcon={<ArrowForwardIcon />}
-                    >
-                      Open
-                    </Button>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                      <Button
+                        component={Link}
+                        to={`/goals/${savedGoal._id}`}
+                        color="inherit"
+                        size="small"
+                        endIcon={<ArrowForwardIcon />}
+                      >
+                        Open
+                      </Button>
+                      {!isEditing && (
+                        <>
+                          <Button
+                            component={Link}
+                            to="/goal/new"
+                            state={{ parentGoal: savedGoal, isParentGoalFixed: true }}
+                            color="inherit"
+                            size="small"
+                          >
+                            Add subgoal
+                          </Button>
+                          <Button
+                            component={Link}
+                            to={`/task/new?goalId=${savedGoal._id}`}
+                            color="inherit"
+                            size="small"
+                          >
+                            Add task
+                          </Button>
+                        </>
+                      )}
+                    </Stack>
                   }
                 >
                   {isEditing ? "Updated" : "Created"} "{savedGoal.title}".
