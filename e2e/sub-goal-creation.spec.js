@@ -59,7 +59,12 @@ test("creates a sub-goal from a parent goal with inherited category and deadline
   const createdSubGoalId = page.url().split("/").pop();
 
   await expect(page.getByRole("heading", { name: subGoalTitle })).toBeVisible();
-  await expect(page.getByText(parentGoal.title, { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByText("Parent goal", { exact: true })
+      .locator("..")
+      .getByText(parentGoal.title, { exact: true })
+  ).toBeVisible();
   await expect(page.getByText("Growth", { exact: true }).first()).toBeVisible();
 
   await page.goto(`/goals/${parentGoal._id}/tree`);

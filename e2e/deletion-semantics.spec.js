@@ -111,5 +111,10 @@ test("deletes timed tasks and detaches direct child goals and tasks when deletin
 
   await page.goto(`/tasks/${nestedTask._id}`);
   await expect(page.getByRole("heading", { name: nestedTask.title })).toBeVisible();
-  await expect(page.getByText(nestedChildGoal.title, { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByText("Parent goal", { exact: true })
+      .locator("..")
+      .getByText(nestedChildGoal.title, { exact: true })
+  ).toBeVisible();
 });

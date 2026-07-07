@@ -12,7 +12,7 @@ test("redirects signed-out users away from protected routes", async ({ page }) =
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText(/welcome back/i)).toBeVisible();
-  await expect(page.getByText(/productivity hub/i)).toBeVisible();
+  await expect(page.getByText(/branchwork/i)).toBeVisible();
 });
 
 test("redirects expired stored sessions to sign-in and shows the session-expired message", async ({
