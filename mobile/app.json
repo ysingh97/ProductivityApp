@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Productivity Hub",
-    "slug": "productivity-hub",
-    "scheme": "productivityhub",
+    "name": "Branchwork",
+    "slug": "branchwork",
+    "scheme": "branchwork",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.productivityhub.app"
+      "bundleIdentifier": "com.branchwork.app"
     },
     "android": {
-      "package": "com.productivityhub.app",
+      "package": "com.branchwork.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -31,7 +31,8 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

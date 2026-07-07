@@ -1,4 +1,4 @@
-# Productivity Hub — Mobile (Expo / React Native)
+# Branchwork — Mobile (Expo / React Native)
 
 Native iOS + Android client for ProductivityApp. It reuses the existing backend
 REST API and the framework-agnostic `@productivity/shared` package (API client,

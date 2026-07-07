@@ -1,7 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 import {
   ActivityIndicator,
   Button,
@@ -11,30 +9,13 @@ import {
 } from 'react-native-paper';
 import apiClient from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import {
-  ALLOW_DEV_SIGN_IN,
-  DEV_AUTH_TOKEN,
-  GOOGLE_ANDROID_CLIENT_ID,
-  GOOGLE_IOS_CLIENT_ID,
-  GOOGLE_WEB_CLIENT_ID
-} from '../config/env';
-
-WebBrowser.maybeCompleteAuthSession();
+import { ALLOW_DEV_SIGN_IN, DEV_AUTH_TOKEN, GOOGLE_SIGN_IN_CONFIGURED } from '../config/env';
+import GoogleSignInButton from './GoogleSignInButton';
 
 const SignInScreen = () => {
   const { saveAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const googleConfigured = Boolean(
-    GOOGLE_WEB_CLIENT_ID || GOOGLE_IOS_CLIENT_ID || GOOGLE_ANDROID_CLIENT_ID
-  );
-
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
-    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined
-  });
 
   const authenticate = useCallback(
     async (credential) => {
@@ -52,19 +33,6 @@ const SignInScreen = () => {
     [saveAuth]
   );
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const idToken = response.params?.id_token || response.authentication?.idToken;
-      if (idToken) {
-        authenticate(idToken);
-      } else {
-        setError('Google did not return an ID token.');
-      }
-    } else if (response?.type === 'error') {
-      setError('Google sign-in was cancelled or failed.');
-    }
-  }, [response, authenticate]);
-
   return (
     <View style={styles.container}>
       <Card style={styles.card} mode="elevated">
@@ -73,24 +41,20 @@ const SignInScreen = () => {
             WELCOME BACK
           </Text>
           <Text variant="headlineMedium" style={styles.title}>
-            Productivity Hub
+            Branchwork
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
             Sign in with Google to keep your tasks, lists, and goals synced to your
             account.
           </Text>
 
-          <Button
-            mode="contained"
-            icon="google"
-            style={styles.button}
-            disabled={!googleConfigured || !request || loading}
-            onPress={() => promptAsync()}
-          >
-            Sign in with Google
-          </Button>
-
-          {!googleConfigured && (
+          {GOOGLE_SIGN_IN_CONFIGURED ? (
+            <GoogleSignInButton
+              disabled={loading}
+              onIdToken={authenticate}
+              onError={setError}
+            />
+          ) : (
             <HelperText type="info" visible>
               Set EXPO_PUBLIC_GOOGLE_* client IDs to enable Google sign-in.
             </HelperText>
