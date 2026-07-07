@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { createApiClient } from '@productivity/shared';
 import { API_URL } from '../config/env';
 import { getToken } from './tokenStore';
@@ -11,6 +12,7 @@ export const setUnauthorizedHandler = (handler) => {
 };
 
 const apiClient = createApiClient({
+  axios,
   baseURL: API_URL,
   getToken,
   onUnauthorized: () => {

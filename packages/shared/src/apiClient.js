@@ -1,12 +1,19 @@
-const axiosModule = require('axios');
-// Interop for both CommonJS builds and ESM-default mocks/bundles of axios.
-const axios = axiosModule.default || axiosModule;
+// Interop for axios passed as either a direct export or an ESM namespace.
+const resolveAxios = (lib) => (lib && lib.create ? lib : lib && lib.default) || lib;
 
 // Creates an axios instance whose auth token and 401 handling are supplied by the
 // host app. `getToken` may be synchronous (web/localStorage) or asynchronous
 // (mobile/SecureStore); axios request interceptors support returning a promise.
-const createApiClient = ({ baseURL, getToken, onUnauthorized } = {}) => {
-  const client = axios.create({ baseURL });
+//
+// `axios` is injected by the caller rather than required here so each platform
+// controls how axios is bundled/resolved (e.g. the web build resolves axios's
+// ESM entry, not its `.cjs` build which some bundlers treat as an asset).
+const createApiClient = ({ baseURL, getToken, onUnauthorized, axios } = {}) => {
+  const axiosLib = resolveAxios(axios);
+  if (!axiosLib || typeof axiosLib.create !== 'function') {
+    throw new Error('createApiClient requires an axios instance');
+  }
+  const client = axiosLib.create({ baseURL });
 
   const applyToken = (config, token) => {
     if (token) {

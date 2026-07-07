@@ -1,6 +1,8 @@
+import axios from 'axios';
 import { createApiClient } from '@productivity/shared';
 
 const apiClient = createApiClient({
+  axios,
   baseURL: process.env.REACT_APP_API_URL,
   getToken: () => localStorage.getItem('authToken'),
   onUnauthorized: () => {
