@@ -2,8 +2,12 @@
   "name": "productivity",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "dependencies": {
     "@emotion/react": "^11.14.0",
+    "@productivity/shared": "*",
     "@emotion/styled": "^11.14.1",
     "@fontsource/fraunces": "^5.2.9",
     "@fontsource/roboto": "^5.2.6",
@@ -43,6 +47,11 @@
       "react-app",
       "react-app/jest"
     ]
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^axios$": "axios/dist/node/axios.cjs"
+    }
   },
   "browserslist": {
     "production": [

@@ -1,5 +1,13 @@
 # Productivity App
 
+## Repository layout
+This repo is an npm-workspaces monorepo:
+- `src/` + `app-server/` — the React web app and its Express/MongoDB backend.
+- `packages/shared/` — framework-agnostic API client, service functions, and
+  validation shared by the web and mobile apps (`@productivity/shared`).
+- `mobile/` — Expo (React Native) app for iOS + Android. See `mobile/README.md`.
+- `docs/mobile-app-plan.md` — plan for the mobile apps.
+
 ## Auth & API setup
 - Frontend env: set `REACT_APP_API_URL` (e.g. `http://localhost:5000/api`) and `REACT_APP_GOOGLE_CLIENT_ID` in `.env.development`/`.env.production`.
 - Backend env: set `MONGO_URI`, `PORT`, `GOOGLE_CLIENT_ID` in `app-server/.env.*`. `GOOGLE_CLIENT_ID` must match the frontend client id.

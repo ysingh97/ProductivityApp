@@ -4,6 +4,20 @@ const { getTestAuthPayload } = require('../utils/testAuth');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Google issues ID tokens with a different `aud` per OAuth client (web, iOS,
+// Android), so accept an allow-list of client IDs. `GOOGLE_CLIENT_ID` remains the
+// primary web client; `GOOGLE_ALLOWED_AUDIENCES` is an optional comma-separated
+// list of additional accepted client IDs (e.g. the mobile clients).
+const getAllowedAudiences = () => {
+  const extra = (process.env.GOOGLE_ALLOWED_AUDIENCES || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const audiences = [process.env.GOOGLE_CLIENT_ID, ...extra].filter(Boolean);
+  return Array.from(new Set(audiences));
+};
+
 const verifyGoogleToken = async (token) => {
   const testPayload = getTestAuthPayload(token);
   if (testPayload) {
@@ -12,7 +26,7 @@ const verifyGoogleToken = async (token) => {
 
   const ticket = await googleClient.verifyIdToken({
     idToken: token,
-    audience: process.env.GOOGLE_CLIENT_ID
+    audience: getAllowedAudiences()
   });
 
   return ticket.getPayload();
@@ -102,5 +116,6 @@ const requireAuth = async (req, res, next) => {
 
 module.exports = {
   requireAuth,
-  verifyGoogleToken
+  verifyGoogleToken,
+  getAllowedAudiences
 };
