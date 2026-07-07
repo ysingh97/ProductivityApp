@@ -20,6 +20,7 @@
 - Add CRUD operations to the goal tree view for tasks and goals, such as creating child goals/tasks from a node, editing key fields inline, moving items, and deleting items with confirmation.
 - Improve the UI when the screen is resized so the application remains usable and readable in compact window sizes, especially for the calendar view on the dashboard.
 - Add a Google Calendar sync status indicator in the site header so users can see whether calendar sync is connected, pending, or failing.
+- Separate Google OAuth clients for local development and staging, even if they remain in the same Google Cloud project, so auth configuration and debugging stay isolated per environment.
 - Add search functionality for goals and tasks so users can quickly find items by title and related metadata.
 - Add a user-facing bug report flow so users can easily submit issues, reproduction details, and optional screenshots or environment context.
 - Adjust dark-mode UI contrast, including borders and dividers that are currently too subtle or invisible.
