@@ -2,7 +2,7 @@
   "expo": {
     "name": "Branchwork",
     "slug": "branchwork",
-    "scheme": "branchwork",
+    "scheme": ["branchwork", "com.branchwork.app"],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
