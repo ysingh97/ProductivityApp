@@ -1,0 +1,21 @@
+# Dev sign-in, then verify every primary tab renders its own screen.
+appId: com.branchwork.app
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- tapOn: "Developer sign-in"
+# Board (default tab) is reached once its create FAB is present.
+- assertVisible: "Create task"
+- tapOn: "Lists"
+- assertVisible: "Create list"
+- tapOn: "Goals"
+- assertVisible: "Create goal"
+- tapOn: "Calendar"
+- assertVisible: "Week"
+- assertVisible: "Month"
+- tapOn: "Board"
+- assertVisible: "Create task"

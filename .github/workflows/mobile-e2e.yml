@@ -1,0 +1,138 @@
+name: Mobile E2E
+
+# Device-level end-to-end tests for the Branchwork mobile app, driven by Maestro
+# against a real Android emulator and a live backend. This is heavier and slower
+# than the unit suites (it boots an emulator and builds the app), so it only runs
+# for changes that touch the mobile app / shared package, plus on-demand.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mobile-e2e.yml'
+
+# Avoid piling up emulator runs on rapid pushes.
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-e2e:
+    name: Mobile E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MONGO_URI: mongodb://127.0.0.1:27017/branchwork_mobile_e2e
+      # Baked into the release bundle at build time; the emulator reaches the
+      # runner host (where the backend listens) via 10.0.2.2.
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:5000/api
+      EXPO_PUBLIC_ALLOW_DEV_SIGN_IN: 'true'
+      EXPO_PUBLIC_DEV_AUTH_TOKEN: 'test:power'
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval \"db.adminCommand({ ping: 1 })\""
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app-server/package-lock.json
+            mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm --prefix app-server ci
+
+      - name: Install mobile dependencies
+        run: npm --prefix mobile ci
+
+      - name: Start backend
+        run: |
+          cd app-server
+          NODE_ENV=development ALLOW_TEST_AUTH=true PORT=5000 \
+            MONGO_URI="$MONGO_URI" nohup npm start > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/api/health > /dev/null; then
+              echo "backend is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend failed to start"; cat "$GITHUB_WORKSPACE/backend.log"; exit 1
+
+      - name: Prebuild Android project
+        run: npm --prefix mobile exec -- expo prebuild --platform android --no-install
+
+      - name: Build release APK (debug-signed, self-contained)
+        run: |
+          cd mobile/android
+          ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Install Maestro
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Maestro E2E on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
+            maestro test mobile/e2e/flows
+
+      - name: Upload Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-artifacts
+          path: |
+            ~/.maestro/tests
+            backend.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Write summary
+        if: always()
+        run: |
+          {
+            echo "## Mobile E2E"
+            echo ""
+            echo "- Provisioned an ephemeral MongoDB service (\`$MONGO_URI\`) and started the backend."
+            echo "- Built a self-contained release APK via \`expo prebuild\` + \`gradlew assembleRelease\`."
+            echo "- Booted an Android 34 emulator and ran the Maestro flows in \`mobile/e2e/flows\`."
+          } >> "$GITHUB_STEP_SUMMARY"
