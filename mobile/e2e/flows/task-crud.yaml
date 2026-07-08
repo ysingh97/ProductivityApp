@@ -17,12 +17,20 @@ tags:
 - inputText: "E2E Maestro Task"
 - hideKeyboard
 # Submit button shares the "Create task" label; only the form is on screen here.
+# The form scrolls, so bring the submit button into view before tapping it.
+- scrollUntilVisible:
+    element:
+      text: "Create task"
+    direction: DOWN
 - tapOn: "Create task"
 # Back on the Board, the new task is listed.
 - assertVisible: "E2E Maestro Task"
 # Open it and delete it to clean up.
 - tapOn: "E2E Maestro Task"
-- assertVisible: "Delete task"
+- scrollUntilVisible:
+    element:
+      text: "Delete task"
+    direction: DOWN
 - tapOn: "Delete task"
 - assertVisible: "Delete task?"
 - tapOn: "Delete"
