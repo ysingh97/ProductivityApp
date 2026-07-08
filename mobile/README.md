@@ -47,9 +47,21 @@ npm start         # Expo dev server (choose a target)
   `Mobile Tests` CI job on every PR.
 - **End-to-end** (`npm run test:e2e`): [Maestro](https://maestro.mobile.dev) flows in
   `e2e/flows/` driving a real emulator against the live backend. Prereqs: a booted
-  Android emulator/device with the app installed, Metro (for a dev build) or a
-  self-contained release build, and the backend reachable at `EXPO_PUBLIC_API_URL`.
-  Install Maestro with `curl -Ls https://get.maestro.mobile.dev | bash`.
+  Android emulator/device with the app installed and the backend reachable at
+  `EXPO_PUBLIC_API_URL`. Install Maestro with `curl -Ls https://get.maestro.mobile.dev | bash`.
+
+  Quickest install for a run is a dev build (`npm run android`, keeps Metro up).
+  To mirror CI (self-contained release APK, no Metro):
+  ```
+  npx expo prebuild --platform android --no-install
+  # release builds block cleartext HTTP; the emulator backend is http://10.0.2.2 —
+  # enable it for this test-only APK (production is built via EAS, unaffected):
+  sed -i 's/<application android:name=".MainApplication"/&  android:usesCleartextTraffic="true"/' \
+    android/app/src/main/AndroidManifest.xml
+  (cd android && ./gradlew :app:assembleRelease)
+  adb install -r android/app/build/outputs/apk/release/app-release.apk
+  npm run test:e2e
+  ```
 
   Flows:
   - `smoke.yaml` — developer sign-in, then assert each primary tab (Board/Lists/Goals/Calendar) renders.

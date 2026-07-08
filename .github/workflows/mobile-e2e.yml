@@ -88,7 +88,21 @@ jobs:
           echo "backend failed to start"; cat "$GITHUB_WORKSPACE/backend.log"; exit 1
 
       - name: Prebuild Android project
-        run: npm --prefix mobile exec -- expo prebuild --platform android --no-install
+        run: |
+          cd mobile
+          npx expo prebuild --platform android --no-install
+
+      # The E2E backend is served over plain HTTP on the emulator host
+      # (10.0.2.2). Android blocks cleartext in release builds by default, so
+      # enable it for this throwaway test APK only (production is built via EAS,
+      # not this workflow, and is unaffected).
+      - name: Allow cleartext traffic for the test build
+        run: |
+          manifest=mobile/android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android:usesCleartextTraffic' "$manifest"; then
+            sed -i 's/<application android:name=".MainApplication"/<application android:name=".MainApplication" android:usesCleartextTraffic="true"/' "$manifest"
+          fi
+          grep -o 'android:usesCleartextTraffic="true"' "$manifest"
 
       - name: Build release APK (debug-signed, self-contained)
         run: |
