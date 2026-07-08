@@ -3,6 +3,7 @@ const { createServices, buildAnalyticsQuery } = require('./services');
 const validation = require('./validation');
 const authUtils = require('./authUtils');
 const goalHierarchy = require('./goalHierarchy');
+const calendarModel = require('./calendarModel');
 
 module.exports = {
   createApiClient,
@@ -10,5 +11,6 @@ module.exports = {
   buildAnalyticsQuery,
   ...validation,
   ...authUtils,
-  ...goalHierarchy
+  ...goalHierarchy,
+  ...calendarModel
 };

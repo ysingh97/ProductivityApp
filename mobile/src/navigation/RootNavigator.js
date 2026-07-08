@@ -10,6 +10,7 @@ import SignInScreen from '../screens/SignInScreen';
 import BoardScreen from '../screens/BoardScreen';
 import ListsScreen from '../screens/ListsScreen';
 import GoalsScreen from '../screens/GoalsScreen';
+import CalendarScreen from '../screens/CalendarScreen';
 import ComingSoonScreen from '../screens/ComingSoonScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskFormScreen from '../screens/TaskFormScreen';
@@ -51,7 +52,7 @@ const MainTabs = ({ navigation }) => (
     <Tab.Screen name="Board" component={BoardScreen} />
     <Tab.Screen name="Lists" component={ListsScreen} />
     <Tab.Screen name="Goals" component={GoalsScreen} />
-    <Tab.Screen name="Calendar" component={ComingSoonScreen} />
+    <Tab.Screen name="Calendar" component={CalendarScreen} />
     <Tab.Screen name="Analytics" component={ComingSoonScreen} />
   </Tab.Navigator>
 );
