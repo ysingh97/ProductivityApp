@@ -133,9 +133,18 @@ jobs:
           echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
       - name: Create and boot emulator
+        env:
+          # Pin a single AVD home so avdmanager (create) and emulator (launch)
+          # agree on where the AVD lives.
+          ANDROID_AVD_HOME: /home/runner/.android/avd
         run: |
           if [ -e /dev/kvm ]; then echo "KVM present"; else echo "WARNING: /dev/kvm missing"; fi
-          echo "no" | avdmanager create avd -n ci -k "$ANDROID_IMAGE" -d pixel_6 --force
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "no" | avdmanager create avd -n ci -k "$ANDROID_IMAGE" --force
+          echo "Available AVDs:"; emulator -list-avds
+          if ! emulator -list-avds | grep -qx ci; then
+            echo "::error::AVD 'ci' was not created"; exit 1
+          fi
           nohup emulator -avd ci \
             -no-window -no-audio -no-boot-anim -no-snapshot -accel on \
             -gpu swiftshader_indirect -camera-back none -camera-front none -no-metrics \
