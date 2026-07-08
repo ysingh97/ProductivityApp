@@ -7,3 +7,14 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(async () => {}),
   deleteItemAsync: jest.fn(async () => {})
 }));
+
+// useFocusEffect needs a navigation context at runtime; under jest we run the
+// effect like a plain useEffect so screens can be tested in isolation.
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  const React = require('react');
+  return {
+    ...actual,
+    useFocusEffect: (callback) => React.useEffect(callback, [callback])
+  };
+});
