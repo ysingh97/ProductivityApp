@@ -134,12 +134,25 @@ jobs:
 
       - name: Create and boot emulator
         run: |
+          if [ -e /dev/kvm ]; then echo "KVM present"; else echo "WARNING: /dev/kvm missing"; fi
           echo "no" | avdmanager create avd -n ci -k "$ANDROID_IMAGE" -d pixel_6 --force
-          emulator -avd ci \
-            -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
+          nohup emulator -avd ci \
+            -no-window -no-audio -no-boot-anim -no-snapshot -accel on \
+            -gpu swiftshader_indirect -camera-back none -camera-front none -no-metrics \
             > "$GITHUB_WORKSPACE/emulator.log" 2>&1 &
-          adb wait-for-device
-          timeout 300 bash -c 'while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 3; done'
+          # Wait for the device to register; dump the emulator log if it never does.
+          if ! timeout 180 adb wait-for-device; then
+            echo "::error::emulator never registered a device"
+            cat "$GITHUB_WORKSPACE/emulator.log" || true
+            exit 1
+          fi
+          # Wait for full boot.
+          if ! timeout 300 bash -c 'while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 3; done'; then
+            echo "::error::boot did not complete in time"
+            adb devices || true
+            cat "$GITHUB_WORKSPACE/emulator.log" || true
+            exit 1
+          fi
           adb shell input keyevent 82 || true
           adb devices
 
