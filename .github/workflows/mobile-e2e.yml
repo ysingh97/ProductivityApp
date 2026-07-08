@@ -4,6 +4,10 @@ name: Mobile E2E
 # against a real Android emulator and a live backend. This is heavier and slower
 # than the unit suites (it boots an emulator and builds the app), so it only runs
 # for changes that touch the mobile app / shared package, plus on-demand.
+#
+# NOTE: this repo's Actions policy only permits GitHub-owned (actions/*) actions,
+# so the emulator is provisioned with the runner's preinstalled Android SDK via
+# shell rather than a third-party setup action.
 on:
   workflow_dispatch:
   pull_request:
@@ -29,6 +33,7 @@ jobs:
       EXPO_PUBLIC_API_URL: http://10.0.2.2:5000/api
       EXPO_PUBLIC_ALLOW_DEV_SIGN_IN: 'true'
       EXPO_PUBLIC_DEV_AUTH_TOKEN: 'test:power'
+      ANDROID_IMAGE: system-images;android-34;google_apis;x86_64
     services:
       mongo:
         image: mongo:7
@@ -103,26 +108,38 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Maestro E2E on emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
-            adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
-            maestro test mobile/e2e/flows
+      - name: Install Android emulator image
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "emulator" "platforms;android-34" "$ANDROID_IMAGE" > /dev/null
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
-      - name: Upload Maestro artifacts
+      - name: Create and boot emulator
+        run: |
+          echo "no" | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" \
+            create avd -n ci -k "$ANDROID_IMAGE" -d pixel_6 --force
+          "$ANDROID_SDK_ROOT/emulator/emulator" -avd ci \
+            -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
+            > "$GITHUB_WORKSPACE/emulator.log" 2>&1 &
+          adb wait-for-device
+          timeout 300 bash -c 'while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 3; done'
+          adb shell input keyevent 82 || true
+          adb devices
+
+      - name: Run Maestro E2E
+        run: |
+          adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
+          maestro test mobile/e2e/flows
+
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: maestro-artifacts
+          name: mobile-e2e-artifacts
           path: |
             ~/.maestro/tests
             backend.log
+            emulator.log
           if-no-files-found: ignore
           retention-days: 7
 
@@ -134,5 +151,5 @@ jobs:
             echo ""
             echo "- Provisioned an ephemeral MongoDB service (\`$MONGO_URI\`) and started the backend."
             echo "- Built a self-contained release APK via \`expo prebuild\` + \`gradlew assembleRelease\`."
-            echo "- Booted an Android 34 emulator and ran the Maestro flows in \`mobile/e2e/flows\`."
+            echo "- Booted an Android 34 emulator (runner SDK) and ran the Maestro flows in \`mobile/e2e/flows\`."
           } >> "$GITHUB_STEP_SUMMARY"
