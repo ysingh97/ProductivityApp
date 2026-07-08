@@ -14,6 +14,8 @@ import ComingSoonScreen from '../screens/ComingSoonScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskFormScreen from '../screens/TaskFormScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
+import ListFormScreen from '../screens/ListFormScreen';
+import ListDetailScreen from '../screens/ListDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -110,6 +112,16 @@ const RootNavigator = () => {
               options={({ route }) => ({
                 title: route.params?.mode === 'edit' ? 'Edit task' : 'New task'
               })}
+            />
+            <Stack.Screen
+              name="ListDetail"
+              component={ListDetailScreen}
+              options={{ title: 'List' }}
+            />
+            <Stack.Screen
+              name="ListForm"
+              component={ListFormScreen}
+              options={{ title: 'New list' }}
             />
           </>
         ) : (

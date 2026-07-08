@@ -77,6 +77,13 @@ const getTimeEntryDurationHours = ({ startedAt, endedAt }) => {
   return Math.round((endedAt.diff(startedAt, 'minute', true) / 60) * 100) / 100;
 };
 
+const getListTitleError = (value) => {
+  if (!value || !String(value).trim()) {
+    return 'List title is required.';
+  }
+  return null;
+};
+
 const getGoalTargetCompletionDateError = ({
   targetCompletionDate,
   now,
@@ -135,6 +142,7 @@ module.exports = {
   parseTaskEstimateHours,
   getTimeEntryRangeError,
   getTimeEntryDurationHours,
+  getListTitleError,
   getGoalTargetCompletionDateError,
   getGoalTargetCompletionDateMinDateTime,
   getGoalEstimateHoursError,

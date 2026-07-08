@@ -10,7 +10,8 @@ const {
   getTaskEstimateHoursError,
   parseTaskEstimateHours,
   getTimeEntryRangeError,
-  getTimeEntryDurationHours
+  getTimeEntryDurationHours,
+  getListTitleError
 } = require('./validation');
 
 const now = dayjs('2026-01-01T12:00:00Z');
@@ -143,5 +144,17 @@ test('time entry validation', async (t) => {
   await t.test('accepts a valid range and computes duration hours', () => {
     assert.equal(getTimeEntryRangeError({ startedAt: start, endedAt: end, now }), null);
     assert.equal(getTimeEntryDurationHours({ startedAt: start, endedAt: end }), 1.5);
+  });
+});
+
+test('list title validation', async (t) => {
+  await t.test('rejects an empty or whitespace-only title', () => {
+    assert.match(getListTitleError(''), /title is required/i);
+    assert.match(getListTitleError('   '), /title is required/i);
+    assert.match(getListTitleError(undefined), /title is required/i);
+  });
+
+  await t.test('accepts a non-empty title', () => {
+    assert.equal(getListTitleError('Groceries'), null);
   });
 });

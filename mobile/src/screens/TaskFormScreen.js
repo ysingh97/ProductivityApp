@@ -35,7 +35,9 @@ const TaskFormScreen = ({ navigation, route }) => {
   const [targetCompletionDate, setTargetCompletionDate] = useState(
     task?.targetCompletionDate ? dayjs(task.targetCompletionDate) : null
   );
-  const [listId, setListId] = useState(task?.listId || task?.list?._id || null);
+  const [listId, setListId] = useState(
+    task?.listId || task?.list?._id || route.params?.initialListId || null
+  );
   const [parentGoalId, setParentGoalId] = useState(
     task?.parentGoalId || task?.parentGoal?._id || null
   );
