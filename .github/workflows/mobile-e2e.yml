@@ -127,12 +127,15 @@ jobs:
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "platform-tools" "emulator" "platforms;android-34" "$ANDROID_IMAGE" > /dev/null
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          # Put adb / emulator / avdmanager on PATH for subsequent steps.
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
       - name: Create and boot emulator
         run: |
-          echo "no" | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" \
-            create avd -n ci -k "$ANDROID_IMAGE" -d pixel_6 --force
-          "$ANDROID_SDK_ROOT/emulator/emulator" -avd ci \
+          echo "no" | avdmanager create avd -n ci -k "$ANDROID_IMAGE" -d pixel_6 --force
+          emulator -avd ci \
             -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
             > "$GITHUB_WORKSPACE/emulator.log" 2>&1 &
           adb wait-for-device
