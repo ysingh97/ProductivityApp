@@ -1,36 +1,38 @@
 import React, { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Card,
   Checkbox,
   Chip,
+  FAB,
   Text
 } from 'react-native-paper';
 import services from '../api/services';
 import ScreenMessage from '../components/ScreenMessage';
 
-const TaskItem = ({ task, onToggle }) => (
+const TaskItem = ({ task, onToggle, onPress }) => (
   <Card style={styles.card} mode="outlined">
-    <Card.Content style={styles.cardContent}>
-      <Checkbox
-        status={task.isComplete ? 'checked' : 'unchecked'}
-        onPress={() => onToggle(task)}
-      />
-      <View style={styles.taskText}>
-        <Text
-          variant="titleMedium"
-          style={task.isComplete ? styles.completedTitle : null}
-        >
-          {task.title}
-        </Text>
-        {Boolean(task.description) && (
-          <Text variant="bodySmall" numberOfLines={2} style={styles.description}>
-            {task.description}
+    <Pressable onPress={() => onPress(task)}>
+      <Card.Content style={styles.cardContent}>
+        <Checkbox
+          status={task.isComplete ? 'checked' : 'unchecked'}
+          onPress={() => onToggle(task)}
+        />
+        <View style={styles.taskText}>
+          <Text
+            variant="titleMedium"
+            style={task.isComplete ? styles.completedTitle : null}
+          >
+            {task.title}
           </Text>
-        )}
-        <View style={styles.metaRow}>
+          {Boolean(task.description) && (
+            <Text variant="bodySmall" numberOfLines={2} style={styles.description}>
+              {task.description}
+            </Text>
+          )}
+          <View style={styles.metaRow}>
           {typeof task.estimatedCompletionTime === 'number' &&
             task.estimatedCompletionTime > 0 && (
               <Chip compact style={styles.chip}>
@@ -38,17 +40,18 @@ const TaskItem = ({ task, onToggle }) => (
               </Chip>
             )}
           {typeof task.timeSpent === 'number' && task.timeSpent > 0 && (
-            <Chip compact style={styles.chip}>
-              Logged {task.timeSpent}h
-            </Chip>
-          )}
+              <Chip compact style={styles.chip}>
+                Logged {task.timeSpent}h
+              </Chip>
+            )}
+          </View>
         </View>
-      </View>
-    </Card.Content>
+      </Card.Content>
+    </Pressable>
   </Card>
 );
 
-const BoardScreen = () => {
+const BoardScreen = ({ navigation }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +96,16 @@ const BoardScreen = () => {
     }
   }, []);
 
+  const openTask = useCallback(
+    (task) => navigation.navigate('TaskDetail', { taskId: task._id }),
+    [navigation]
+  );
+
+  const openCreate = useCallback(
+    () => navigation.navigate('TaskForm', { mode: 'create' }),
+    [navigation]
+  );
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -105,33 +118,44 @@ const BoardScreen = () => {
     return <ScreenMessage message={error} actionLabel="Retry" onAction={load} />;
   }
 
-  if (tasks.length === 0) {
-    return (
-      <ScreenMessage
-        message="No tasks yet. Create one from the web app to see it here."
-        actionLabel="Refresh"
-        onAction={load}
-      />
-    );
-  }
-
   return (
-    <FlatList
-      contentContainerStyle={styles.list}
-      data={tasks}
-      keyExtractor={(item) => String(item._id)}
-      renderItem={({ item }) => <TaskItem task={item} onToggle={handleToggle} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => load({ isRefresh: true })}
+    <View style={styles.container}>
+      {tasks.length === 0 ? (
+        <ScreenMessage
+          message="No tasks yet. Tap + to create your first task."
+          actionLabel="Refresh"
+          onAction={load}
         />
-      }
-    />
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.list}
+          data={tasks}
+          keyExtractor={(item) => String(item._id)}
+          renderItem={({ item }) => (
+            <TaskItem task={item} onToggle={handleToggle} onPress={openTask} />
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => load({ isRefresh: true })}
+            />
+          }
+        />
+      )}
+      <FAB icon="plus" style={styles.fab} onPress={openCreate} accessibilityLabel="Create task" />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',

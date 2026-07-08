@@ -12,6 +12,8 @@ import ListsScreen from '../screens/ListsScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import ComingSoonScreen from '../screens/ComingSoonScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import TaskFormScreen from '../screens/TaskFormScreen';
+import TaskDetailScreen from '../screens/TaskDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -97,6 +99,18 @@ const RootNavigator = () => {
               options={{ headerShown: false }}
             />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen
+              name="TaskDetail"
+              component={TaskDetailScreen}
+              options={{ title: 'Task' }}
+            />
+            <Stack.Screen
+              name="TaskForm"
+              component={TaskFormScreen}
+              options={({ route }) => ({
+                title: route.params?.mode === 'edit' ? 'Edit task' : 'New task'
+              })}
+            />
           </>
         ) : (
           <Stack.Screen
