@@ -17,32 +17,20 @@ import {
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import {
+  UNASSIGNED_ID,
+  resolveTopLevelGoalIds,
+  buildGoalColorMap,
+  buildGoalCalendarItems,
+  buildTaskCalendarItems,
+  describeCalendarGroup
+} from "@productivity/shared";
 import { fetchGoals } from "../features/goals/goalService";
 import { fetchTasks } from "../features/tasks/taskService";
 
 dayjs.extend(isBetween);
 
-const UNASSIGNED_ID = "unassigned";
-const baseColors = [
-  "#1d4ed8",
-  "#059669",
-  "#ea580c",
-  "#e11d48",
-  "#0f766e",
-  "#0ea5e9",
-  "#84cc16",
-  "#16a34a",
-  "#f59e0b",
-  "#dc2626"
-];
-
 const formatDayKey = (value) => dayjs(value).format("YYYY-MM-DD");
-
-const getTopLevelId = (goalId, topLevelByGoalId) => {
-  if (!goalId) return null;
-  const id = String(goalId);
-  return topLevelByGoalId.get(id) || id;
-};
 
 const CalendarView = () => {
   const [goals, setGoals] = useState([]);
@@ -117,64 +105,12 @@ const CalendarView = () => {
     return map;
   }, [goals]);
 
-  const topLevelByGoalId = useMemo(() => {
-    const map = new Map();
+  const topLevelByGoalId = useMemo(() => resolveTopLevelGoalIds(goals), [goals]);
 
-    const resolveTopLevel = (goalId, trail) => {
-      if (!goalId) return null;
-      const id = String(goalId);
-      if (map.has(id)) {
-        return map.get(id);
-      }
-      if (trail.has(id)) {
-        map.set(id, id);
-        return id;
-      }
-      const goal = goalsById.get(id);
-      if (!goal) {
-        map.set(id, id);
-        return id;
-      }
-      if (!goal.parentGoalId) {
-        map.set(id, id);
-        return id;
-      }
-      trail.add(id);
-      const parentId = String(goal.parentGoalId);
-      const rootId = resolveTopLevel(parentId, trail);
-      map.set(id, rootId || id);
-      return map.get(id);
-    };
-
-    goalsById.forEach((_goal, id) => {
-      resolveTopLevel(id, new Set());
-    });
-
-    return map;
-  }, [goalsById]);
-
-  const topLevelIds = useMemo(() => {
-    const ids = new Set();
-    goalsById.forEach((_goal, id) => {
-      ids.add(getTopLevelId(id, topLevelByGoalId) || id);
-    });
-    return Array.from(ids);
-  }, [goalsById, topLevelByGoalId]);
-
-  const goalColorMap = useMemo(() => {
-    const sortedGoals = topLevelIds
-      .map((id) => ({
-        id,
-        title: goalsById.get(id)?.title || "Unknown goal"
-      }))
-      .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
-    const map = new Map();
-    sortedGoals.forEach((goal, index) => {
-      map.set(goal.id, baseColors[index % baseColors.length]);
-    });
-    map.set(UNASSIGNED_ID, "#64748b");
-    return map;
-  }, [goalsById, topLevelIds]);
+  const goalColorMap = useMemo(
+    () => buildGoalColorMap(goals, topLevelByGoalId),
+    [goals, topLevelByGoalId]
+  );
 
   const goalsInRange = useMemo(
     () =>
@@ -197,29 +133,12 @@ const CalendarView = () => {
   );
 
   const goalItemsInRange = useMemo(
-    () =>
-      goalsInRange.map((goal) => ({
-        type: "goal",
-        id: String(goal._id),
-        title: goal.title,
-        topLevelId: getTopLevelId(goal._id, topLevelByGoalId),
-        isTopLevel: !goal.parentGoalId,
-        date: goal.targetCompletionDate
-      })),
+    () => buildGoalCalendarItems(goalsInRange, topLevelByGoalId),
     [goalsInRange, topLevelByGoalId]
   );
 
   const taskItemsInRange = useMemo(
-    () =>
-      tasksInRange.map((task) => ({
-        type: "task",
-        id: String(task._id),
-        title: task.title,
-        topLevelId: task.parentGoalId
-          ? getTopLevelId(task.parentGoalId, topLevelByGoalId)
-          : UNASSIGNED_ID,
-        date: task.targetCompletionDate
-      })),
+    () => buildTaskCalendarItems(tasksInRange, topLevelByGoalId),
     [tasksInRange, topLevelByGoalId]
   );
 
@@ -244,13 +163,7 @@ const CalendarView = () => {
 
   const availableGoals = useMemo(() => {
     const items = availableGoalIds
-      .map((id) => {
-        if (id === UNASSIGNED_ID) {
-          return { id, title: "Unassigned tasks", isPseudo: true };
-        }
-        const goal = goalsById.get(id);
-        return { id, title: goal?.title || "Unknown goal" };
-      })
+      .map((id) => describeCalendarGroup(id, goalsById))
       .sort((a, b) => {
         if (a.isPseudo) return 1;
         if (b.isPseudo) return -1;
