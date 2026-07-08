@@ -4,6 +4,7 @@ const validation = require('./validation');
 const authUtils = require('./authUtils');
 const goalHierarchy = require('./goalHierarchy');
 const calendarModel = require('./calendarModel');
+const visualizationsModel = require('./visualizationsModel');
 
 module.exports = {
   createApiClient,
@@ -12,5 +13,6 @@ module.exports = {
   ...validation,
   ...authUtils,
   ...goalHierarchy,
-  ...calendarModel
+  ...calendarModel,
+  ...visualizationsModel
 };
