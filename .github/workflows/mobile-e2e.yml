@@ -1,0 +1,194 @@
+name: Mobile E2E
+
+# Device-level end-to-end tests for the Branchwork mobile app, driven by Maestro
+# against a real Android emulator and a live backend. This is heavier and slower
+# than the unit suites (it boots an emulator and builds the app), so it only runs
+# for changes that touch the mobile app / shared package, plus on-demand.
+#
+# NOTE: this repo's Actions policy only permits GitHub-owned (actions/*) actions,
+# so the emulator is provisioned with the runner's preinstalled Android SDK via
+# shell rather than a third-party setup action.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mobile-e2e.yml'
+
+# Avoid piling up emulator runs on rapid pushes.
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-e2e:
+    name: Mobile E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MONGO_URI: mongodb://127.0.0.1:27017/branchwork_mobile_e2e
+      # Baked into the release bundle at build time; the emulator reaches the
+      # runner host (where the backend listens) via 10.0.2.2.
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:5000/api
+      EXPO_PUBLIC_ALLOW_DEV_SIGN_IN: 'true'
+      EXPO_PUBLIC_DEV_AUTH_TOKEN: 'test:power'
+      ANDROID_IMAGE: system-images;android-34;google_apis;x86_64
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval \"db.adminCommand({ ping: 1 })\""
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app-server/package-lock.json
+            mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm --prefix app-server ci
+
+      - name: Install mobile dependencies
+        run: npm --prefix mobile ci
+
+      - name: Start backend
+        run: |
+          cd app-server
+          NODE_ENV=development ALLOW_TEST_AUTH=true PORT=5000 \
+            MONGO_URI="$MONGO_URI" nohup npm start > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/api/health > /dev/null; then
+              echo "backend is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend failed to start"; cat "$GITHUB_WORKSPACE/backend.log"; exit 1
+
+      - name: Prebuild Android project
+        run: |
+          cd mobile
+          npx expo prebuild --platform android --no-install
+
+      # The E2E backend is served over plain HTTP on the emulator host
+      # (10.0.2.2). Android blocks cleartext in release builds by default, so
+      # enable it for this throwaway test APK only (production is built via EAS,
+      # not this workflow, and is unaffected).
+      - name: Allow cleartext traffic for the test build
+        run: |
+          manifest=mobile/android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android:usesCleartextTraffic' "$manifest"; then
+            sed -i 's/<application android:name=".MainApplication"/<application android:name=".MainApplication" android:usesCleartextTraffic="true"/' "$manifest"
+          fi
+          grep -o 'android:usesCleartextTraffic="true"' "$manifest"
+
+      - name: Build release APK (debug-signed, self-contained)
+        run: |
+          cd mobile/android
+          ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Install Maestro
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Android emulator image
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "emulator" "platforms;android-34" "$ANDROID_IMAGE" > /dev/null
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          # Put adb / emulator / avdmanager on PATH for subsequent steps.
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
+      - name: Create and boot emulator
+        env:
+          # Pin a single AVD home so avdmanager (create) and emulator (launch)
+          # agree on where the AVD lives.
+          ANDROID_AVD_HOME: /home/runner/.android/avd
+        run: |
+          if [ -e /dev/kvm ]; then echo "KVM present"; else echo "WARNING: /dev/kvm missing"; fi
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "no" | avdmanager create avd -n ci -k "$ANDROID_IMAGE" --force
+          echo "Available AVDs:"; emulator -list-avds
+          if ! emulator -list-avds | grep -qx ci; then
+            echo "::error::AVD 'ci' was not created"; exit 1
+          fi
+          nohup emulator -avd ci \
+            -no-window -no-audio -no-boot-anim -no-snapshot -accel on \
+            -gpu swiftshader_indirect -camera-back none -camera-front none -no-metrics \
+            > "$GITHUB_WORKSPACE/emulator.log" 2>&1 &
+          # Wait for the device to register; dump the emulator log if it never does.
+          if ! timeout 180 adb wait-for-device; then
+            echo "::error::emulator never registered a device"
+            cat "$GITHUB_WORKSPACE/emulator.log" || true
+            exit 1
+          fi
+          # Wait for full boot.
+          if ! timeout 300 bash -c 'while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 3; done'; then
+            echo "::error::boot did not complete in time"
+            adb devices || true
+            cat "$GITHUB_WORKSPACE/emulator.log" || true
+            exit 1
+          fi
+          adb shell input keyevent 82 || true
+          adb devices
+
+      - name: Run Maestro E2E
+        run: |
+          adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
+          maestro test mobile/e2e/flows
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-e2e-artifacts
+          path: |
+            ~/.maestro/tests
+            backend.log
+            emulator.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Write summary
+        if: always()
+        run: |
+          {
+            echo "## Mobile E2E"
+            echo ""
+            echo "- Provisioned an ephemeral MongoDB service (\`$MONGO_URI\`) and started the backend."
+            echo "- Built a self-contained release APK via \`expo prebuild\` + \`gradlew assembleRelease\`."
+            echo "- Booted an Android 34 emulator (runner SDK) and ran the Maestro flows in \`mobile/e2e/flows\`."
+          } >> "$GITHUB_STEP_SUMMARY"

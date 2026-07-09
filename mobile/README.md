@@ -42,17 +42,48 @@ npm start         # Expo dev server (choose a target)
 > Native Google Sign-In / secure store require a development build (EAS Build) or
 > Expo Go depending on the module. Developer sign-in works without Google OAuth.
 
+## Tests
+- **Unit / component** (`npm test`): Jest + React Native Testing Library. Runs in the
+  `Mobile Tests` CI job on every PR.
+- **End-to-end** (`npm run test:e2e`): [Maestro](https://maestro.mobile.dev) flows in
+  `e2e/flows/` driving a real emulator against the live backend. Prereqs: a booted
+  Android emulator/device with the app installed and the backend reachable at
+  `EXPO_PUBLIC_API_URL`. Install Maestro with `curl -Ls https://get.maestro.mobile.dev | bash`.
+
+  Quickest install for a run is a dev build (`npm run android`, keeps Metro up).
+  To mirror CI (self-contained release APK, no Metro):
+  ```
+  npx expo prebuild --platform android --no-install
+  # release builds block cleartext HTTP; the emulator backend is http://10.0.2.2 —
+  # enable it for this test-only APK (production is built via EAS, unaffected):
+  sed -i 's/<application android:name=".MainApplication"/&  android:usesCleartextTraffic="true"/' \
+    android/app/src/main/AndroidManifest.xml
+  (cd android && ./gradlew :app:assembleRelease)
+  adb install -r android/app/build/outputs/apk/release/app-release.apk
+  npm run test:e2e
+  ```
+
+  Flows:
+  - `smoke.yaml` — developer sign-in, then assert each primary tab (Board/Lists/Goals/Calendar) renders.
+  - `task-crud.yaml` — create a task via the form (round-trips to the backend), see it on the Board, open and delete it.
+
+  In CI the `Mobile E2E` workflow (`.github/workflows/mobile-e2e.yml`) builds a
+  debug-signed release APK, boots an Android 34 emulator, starts Mongo + backend,
+  and runs the flows. It only triggers on `mobile/**` / `packages/shared/**` changes
+  (and `workflow_dispatch`) because booting an emulator + building the app is slow.
+
 ## Structure
 ```
 mobile/
   App.js                     # providers (Paper theme, auth) + navigation root
   metro.config.js            # monorepo config to resolve @productivity/shared
+  e2e/                       # Maestro end-to-end flows
   src/
     api/                     # api client (SecureStore token) + services
     auth/                    # AuthContext (SecureStore-backed)
     config/env.js            # EXPO_PUBLIC_* config
     navigation/              # stack + bottom tabs
-    screens/                 # SignIn, Board, Lists, Goals, Settings, ...
+    screens/                 # SignIn, Board, Lists, Goals, Calendar, Settings, ...
     components/              # shared UI bits
     theme.js                 # Paper light/dark themes matching the web palette
 ```
@@ -60,4 +91,4 @@ mobile/
 ## Notes
 - `@productivity/shared` is consumed via a `file:` dependency and resolved by Metro
   (`metro.config.js`). Axios is aliased to its browser build for React Native.
-- Calendar and Visualizations screens are placeholders pending follow-up work.
+- The Visualizations/Analytics screen is a placeholder pending follow-up work.

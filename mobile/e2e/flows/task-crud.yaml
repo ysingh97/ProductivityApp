@@ -1,0 +1,37 @@
+# Create a task through the form (round-trips to the live backend), confirm it
+# lands on the Board, then open it and delete it so the run is self-cleaning.
+appId: com.branchwork.app
+tags:
+  - crud
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- tapOn: "Developer sign-in"
+- assertVisible: "Create task"
+# Open the create-task form via the Board FAB.
+- tapOn: "Create task"
+- assertVisible: "New task"
+- tapOn: "Title"
+- inputText: "E2E Maestro Task"
+- hideKeyboard
+# Submit button shares the "Create task" label; only the form is on screen here.
+# The form scrolls, so bring the submit button into view before tapping it.
+- scrollUntilVisible:
+    element:
+      text: "Create task"
+    direction: DOWN
+- tapOn: "Create task"
+# Back on the Board, the new task is listed.
+- assertVisible: "E2E Maestro Task"
+# Open it and delete it to clean up.
+- tapOn: "E2E Maestro Task"
+- scrollUntilVisible:
+    element:
+      text: "Delete task"
+    direction: DOWN
+- tapOn: "Delete task"
+- assertVisible: "Delete task?"
+- tapOn: "Delete"
+- assertNotVisible: "E2E Maestro Task"

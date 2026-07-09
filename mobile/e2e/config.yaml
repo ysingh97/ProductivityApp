@@ -1,0 +1,5 @@
+# Maestro workspace config for the Branchwork mobile E2E suite.
+# Run with: npm run test:e2e  (from mobile/) — requires a booted Android
+# emulator/device with the app installed and the backend reachable.
+flows:
+  - flows/*.yaml
