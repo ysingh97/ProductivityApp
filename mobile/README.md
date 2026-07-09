@@ -66,6 +66,7 @@ npm start         # Expo dev server (choose a target)
   Flows:
   - `smoke.yaml` — developer sign-in, then assert each primary tab (Board/Lists/Goals/Calendar) renders.
   - `task-crud.yaml` — create a task via the form (round-trips to the backend), see it on the Board, open and delete it.
+  - `visualizations.yaml` — open the Analytics tab and assert the stat cards + period controls render across Week/Year.
 
   In CI the `Mobile E2E` workflow (`.github/workflows/mobile-e2e.yml`) builds a
   debug-signed release APK, boots an Android 34 emulator, starts Mongo + backend,
@@ -91,4 +92,6 @@ mobile/
 ## Notes
 - `@productivity/shared` is consumed via a `file:` dependency and resolved by Metro
   (`metro.config.js`). Axios is aliased to its browser build for React Native.
-- The Visualizations/Analytics screen is a placeholder pending follow-up work.
+- The Analytics screen renders time-by-category (donut) and trend (bar) charts
+  with `react-native-svg`, driven by the shared `visualizationsModel` helpers and
+  the `/analytics/*` endpoints. Week/Month/Year period nav mirrors the web app.

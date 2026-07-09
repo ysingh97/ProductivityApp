@@ -1,0 +1,23 @@
+# Dev sign-in, open the Analytics tab, and verify the visualizations screen
+# renders its stat cards and period controls (stable regardless of tracked data).
+appId: com.branchwork.app
+tags:
+  - viz
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- tapOn: "Developer sign-in"
+- assertVisible: "Create task"
+# Open the Analytics tab.
+- tapOn: "Analytics"
+# Stat cards always render, even with no recorded time.
+- assertVisible: "Tracked hours"
+- assertVisible: "Top category"
+# Period controls are present; switching range keeps the screen alive.
+- assertVisible: "Month"
+- tapOn: "Week"
+- assertVisible: "Tracked hours"
+- tapOn: "Year"
+- assertVisible: "Tracked hours"
