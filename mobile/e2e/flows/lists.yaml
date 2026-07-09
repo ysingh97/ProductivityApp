@@ -1,0 +1,28 @@
+# Create a list through the form (round-trips to the live backend), confirm it
+# lands on the Lists tab, then open it to verify its detail screen. Lists have no
+# delete endpoint (web parity), so this flow does not clean up after itself.
+appId: com.branchwork.app
+tags:
+  - crud
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- tapOn: "Developer sign-in"
+- assertVisible: "Create task"
+- tapOn: "Lists"
+- assertVisible: "Create list"
+# Open the create-list form via the Lists FAB.
+- tapOn: "Create list"
+- assertVisible: "New list"
+- tapOn: "Title"
+- inputText: "E2E Maestro List"
+- hideKeyboard
+# Submit button shares the "Create list" label; only the form is on screen here.
+- tapOn: "Create list"
+# Back on the Lists tab, the new list is listed.
+- assertVisible: "E2E Maestro List"
+# Open it and confirm the detail screen renders its add-task action.
+- tapOn: "E2E Maestro List"
+- assertVisible: "Add task to list"

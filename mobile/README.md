@@ -66,6 +66,9 @@ npm start         # Expo dev server (choose a target)
   Flows:
   - `smoke.yaml` — developer sign-in, then assert each primary tab (Board/Lists/Goals/Calendar) renders.
   - `task-crud.yaml` — create a task via the form (round-trips to the backend), see it on the Board, open and delete it.
+  - `lists.yaml` — create a list, see it on the Lists tab, open its detail (no delete endpoint, so no cleanup).
+  - `goals.yaml` — create a goal, see it on the Goals tab, open and delete it.
+  - `calendar.yaml` — exercise Calendar range nav (Prev/Today/Next), the Week/Month switch, and the Tasks toggle.
   - `visualizations.yaml` — open the Analytics tab and assert the stat cards + period controls render across Week/Year.
 
   In CI the `Mobile E2E` workflow (`.github/workflows/mobile-e2e.yml`) builds a

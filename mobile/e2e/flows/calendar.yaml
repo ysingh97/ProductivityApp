@@ -1,0 +1,28 @@
+# Exercise the Calendar tab: range navigation (Prev/Today/Next), the Week/Month
+# range switch, and the Tasks visibility toggle. Read-only, so no cleanup needed.
+# The Tasks checkbox is used for the toggle (the "Goals" checkbox label collides
+# with the bottom "Goals" tab, so it is left alone here).
+appId: com.branchwork.app
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- tapOn: "Developer sign-in"
+- assertVisible: "Create task"
+- tapOn: "Calendar"
+- assertVisible: "Week"
+- assertVisible: "Month"
+# Range navigation controls.
+- tapOn: "Prev"
+- tapOn: "Next"
+- tapOn: "Today"
+# Switch to the month range and back to week.
+- tapOn: "Month"
+- tapOn: "Week"
+# Toggle the Tasks filter off and back on; the calendar still renders.
+- tapOn: "Tasks"
+- tapOn: "Tasks"
+- assertVisible: "Week"
