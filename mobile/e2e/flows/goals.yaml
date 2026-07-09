@@ -1,0 +1,39 @@
+# Create a goal through the form (round-trips to the live backend), confirm it
+# lands on the Goals tab, then open it and delete it so the run is self-cleaning.
+appId: com.branchwork.app
+tags:
+  - crud
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- tapOn: "Developer sign-in"
+- assertVisible: "Create task"
+- tapOn: "Goals"
+- assertVisible: "Create goal"
+# Open the create-goal form via the Goals FAB.
+- tapOn: "Create goal"
+- assertVisible: "New goal"
+- tapOn: "Title"
+- inputText: "E2E Maestro Goal"
+- hideKeyboard
+# Submit button shares the "Create goal" label; the form scrolls, so bring the
+# submit button into view before tapping it.
+- scrollUntilVisible:
+    element:
+      text: "Create goal"
+    direction: DOWN
+- tapOn: "Create goal"
+# Back on the Goals tab, the new goal is listed.
+- assertVisible: "E2E Maestro Goal"
+# Open it and delete it to clean up.
+- tapOn: "E2E Maestro Goal"
+- scrollUntilVisible:
+    element:
+      text: "Delete goal"
+    direction: DOWN
+- tapOn: "Delete goal"
+- assertVisible: "Delete goal?"
+- tapOn: "Delete"
+- assertNotVisible: "E2E Maestro Goal"
