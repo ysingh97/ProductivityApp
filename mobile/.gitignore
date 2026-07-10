@@ -33,6 +33,13 @@ yarn-error.*
 # local env files
 .env*.local
 
+# EAS / store credentials & build artifacts (never commit)
+credentials/
+*.aab
+*.apk
+google-services.json
+GoogleService-Info.plist
+
 # typescript
 *.tsbuildinfo
 
