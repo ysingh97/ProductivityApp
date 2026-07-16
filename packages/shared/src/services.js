@@ -60,6 +60,10 @@ const createServices = (client) => {
     return (await client.get(`/analytics/time-series${query ? `?${query}` : ''}`)).data;
   };
 
+  // AI planning
+  const generatePlan = async (prompt) =>
+    (await client.post('/ai/plan', { prompt })).data;
+
   // Google Calendar integration
   const fetchGoogleCalendarConnectUrl = async () =>
     (await client.get('/integrations/google-calendar/connect-url')).data;
@@ -95,6 +99,7 @@ const createServices = (client) => {
     fetchCategories,
     fetchTimeByCategory,
     fetchTimeSeries,
+    generatePlan,
     fetchGoogleCalendarConnectUrl,
     fetchGoogleCalendarStatus,
     fetchGoogleCalendars,

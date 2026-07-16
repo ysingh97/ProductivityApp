@@ -26,13 +26,16 @@ import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined";
 import Brightness4OutlinedIcon from "@mui/icons-material/Brightness4Outlined";
 import Brightness7OutlinedIcon from "@mui/icons-material/Brightness7Outlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import { SITE_NAME } from "../config/branding";
 import { useAuth } from "../context/AuthContext";
+import AiPlannerDialog from "../features/ai/AiPlannerDialog";
 
 const drawerWidth = 280;
 
 const AppShell = ({ colorMode, onToggleColorMode }) => {
   const [open, setOpen] = useState(false);
+  const [aiPlannerOpen, setAiPlannerOpen] = useState(false);
   const [accountAnchorEl, setAccountAnchorEl] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -163,6 +166,16 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
                 "&::-webkit-scrollbar": { display: "none" }
               }}
             >
+              <Button
+                variant="contained"
+                color="secondary"
+                size="small"
+                startIcon={<AutoAwesomeOutlinedIcon />}
+                onClick={() => setAiPlannerOpen(true)}
+                sx={{ flexShrink: 0 }}
+              >
+                Plan with AI
+              </Button>
               {quickActions.map((action) => (
                 <Button
                   key={action.to}
@@ -321,6 +334,15 @@ const AppShell = ({ colorMode, onToggleColorMode }) => {
           </List>
         </Box>
       </Drawer>
+
+      <AiPlannerDialog
+        open={aiPlannerOpen}
+        onClose={() => setAiPlannerOpen(false)}
+        onSaved={() => {
+          setAiPlannerOpen(false);
+          navigate("/goals/overview");
+        }}
+      />
 
       <Box component="main" sx={{ pb: 4 }}>
         <Outlet />

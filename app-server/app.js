@@ -10,6 +10,7 @@ const authRoutes = require('./routes/authRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const googleCalendarRoutes = require('./routes/googleCalendarRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 const createApp = () => {
   // Initialize Express
@@ -54,6 +55,7 @@ const createApp = () => {
   app.use('/api/tasks', requireAuth, taskRoutes); // Routes for tasks
   app.use('/api/categories', requireAuth, categoryRoutes); // Routes for categories
   app.use('/api/analytics', requireAuth, analyticsRoutes);
+  app.use('/api/ai', requireAuth, aiRoutes);
   app.use('/api/integrations/google-calendar', googleCalendarRoutes);
 
   return app;

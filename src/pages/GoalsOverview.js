@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Accordion,
@@ -23,7 +23,9 @@ import {
   Typography
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import { fetchGoals } from "../features/goals/goalService";
+import AiPlannerDialog from "../features/ai/AiPlannerDialog";
 
 const sortOptions = [
   { value: "deadline", label: "Deadline" },
@@ -81,35 +83,25 @@ const GoalsOverview = () => {
   const [sortBy, setSortBy] = useState("deadline");
   const [thenBy, setThenBy] = useState("none");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [aiPlannerOpen, setAiPlannerOpen] = useState(false);
+
+  const loadGoals = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const goalData = await fetchGoals();
+      setGoals(goalData);
+    } catch (err) {
+      console.error(err);
+      setError("Unable to load goals right now.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    const loadGoals = async () => {
-      setError("");
-      setLoading(true);
-      try {
-        const goalData = await fetchGoals();
-        if (isActive) {
-          setGoals(goalData);
-        }
-      } catch (err) {
-        console.error(err);
-        if (isActive) {
-          setError("Unable to load goals right now.");
-        }
-      } finally {
-        if (isActive) {
-          setLoading(false);
-        }
-      }
-    };
-
     loadGoals();
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  }, [loadGoals]);
 
   const dateFormatter = useMemo(
     () =>
@@ -407,14 +399,29 @@ const GoalsOverview = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4, textAlign: "left" }}>
       <Stack spacing={3}>
-        <Box>
-          <Typography variant="h4" fontWeight={700} gutterBottom>
-            In-depth goals view
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Review every top-level goal and dive deeper when you are ready.
-          </Typography>
-        </Box>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          sx={{ justifyContent: "space-between", alignItems: { sm: "flex-start" } }}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight={700} gutterBottom>
+              In-depth goals view
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Review every top-level goal and dive deeper when you are ready.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<AutoAwesomeOutlinedIcon />}
+            onClick={() => setAiPlannerOpen(true)}
+            sx={{ alignSelf: { xs: "flex-start", sm: "center" }, flexShrink: 0 }}
+          >
+            Plan with AI
+          </Button>
+        </Stack>
 
         <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
           <Stack spacing={2}>
@@ -578,6 +585,15 @@ const GoalsOverview = () => {
           <Stack spacing={2}>{sortedGoals.map((goal) => renderGoalCard(goal))}</Stack>
         )}
       </Stack>
+
+      <AiPlannerDialog
+        open={aiPlannerOpen}
+        onClose={() => setAiPlannerOpen(false)}
+        onSaved={() => {
+          setAiPlannerOpen(false);
+          loadGoals();
+        }}
+      />
     </Container>
   );
 };

@@ -74,6 +74,17 @@ test('analytics services append query strings', async () => {
   assert.ok(client.calls.some((c) => c.url === '/analytics/time-by-category'));
 });
 
+test('generatePlan posts the prompt to the ai route', async () => {
+  const client = makeClient();
+  const services = createServices(client);
+
+  await services.generatePlan('run a marathon');
+
+  const call = client.calls.find((c) => c.method === 'post' && c.url === '/ai/plan');
+  assert.ok(call);
+  assert.deepEqual(call.body, { prompt: 'run a marathon' });
+});
+
 test('google calendar services map to integration routes', async () => {
   const client = makeClient();
   const services = createServices(client);
